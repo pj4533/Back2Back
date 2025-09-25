@@ -52,10 +52,36 @@ Back2Back/
 
 ## Development Guidelines
 
-### MusicKit Setup
-1. Enable MusicKit capability in Xcode project settings
-2. Add usage description in Info.plist for `NSAppleMusicUsageDescription`
-3. Configure proper entitlements for MusicKit
+### MusicKit Setup (Xcode 13+ Changes)
+**IMPORTANT**: Starting from Xcode 13 (and continuing in Xcode 16/26):
+- Info.plist is now integrated into the project settings as "Custom iOS Target Properties"
+- Access via: Project → Target → Info tab
+- NSAppleMusicUsageDescription should be set via INFOPLIST_KEY_NSAppleMusicUsageDescription in build settings
+- MusicKit is configured as an App Service (not an entitlement) in the Apple Developer portal
+
+#### Required Configuration:
+1. **Apple Developer Portal**:
+   - Enable MusicKit in App Services for your App ID (com.saygoodnight.Back2Back)
+   - This enables automatic developer token generation
+
+2. **Xcode Project Settings**:
+   - NSAppleMusicUsageDescription is already configured in project.pbxproj
+   - Background audio mode is enabled in Info.plist
+
+3. **Testing Requirements**:
+   - MusicKit API calls require testing on a physical device (not simulator)
+   - User must have accepted Apple Music privacy policy in the Music app
+   - Device must have valid Apple Music subscription for full functionality
+
+### Known Issues & Solutions
+
+#### "Failed to request developer token" Error
+This error occurs when automatic token generation fails. Common causes:
+1. MusicKit not enabled in App Services (Developer Portal)
+2. Bundle ID mismatch between Xcode and Developer Portal
+3. Testing in simulator instead of physical device
+4. User hasn't accepted Apple Music privacy policy
+5. Provisioning profile needs refresh after enabling MusicKit
 
 ### API Keys Management
 - Store OpenAI API keys securely (use Keychain or environment variables)
