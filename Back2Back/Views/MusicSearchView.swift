@@ -3,6 +3,7 @@ import MusicKit
 
 struct MusicSearchView: View {
     @State private var viewModel = MusicSearchViewModel()
+    @State private var localSearchText: String = ""  // Local state for immediate UI updates
     @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
@@ -36,12 +37,15 @@ struct MusicSearchView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
 
-            // Use a binding that updates the view model
+            // Use local state for instant UI updates
             TextField("Search for songs, artists, or albums",
-                     text: Binding(
-                         get: { viewModel.searchText },
-                         set: { viewModel.searchText = $0 }
-                     ))
+                     text: $localSearchText)
+                .onChange(of: localSearchText) { _, newValue in
+                    // Update ViewModel asynchronously without blocking
+                    Task {
+                        await viewModel.updateSearchTextAsync(newValue)
+                    }
+                }
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .focused($isSearchFieldFocused)
                 .submitLabel(.search)
@@ -49,9 +53,16 @@ struct MusicSearchView: View {
                 .textInputAutocapitalization(.never)
                 // Disable smart punctuation for better search experience
                 .disableAutocorrection(true)
+                // Add explicit animation to smooth updates
+                .animation(.easeInOut(duration: 0.1), value: localSearchText)
 
-            if !viewModel.searchText.isEmpty {
-                Button(action: viewModel.clearSearch) {
+            if !localSearchText.isEmpty {
+                Button(action: {
+                    localSearchText = ""
+                    Task {
+                        await viewModel.clearSearchAsync()
+                    }
+                }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.secondary)
                 }
@@ -147,7 +158,12 @@ struct SearchResultRow: View {
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
+        Button(action: {
+            // Perform tap action asynchronously to avoid blocking
+            Task { @MainActor in
+                onTap()
+            }
+        }) {
             HStack(spacing: 12) {
                 artworkImage
 
@@ -186,8 +202,9 @@ struct SearchResultRow: View {
     private var artworkImage: some View {
         Group {
             if let artwork = result.artwork {
-                // Optimize image loading with smaller placeholder
-                AsyncImage(url: artwork.url(width: 60, height: 60)) { phase in
+                // Optimize image loading with smaller placeholder and caching
+                AsyncImage(url: artwork.url(width: 60, height: 60),
+                          transaction: Transaction(animation: .easeInOut(duration: 0.2))) { phase in
                     switch phase {
                     case .empty:
                         Rectangle()
