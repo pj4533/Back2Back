@@ -21,9 +21,22 @@
 		B0B77BBA2E85B1120006E510 /* Back2BackTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Back2BackTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B0B77BD82E85BEB20006E510 /* Exceptions for "Back2Back" folder in "Back2Back" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B0B77BAC2E85B1100006E510 /* Back2Back */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B0B77BAF2E85B1100006E510 /* Back2Back */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B0B77BD82E85BEB20006E510 /* Exceptions for "Back2Back" folder in "Back2Back" target */,
+			);
 			path = Back2Back;
 			sourceTree = "<group>";
 		};
@@ -331,6 +344,8 @@
 				DEVELOPMENT_TEAM = U3FNBSFU75;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Back2Back/Info.plist;
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Back2Back needs access to Apple Music to play songs and create your collaborative DJ experience.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -363,6 +378,8 @@
 				DEVELOPMENT_TEAM = U3FNBSFU75;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Back2Back/Info.plist;
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Back2Back needs access to Apple Music to play songs and create your collaborative DJ experience.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
