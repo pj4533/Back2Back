@@ -2,6 +2,7 @@ import Foundation
 import MusicKit
 import SwiftUI
 import Combine
+import OSLog
 
 @MainActor
 class MusicAuthViewModel: ObservableObject {
@@ -13,26 +14,34 @@ class MusicAuthViewModel: ObservableObject {
     private let musicService = MusicService.shared
 
     init() {
+        B2BLog.auth.info("🔐 Initializing MusicAuthViewModel")
         checkCurrentAuthorizationStatus()
     }
 
     func checkCurrentAuthorizationStatus() {
         authorizationStatus = MusicAuthorization.currentStatus
         isAuthorized = authorizationStatus == .authorized
+        B2BLog.auth.debug("Current authorization status: \(String(describing: self.authorizationStatus))")
     }
 
     func requestAuthorization() {
-        guard !isRequestingAuthorization else { return }
+        guard !isRequestingAuthorization else {
+            B2BLog.auth.debug("Authorization request already in progress")
+            return
+        }
 
         Task {
+            B2BLog.auth.info("👤 User action: Request music authorization")
             isRequestingAuthorization = true
             errorMessage = nil
 
             do {
                 try await musicService.requestAuthorization()
                 checkCurrentAuthorizationStatus()
+                B2BLog.auth.success("Authorization request completed")
             } catch {
                 errorMessage = error.localizedDescription
+                B2BLog.auth.error(error, context: "MusicAuthViewModel.requestAuthorization")
             }
 
             isRequestingAuthorization = false
@@ -63,8 +72,12 @@ class MusicAuthViewModel: ObservableObject {
     }
 
     func openSettings() {
+        B2BLog.ui.userAction("Open settings for music authorization")
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
+            B2BLog.ui.debug("Opened system settings")
+        } else {
+            B2BLog.ui.warning("Failed to create settings URL")
         }
     }
 }

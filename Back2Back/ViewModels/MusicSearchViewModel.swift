@@ -2,6 +2,7 @@ import Foundation
 import MusicKit
 import SwiftUI
 import Combine
+import OSLog
 
 @MainActor
 class MusicSearchViewModel: ObservableObject {
@@ -17,6 +18,7 @@ class MusicSearchViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
+        B2BLog.search.info("🔍 Initializing MusicSearchViewModel")
         setupBindings()
         setupSearchDebouncing()
     }
@@ -48,27 +50,32 @@ class MusicSearchViewModel: ObservableObject {
         errorMessage = nil
 
         guard !searchTerm.isEmpty else {
+            B2BLog.search.debug("Search term is empty, clearing results")
             searchResults = []
             return
         }
 
         Task {
+            B2BLog.search.info("Performing search for: \(searchTerm)")
             do {
                 try await musicService.searchCatalog(for: searchTerm)
             } catch {
                 errorMessage = "Search failed: \(error.localizedDescription)"
                 searchResults = []
+                B2BLog.search.error(error, context: "MusicSearchViewModel.performSearch")
             }
         }
     }
 
     func selectSong(_ song: Song) {
         Task {
+            B2BLog.playback.userAction("Selected song: \(song.title)")
             do {
                 try await musicService.playSong(song)
                 errorMessage = nil
             } catch {
                 errorMessage = "Failed to play song: \(error.localizedDescription)"
+                B2BLog.playback.error(error, context: "MusicSearchViewModel.selectSong")
             }
         }
     }
@@ -79,6 +86,7 @@ class MusicSearchViewModel: ObservableObject {
                 try await musicService.togglePlayPause()
             } catch {
                 errorMessage = "Playback control failed: \(error.localizedDescription)"
+                B2BLog.playback.error(error, context: "MusicSearchViewModel.togglePlayPause")
             }
         }
     }
@@ -89,6 +97,7 @@ class MusicSearchViewModel: ObservableObject {
                 try await musicService.skipToNext()
             } catch {
                 errorMessage = "Failed to skip to next song"
+                B2BLog.playback.warning("Failed to skip to next song")
             }
         }
     }
@@ -99,6 +108,7 @@ class MusicSearchViewModel: ObservableObject {
                 try await musicService.skipToPrevious()
             } catch {
                 errorMessage = "Failed to skip to previous song"
+                B2BLog.playback.warning("Failed to skip to previous song")
             }
         }
     }
@@ -116,6 +126,7 @@ class MusicSearchViewModel: ObservableObject {
     }
 
     func clearSearch() {
+        B2BLog.ui.userAction("Clear search")
         searchText = ""
         searchResults = []
         errorMessage = nil

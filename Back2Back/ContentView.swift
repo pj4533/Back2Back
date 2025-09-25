@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MusicKit
+import OSLog
 
 struct ContentView: View {
     @StateObject private var musicService = MusicService.shared
@@ -66,8 +67,14 @@ struct ContentView: View {
     private func checkAuthorizationStatus() {
         Task {
             let status = MusicAuthorization.currentStatus
+            B2BLog.auth.debug("Checking authorization status on app launch: \(String(describing: status))")
             if status == .notDetermined {
-                try? await musicService.requestAuthorization()
+                B2BLog.auth.info("Authorization not determined, requesting...")
+                do {
+                    try await musicService.requestAuthorization()
+                } catch {
+                    B2BLog.auth.error(error, context: "ContentView.checkAuthorizationStatus")
+                }
             }
         }
     }
