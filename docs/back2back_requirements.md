@@ -1,5 +1,7 @@
 # Back to Back (B2B) — Requirements Document
 
+> **Note**: This document is the project specification and should NEVER be modified. It serves as the source of truth for requirements.
+
 ## Overview
 Back to Back (B2B) is an interactive music suggestion app where the user and an AI take turns acting as DJs. The user plays a track, and the AI responds with the next track “back-to-back,” inspired by a selected persona. This creates a collaborative and playful DJ experience where the AI functions as a co-DJ rather than a static recommender.
 

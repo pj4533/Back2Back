@@ -26,28 +26,59 @@ Key MusicKit resources:
 - MusicPlayer: https://sosumi.ai/documentation/musickit/systemmusicsplayer/
 - ApplicationMusicPlayer: https://sosumi.ai/documentation/musickit/applicationmusicplayer/
 
-### OpenAI API
-- Use for generating persona-based song recommendations
-- Implement streaming responses for better UX during AI turn
+### OpenAI API (Not Yet Implemented)
+- Will be used for generating persona-based song recommendations
+- Plan to implement streaming responses for better UX during AI turn
+- Requires secure API key storage (Keychain recommended)
 
 ## Core Features (MVP)
-1. Apple Music authentication and integration
-2. Turn-based song selection (user → AI → user)
-3. Persona library with preset and custom options
-4. Visual feedback for current turn
-5. Session history tracking
+
+### Currently Implemented
+1. **Apple Music authentication and integration** ✅
+   - Full MusicAuthorization flow with error handling
+   - Settings deep-linking for denied permissions
+   - Authorization status tracking via MusicService singleton
+
+2. **Music Search and Playback** ✅
+   - Real-time catalog search with 0.75s debouncing
+   - ApplicationMusicPlayer integration
+   - Queue management
+   - Now Playing UI (mini and expanded views)
+
+### Not Yet Implemented
+3. **Turn-based song selection (user → AI → user)** ⏳
+4. **Persona library with preset and custom options** ⏳
+5. **Visual feedback for current turn** ⏳
+6. **Session history tracking** ⏳
+7. **OpenAI API integration** ⏳
 
 ## Project Structure
 ```
 Back2Back/
-├── Back2Back/           # Main app target
-│   ├── Models/         # Data models for songs, personas, sessions
-│   ├── Views/          # SwiftUI views
-│   ├── Services/       # MusicKit, OpenAI API services
-│   ├── ViewModels/     # Business logic and state management
-│   └── Utils/          # Helper functions and extensions
-├── docs/               # Documentation
-└── Back2BackTests/     # Unit tests
+├── Back2Back/                    # Main app target
+│   ├── Back2BackApp.swift       # App entry point with B2BLog initialization
+│   ├── ContentView.swift        # Main navigation and auth flow controller
+│   ├── Models/
+│   │   └── MusicModels.swift   # MusicSearchResult, NowPlayingItem, error types
+│   ├── Views/
+│   │   ├── MusicAuthorizationView.swift  # Apple Music permission UI
+│   │   ├── MusicSearchView.swift         # Search UI with debounced input
+│   │   └── NowPlayingView.swift          # Mini/expanded player views
+│   ├── Services/
+│   │   └── MusicService.swift  # Singleton MusicKit wrapper (@MainActor)
+│   ├── ViewModels/
+│   │   ├── MusicAuthViewModel.swift      # Auth state management
+│   │   └── MusicSearchViewModel.swift    # Search with 0.75s debouncing
+│   ├── Utils/
+│   │   └── Logger.swift         # B2BLog unified logging system
+│   └── Info.plist              # Background audio configuration
+├── docs/
+│   └── back2back_requirements.md # Original spec (DO NOT MODIFY)
+└── Back2BackTests/              # Swift Testing framework tests
+    ├── MusicAuthViewModelTests.swift
+    ├── MusicSearchViewModelTests.swift
+    ├── MusicServiceTests.swift
+    └── MusicModelsTests.swift
 ```
 
 ## Development Guidelines
@@ -126,8 +157,43 @@ xcodebuild test -project Back2Back.xcodeproj -scheme Back2Back -destination 'pla
 xcodebuild clean -project Back2Back.xcodeproj -scheme Back2Back
 ```
 
+## Implementation Details
+
+### Logging System (B2BLog)
+The app uses a comprehensive logging system with OSLog:
+- **Subsystems**: musicKit, auth, search, playback, ui, network, ai, session, general
+- **Log Levels**: trace, debug, info, notice, warning, error
+- **Special Methods**:
+  - `performance(metric, value)` for performance metrics
+  - `userAction(action)` for user interactions
+  - `stateChange(from, to)` for state transitions
+  - `apiCall(endpoint)` for network requests
+  - `success(message)` for successful operations
+
+### Performance Optimizations
+- **Search Debouncing**: 0.75s delay using Combine's debounce operator
+- **Non-blocking UI**: Heavy operations run on background queues with Task.detached
+- **Lazy Loading**: LazyVStack for search results
+- **Async Image Loading**: Properly sized artwork requests (60x60 for list items)
+
+### Architecture Patterns
+- **MVVM**: Clear separation between Views and ViewModels
+- **@Observable**: Modern observation framework (iOS 17+)
+- **Singleton Pattern**: MusicService.shared for centralized state
+- **Swift Concurrency**: async/await throughout, no completion handlers
+- **@MainActor**: Ensures UI updates on main thread
+
+### Current Test Coverage
+- Authorization flow (MusicAuthViewModelTests)
+- Search functionality (MusicSearchViewModelTests)
+- Service layer (MusicServiceTests)
+- Model validation (MusicModelsTests)
+
 ## Important Notes
 - Always test with real Apple Music subscription
-- Ensure AI response times don't interrupt music flow
-- Keep persona suggestions tasteful and appropriate
+- MusicKit requires physical device (simulator won't work)
+- Ensure AI response times don't interrupt music flow (when implemented)
+- Keep persona suggestions tasteful and appropriate (future feature)
 - Follow Apple's Human Interface Guidelines for iOS apps
+- Use B2BLog for all logging - no print statements
+- Maintain non-blocking UI with proper concurrency patterns
