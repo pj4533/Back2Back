@@ -63,6 +63,8 @@ Back2Back/
 - Use configuration files that are gitignored for local development
 
 ### Testing Approach
+- **IMPORTANT**: Always use Swift Testing framework, never use XCTest
+- Focus on fast-running unit tests only (no UI tests)
 - Test with actual Apple Music subscription for full functionality
 - Mock OpenAI responses for unit testing
 - Test persona switching and turn management logic thoroughly
@@ -91,7 +93,7 @@ Back2Back/
 # Build the project
 xcodebuild -project Back2Back.xcodeproj -scheme Back2Back -configuration Debug build
 
-# Run tests
+# Run unit tests (Swift Testing framework)
 xcodebuild test -project Back2Back.xcodeproj -scheme Back2Back -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
 
 # Clean build folder
