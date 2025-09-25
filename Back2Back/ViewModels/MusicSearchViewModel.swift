@@ -4,68 +4,152 @@ import SwiftUI
 import Combine
 import OSLog
 
+/// Modern search implementation using Swift Concurrency with proper task cancellation
+/// and debouncing to ensure smooth UI performance
 @MainActor
-class MusicSearchViewModel: ObservableObject {
-    @Published var searchText: String = ""
-    @Published var searchResults: [MusicSearchResult] = []
-    @Published var isSearching: Bool = false
-    @Published var errorMessage: String?
-    @Published var currentlyPlaying: NowPlayingItem?
-    @Published var playbackState: ApplicationMusicPlayer.PlaybackStatus = .stopped
+@Observable
+class MusicSearchViewModel {
+    // MARK: - Observable State
+    var searchText: String = "" {
+        didSet {
+            // Trigger search when text changes
+            scheduleSearch()
+        }
+    }
+    var searchResults: [MusicSearchResult] = []
+    var isSearching: Bool = false
+    var errorMessage: String?
+    var currentlyPlaying: NowPlayingItem?
+    var playbackState: ApplicationMusicPlayer.PlaybackStatus = .stopped
 
+    // MARK: - Private Properties
     private let musicService = MusicService.shared
-    private var searchCancellable: AnyCancellable?
+    private var searchTask: Task<Void, Never>?
+    private var debounceTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
+    /// Debounce duration in nanoseconds (750ms for better UX)
+    private let debounceDuration: UInt64 = 750_000_000
+
+    // MARK: - Initialization
     init() {
-        B2BLog.search.info("🔍 Initializing MusicSearchViewModel")
+        B2BLog.search.info("🔍 Initializing MusicSearchViewModel with Swift Concurrency")
         setupBindings()
-        setupSearchDebouncing()
     }
 
+    // MARK: - Setup
     private func setupBindings() {
-        musicService.$searchResults
-            .assign(to: &$searchResults)
-
-        musicService.$isSearching
-            .assign(to: &$isSearching)
-
+        // Use Combine for simple observation of published properties
         musicService.$currentlyPlaying
-            .assign(to: &$currentlyPlaying)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] value in
+                self?.currentlyPlaying = value
+            }
+            .store(in: &cancellables)
 
         musicService.$playbackState
-            .assign(to: &$playbackState)
-    }
-
-    private func setupSearchDebouncing() {
-        searchCancellable = $searchText
-            .removeDuplicates()
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-            .sink { [weak self] searchTerm in
-                self?.performSearch(searchTerm)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] value in
+                self?.playbackState = value
             }
+            .store(in: &cancellables)
     }
 
-    private func performSearch(_ searchTerm: String) {
-        errorMessage = nil
+    // MARK: - Search Logic with Proper Debouncing and Cancellation
 
+    /// Schedules a search with proper debouncing and task cancellation
+    private func scheduleSearch() {
+        // Cancel any existing debounce task
+        debounceTask?.cancel()
+
+        // Create new debounce task
+        debounceTask = Task { [weak self, searchText] in
+            guard let self else { return }
+
+            // Wait for debounce duration
+            do {
+                try await Task.sleep(nanoseconds: debounceDuration)
+            } catch {
+                // Task was cancelled during sleep
+                return
+            }
+
+            // Check if task is still valid (not cancelled)
+            guard !Task.isCancelled else { return }
+
+            // Perform the actual search
+            await self.performSearch(for: searchText)
+        }
+    }
+
+    /// Performs the actual search with proper task management
+    private func performSearch(for searchTerm: String) async {
+        // Cancel any existing search task
+        searchTask?.cancel()
+
+        // Clear results if search term is empty
         guard !searchTerm.isEmpty else {
             B2BLog.search.debug("Search term is empty, clearing results")
             searchResults = []
+            errorMessage = nil
             return
         }
 
-        Task {
-            B2BLog.search.info("Performing search for: \(searchTerm)")
+        // Create new search task with structured concurrency
+        searchTask = Task { [weak self] in
+            guard let self else { return }
+
+            // Update UI state
+            self.isSearching = true
+            self.errorMessage = nil
+
+            B2BLog.search.info("🔍 Performing search for: \(searchTerm)")
+            let startTime = Date()
+
             do {
-                try await musicService.searchCatalog(for: searchTerm)
+                // Check for cancellation before making the API call
+                try Task.checkCancellation()
+
+                // Perform the search
+                let results = try await self.searchMusicCatalog(for: searchTerm)
+
+                // Check for cancellation before updating UI
+                try Task.checkCancellation()
+
+                let duration = Date().timeIntervalSince(startTime)
+                B2BLog.search.performance("searchDuration", value: duration)
+                B2BLog.search.info("Found \(results.count) results for '\(searchTerm)' in \(String(format: "%.2f", duration))s")
+
+                // Update UI
+                self.searchResults = results
+                self.isSearching = false
+
+            } catch is CancellationError {
+                // Search was cancelled, don't update UI
+                B2BLog.search.debug("Search task cancelled for: \(searchTerm)")
+                self.isSearching = false
             } catch {
-                errorMessage = "Search failed: \(error.localizedDescription)"
-                searchResults = []
                 B2BLog.search.error(error, context: "MusicSearchViewModel.performSearch")
+                self.errorMessage = "Search failed: \(error.localizedDescription)"
+                self.searchResults = []
+                self.isSearching = false
             }
         }
     }
+
+    /// Isolated search function that can be cancelled
+    private func searchMusicCatalog(for searchTerm: String, limit: Int = 25) async throws -> [MusicSearchResult] {
+        var request = MusicCatalogSearchRequest(term: searchTerm, types: [Song.self])
+        request.limit = limit
+
+        B2BLog.network.apiCall("MusicCatalogSearchRequest")
+        let response = try await request.response()
+
+        // Convert to our model type
+        return response.songs.map { MusicSearchResult(song: $0) }
+    }
+
+    // MARK: - User Actions
 
     func selectSong(_ song: Song) {
         Task {
@@ -113,6 +197,8 @@ class MusicSearchViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Computed Properties
+
     var isPlaying: Bool {
         playbackState == .playing
     }
@@ -125,10 +211,39 @@ class MusicSearchViewModel: ObservableObject {
         currentlyPlaying != nil
     }
 
+    // MARK: - UI Actions
+
     func clearSearch() {
         B2BLog.ui.userAction("Clear search")
+
+        // Cancel any pending search operations
+        searchTask?.cancel()
+        debounceTask?.cancel()
+
+        // Clear state
         searchText = ""
         searchResults = []
         errorMessage = nil
+    }
+
+    // MARK: - Performance Optimization
+
+    /// Force cancels all pending operations (useful for view dismissal)
+    func cancelAllOperations() {
+        searchTask?.cancel()
+        debounceTask?.cancel()
+        B2BLog.search.info("Cancelled all pending search operations")
+    }
+
+    /// Preloads search results for better perceived performance
+    func preloadSearchResults() {
+        // Preload artwork for visible results
+        Task {
+            for result in searchResults.prefix(10) {
+                if let artwork = result.artwork {
+                    _ = artwork.url(width: 60, height: 60)
+                }
+            }
+        }
     }
 }

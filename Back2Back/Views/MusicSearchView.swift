@@ -2,7 +2,7 @@ import SwiftUI
 import MusicKit
 
 struct MusicSearchView: View {
-    @StateObject private var viewModel = MusicSearchViewModel()
+    @State private var viewModel = MusicSearchViewModel()
     @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
@@ -25,6 +25,10 @@ struct MusicSearchView: View {
         }
         .navigationTitle("Search Music")
         .navigationBarTitleDisplayMode(.large)
+        .onDisappear {
+            // Clean up any pending operations when view disappears
+            viewModel.cancelAllOperations()
+        }
     }
 
     private var searchBar: some View {
@@ -32,17 +36,26 @@ struct MusicSearchView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
 
-            TextField("Search for songs, artists, or albums", text: $viewModel.searchText)
+            // Use a binding that updates the view model
+            TextField("Search for songs, artists, or albums",
+                     text: Binding(
+                         get: { viewModel.searchText },
+                         set: { viewModel.searchText = $0 }
+                     ))
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .focused($isSearchFieldFocused)
                 .submitLabel(.search)
                 .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                // Disable smart punctuation for better search experience
+                .disableAutocorrection(true)
 
             if !viewModel.searchText.isEmpty {
                 Button(action: viewModel.clearSearch) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.secondary)
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding()
@@ -57,10 +70,16 @@ struct MusicSearchView: View {
                         result: result,
                         onTap: { viewModel.selectSong(result.song) }
                     )
+                    .id(result.id)  // Ensure proper view identity
+
                     Divider()
                         .padding(.leading, 80)
                 }
             }
+        }
+        .onAppear {
+            // Preload artwork for visible results
+            viewModel.preloadSearchResults()
         }
     }
 
@@ -167,17 +186,32 @@ struct SearchResultRow: View {
     private var artworkImage: some View {
         Group {
             if let artwork = result.artwork {
-                AsyncImage(url: artwork.url(width: 60, height: 60)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .overlay(
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                        )
+                // Optimize image loading with smaller placeholder
+                AsyncImage(url: artwork.url(width: 60, height: 60)) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .overlay(
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                    .scaleEffect(0.5)
+                            )
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .overlay(
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundColor(.gray)
+                            )
+                    @unknown default:
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                    }
                 }
                 .frame(width: 60, height: 60)
                 .cornerRadius(8)
