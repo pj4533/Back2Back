@@ -122,7 +122,7 @@ struct OpenAIModelsTests {
         #expect(decodedRequest.model == originalRequest.model, "Model should match after coding")
         #expect(decodedRequest.input == originalRequest.input, "Input should match after coding")
         #expect(decodedRequest.verbosity == originalRequest.verbosity, "Verbosity should match after coding")
-        #expect(decodedRequest.reasoningEffort == originalRequest.reasoningEffort, "ReasoningEffort should match after coding")
+        #expect(decodedRequest.reasoning?.effort == originalRequest.reasoning?.effort, "ReasoningEffort should match after coding")
         #expect(decodedRequest.maxTokens == originalRequest.maxTokens, "MaxTokens should match after coding")
         #expect(decodedRequest.temperature == originalRequest.temperature, "Temperature should match after coding")
         #expect(decodedRequest.user == originalRequest.user, "User should match after coding")

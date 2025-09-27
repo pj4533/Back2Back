@@ -71,7 +71,7 @@ struct ResponsesRequest: Codable {
     let model: String
     let input: String
     let verbosity: VerbosityLevel?
-    let reasoningEffort: ReasoningEffort?
+    let reasoning: ReasoningConfig?
     let maxTokens: Int?
     let temperature: Double?
     let user: String?
@@ -80,13 +80,13 @@ struct ResponsesRequest: Codable {
         case model
         case input
         case verbosity
-        case reasoningEffort = "reasoning_effort"
+        case reasoning
         case maxTokens = "max_tokens"
         case temperature
         case user
     }
 
-    init(model: String = "gpt-5-mini",
+    init(model: String = "gpt-5",
          input: String,
          verbosity: VerbosityLevel? = nil,
          reasoningEffort: ReasoningEffort? = nil,
@@ -96,11 +96,15 @@ struct ResponsesRequest: Codable {
         self.model = model
         self.input = input
         self.verbosity = verbosity
-        self.reasoningEffort = reasoningEffort
+        self.reasoning = reasoningEffort.map { ReasoningConfig(effort: $0) }
         self.maxTokens = maxTokens
         self.temperature = temperature
         self.user = user
     }
+}
+
+struct ReasoningConfig: Codable {
+    let effort: ReasoningEffort
 }
 
 enum VerbosityLevel: String, Codable {
@@ -168,7 +172,7 @@ struct OpenAIErrorDetail: Codable {
 struct OpenAIConstants {
     static let baseURL = "https://api.openai.com/v1"
     static let responsesEndpoint = "/responses"
-    static let defaultModel = "gpt-5-mini"
+    static let defaultModel = "gpt-5"
     static let defaultTemperature = 0.7
     static let defaultMaxTokens = 1000
 

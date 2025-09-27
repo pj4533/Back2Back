@@ -35,10 +35,10 @@ struct OpenAIClientTests {
     func testResponsesRequestDefaults() async throws {
         let request = ResponsesRequest(input: "Test")
 
-        #expect(request.model == "gpt-5-mini", "Should use default model")
+        #expect(request.model == "gpt-5", "Should use default model")
         #expect(request.input == "Test", "Input should match")
         #expect(request.verbosity == nil, "Verbosity should be nil by default")
-        #expect(request.reasoningEffort == nil, "ReasoningEffort should be nil by default")
+        #expect(request.reasoning == nil, "Reasoning should be nil by default")
         #expect(request.maxTokens == nil, "MaxTokens should be nil by default")
         #expect(request.temperature == nil, "Temperature should be nil by default")
         #expect(request.user == nil, "User should be nil by default")
@@ -59,7 +59,7 @@ struct OpenAIClientTests {
         #expect(request.model == "gpt-5", "Model should match")
         #expect(request.input == "Hello world", "Input should match")
         #expect(request.verbosity == .high, "Verbosity should match")
-        #expect(request.reasoningEffort == .medium, "ReasoningEffort should match")
+        #expect(request.reasoning?.effort == .medium, "ReasoningEffort should match")
         #expect(request.maxTokens == 500, "MaxTokens should match")
         #expect(request.temperature == 0.8, "Temperature should match")
         #expect(request.user == "test-user", "User should match")
@@ -102,7 +102,7 @@ struct OpenAIClientTests {
     func testOpenAIConstants() async throws {
         #expect(OpenAIConstants.baseURL == "https://api.openai.com/v1", "Base URL should be correct")
         #expect(OpenAIConstants.responsesEndpoint == "/responses", "Responses endpoint should be correct")
-        #expect(OpenAIConstants.defaultModel == "gpt-5-mini", "Default model should be gpt-5-mini")
+        #expect(OpenAIConstants.defaultModel == "gpt-5", "Default model should be gpt-5")
         #expect(OpenAIConstants.defaultTemperature == 0.7, "Default temperature should be 0.7")
         #expect(OpenAIConstants.defaultMaxTokens == 1000, "Default max tokens should be 1000")
     }
@@ -234,7 +234,7 @@ struct OpenAIClientTests {
         #expect(OpenAIConstants.modelGPT5 == "gpt-5", "GPT-5 model constant should be correct")
         #expect(OpenAIConstants.modelGPT5Mini == "gpt-5-mini", "GPT-5 Mini model constant should be correct")
         #expect(OpenAIConstants.modelGPT5Nano == "gpt-5-nano", "GPT-5 Nano model constant should be correct")
-        #expect(OpenAIConstants.defaultModel == OpenAIConstants.modelGPT5Mini, "Default model should be GPT-5 Mini")
+        #expect(OpenAIConstants.defaultModel == OpenAIConstants.modelGPT5, "Default model should be GPT-5")
     }
 
     @Test("simpleCompletion uses correct defaults")
