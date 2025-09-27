@@ -37,7 +37,7 @@ struct OpenAIClientTests {
 
         #expect(request.model == "gpt-5", "Should use default model")
         #expect(request.input == "Test", "Input should match")
-        #expect(request.verbosity == nil, "Verbosity should be nil by default")
+        #expect(request.text == nil, "Text config should be nil by default")
         #expect(request.reasoning == nil, "Reasoning should be nil by default")
         #expect(request.maxTokens == nil, "MaxTokens should be nil by default")
         #expect(request.temperature == nil, "Temperature should be nil by default")
@@ -58,7 +58,7 @@ struct OpenAIClientTests {
 
         #expect(request.model == "gpt-5", "Model should match")
         #expect(request.input == "Hello world", "Input should match")
-        #expect(request.verbosity == .high, "Verbosity should match")
+        #expect(request.text?.verbosity == .high, "Verbosity should match")
         #expect(request.reasoning?.effort == .medium, "ReasoningEffort should match")
         #expect(request.maxTokens == 500, "MaxTokens should match")
         #expect(request.temperature == 0.8, "Temperature should match")

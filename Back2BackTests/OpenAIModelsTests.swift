@@ -146,8 +146,10 @@ struct OpenAIModelsTests {
 
         #expect(json["model"] as? String == "gpt-5", "Model should be encoded")
         #expect(json["input"] as? String == "Hello", "Input should be encoded")
-        #expect(json["verbosity"] as? String == "medium", "Verbosity should be encoded")
-        #expect(json["reasoning_effort"] as? String == "high", "ReasoningEffort should use snake_case")
+        let text = json["text"] as? [String: Any]
+        #expect(text?["verbosity"] as? String == "medium", "Verbosity should be nested under text")
+        let reasoning = json["reasoning"] as? [String: Any]
+        #expect(reasoning?["effort"] as? String == "high", "ReasoningEffort should be nested under reasoning")
         #expect(json["temperature"] as? Double == 0.5, "Temperature should be encoded")
         #expect(json["max_tokens"] as? Int == 100, "MaxTokens should use snake_case")
         #expect(json["user"] as? String == "user123", "User should be encoded")

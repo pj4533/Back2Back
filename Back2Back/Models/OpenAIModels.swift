@@ -70,7 +70,7 @@ enum OpenAIError: LocalizedError, CustomStringConvertible, Equatable {
 struct ResponsesRequest: Codable {
     let model: String
     let input: String
-    let verbosity: VerbosityLevel?
+    let text: TextConfig?
     let reasoning: ReasoningConfig?
     let maxTokens: Int?
     let temperature: Double?
@@ -79,7 +79,7 @@ struct ResponsesRequest: Codable {
     enum CodingKeys: String, CodingKey {
         case model
         case input
-        case verbosity
+        case text
         case reasoning
         case maxTokens = "max_tokens"
         case temperature
@@ -95,12 +95,16 @@ struct ResponsesRequest: Codable {
          user: String? = nil) {
         self.model = model
         self.input = input
-        self.verbosity = verbosity
+        self.text = verbosity.map { TextConfig(verbosity: $0) }
         self.reasoning = reasoningEffort.map { ReasoningConfig(effort: $0) }
         self.maxTokens = maxTokens
         self.temperature = temperature
         self.user = user
     }
+}
+
+struct TextConfig: Codable {
+    let verbosity: VerbosityLevel
 }
 
 struct ReasoningConfig: Codable {
