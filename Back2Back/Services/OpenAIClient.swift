@@ -131,9 +131,7 @@ final class OpenAIClient {
             model: model,
             input: prompt,
             verbosity: .medium,
-            reasoningEffort: .medium,
-            maxTokens: OpenAIConstants.defaultMaxTokens,
-            temperature: OpenAIConstants.defaultTemperature
+            reasoningEffort: .medium
         )
 
         let response = try await responses(request: request)
@@ -152,9 +150,7 @@ final class OpenAIClient {
             model: OpenAIConstants.defaultModel,
             input: input,
             verbosity: .high,
-            reasoningEffort: .high,
-            maxTokens: 500,
-            temperature: 0.8
+            reasoningEffort: .high
         )
 
         B2BLog.ai.info("Requesting song recommendation from persona: \(persona)")

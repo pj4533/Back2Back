@@ -104,13 +104,10 @@ struct OpenAIModelsTests {
     @Test("ResponsesRequest JSON encoding and decoding")
     func testResponsesRequestCodable() async throws {
         let originalRequest = ResponsesRequest(
-            model: "gpt-5-mini",
+            model: "gpt-5",
             input: "Test input",
             verbosity: .high,
-            reasoningEffort: .medium,
-            maxTokens: 100,
-            temperature: 0.8,
-            user: "test-user"
+            reasoningEffort: .medium
         )
 
         let encoder = JSONEncoder()
@@ -121,11 +118,8 @@ struct OpenAIModelsTests {
 
         #expect(decodedRequest.model == originalRequest.model, "Model should match after coding")
         #expect(decodedRequest.input == originalRequest.input, "Input should match after coding")
-        #expect(decodedRequest.verbosity == originalRequest.verbosity, "Verbosity should match after coding")
+        #expect(decodedRequest.text?.verbosity == originalRequest.text?.verbosity, "Verbosity should match after coding")
         #expect(decodedRequest.reasoning?.effort == originalRequest.reasoning?.effort, "ReasoningEffort should match after coding")
-        #expect(decodedRequest.maxTokens == originalRequest.maxTokens, "MaxTokens should match after coding")
-        #expect(decodedRequest.temperature == originalRequest.temperature, "Temperature should match after coding")
-        #expect(decodedRequest.user == originalRequest.user, "User should match after coding")
     }
 
     @Test("ResponsesRequest JSON encoding with snake_case")
@@ -134,10 +128,7 @@ struct OpenAIModelsTests {
             model: "gpt-5",
             input: "Hello",
             verbosity: .medium,
-            reasoningEffort: .high,
-            maxTokens: 100,
-            temperature: 0.5,
-            user: "user123"
+            reasoningEffort: .high
         )
 
         let encoder = JSONEncoder()
@@ -150,9 +141,6 @@ struct OpenAIModelsTests {
         #expect(text?["verbosity"] as? String == "medium", "Verbosity should be nested under text")
         let reasoning = json["reasoning"] as? [String: Any]
         #expect(reasoning?["effort"] as? String == "high", "ReasoningEffort should be nested under reasoning")
-        #expect(json["temperature"] as? Double == 0.5, "Temperature should be encoded")
-        #expect(json["max_tokens"] as? Int == 100, "MaxTokens should use snake_case")
-        #expect(json["user"] as? String == "user123", "User should be encoded")
     }
 
     @Test("ResponseUsage JSON decoding with snake_case")

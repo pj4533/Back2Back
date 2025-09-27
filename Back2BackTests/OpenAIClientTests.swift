@@ -39,9 +39,6 @@ struct OpenAIClientTests {
         #expect(request.input == "Test", "Input should match")
         #expect(request.text == nil, "Text config should be nil by default")
         #expect(request.reasoning == nil, "Reasoning should be nil by default")
-        #expect(request.maxTokens == nil, "MaxTokens should be nil by default")
-        #expect(request.temperature == nil, "Temperature should be nil by default")
-        #expect(request.user == nil, "User should be nil by default")
     }
 
     @Test("ResponsesRequest initialization with custom values")
@@ -50,19 +47,13 @@ struct OpenAIClientTests {
             model: "gpt-5",
             input: "Hello world",
             verbosity: .high,
-            reasoningEffort: .medium,
-            maxTokens: 500,
-            temperature: 0.8,
-            user: "test-user"
+            reasoningEffort: .medium
         )
 
         #expect(request.model == "gpt-5", "Model should match")
         #expect(request.input == "Hello world", "Input should match")
         #expect(request.text?.verbosity == .high, "Verbosity should match")
         #expect(request.reasoning?.effort == .medium, "ReasoningEffort should match")
-        #expect(request.maxTokens == 500, "MaxTokens should match")
-        #expect(request.temperature == 0.8, "Temperature should match")
-        #expect(request.user == "test-user", "User should match")
     }
 
     @Test("VerbosityLevel enum values")

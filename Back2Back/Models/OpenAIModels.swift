@@ -72,34 +72,22 @@ struct ResponsesRequest: Codable {
     let input: String
     let text: TextConfig?
     let reasoning: ReasoningConfig?
-    let maxTokens: Int?
-    let temperature: Double?
-    let user: String?
 
     enum CodingKeys: String, CodingKey {
         case model
         case input
         case text
         case reasoning
-        case maxTokens = "max_tokens"
-        case temperature
-        case user
     }
 
     init(model: String = "gpt-5",
          input: String,
          verbosity: VerbosityLevel? = nil,
-         reasoningEffort: ReasoningEffort? = nil,
-         maxTokens: Int? = nil,
-         temperature: Double? = nil,
-         user: String? = nil) {
+         reasoningEffort: ReasoningEffort? = nil) {
         self.model = model
         self.input = input
         self.text = verbosity.map { TextConfig(verbosity: $0) }
         self.reasoning = reasoningEffort.map { ReasoningConfig(effort: $0) }
-        self.maxTokens = maxTokens
-        self.temperature = temperature
-        self.user = user
     }
 }
 
