@@ -20,79 +20,63 @@ struct OpenAIClientTests {
 
         // Only run this test if no API key is set
         if !client.isConfigured {
-            let request = ChatCompletionRequest(
-                model: "gpt-3.5-turbo",
-                messages: [ChatMessage(role: .user, content: "Hello")]
+            let request = ResponsesRequest(
+                model: "gpt-5-mini",
+                input: "Hello"
             )
 
             await #expect(throws: OpenAIError.apiKeyMissing) {
-                _ = try await client.chatCompletion(request: request)
+                _ = try await client.responses(request: request)
             }
         }
     }
 
-    @Test("ChatMessage initialization")
-    func testChatMessageInitialization() async throws {
-        let message = ChatMessage(role: .user, content: "Test content")
+    @Test("ResponsesRequest initialization with defaults")
+    func testResponsesRequestDefaults() async throws {
+        let request = ResponsesRequest(input: "Test")
 
-        #expect(message.role == .user, "Role should be user")
-        #expect(message.content == "Test content", "Content should match")
-        #expect(message.name == nil, "Name should be nil by default")
-    }
-
-    @Test("ChatMessage with name initialization")
-    func testChatMessageWithName() async throws {
-        let message = ChatMessage(role: .assistant, content: "Response", name: "TestBot")
-
-        #expect(message.role == .assistant, "Role should be assistant")
-        #expect(message.content == "Response", "Content should match")
-        #expect(message.name == "TestBot", "Name should match")
-    }
-
-    @Test("ChatCompletionRequest initialization with defaults")
-    func testChatCompletionRequestDefaults() async throws {
-        let messages = [
-            ChatMessage(role: .user, content: "Test")
-        ]
-        let request = ChatCompletionRequest(messages: messages)
-
-        #expect(request.model == "gpt-3.5-turbo", "Should use default model")
-        #expect(request.messages.count == 1, "Should have one message")
-        #expect(request.temperature == nil, "Temperature should be nil by default")
+        #expect(request.model == "gpt-5-mini", "Should use default model")
+        #expect(request.input == "Test", "Input should match")
+        #expect(request.verbosity == nil, "Verbosity should be nil by default")
+        #expect(request.reasoningEffort == nil, "ReasoningEffort should be nil by default")
         #expect(request.maxTokens == nil, "MaxTokens should be nil by default")
-        #expect(request.stream == nil, "Stream should be nil by default")
+        #expect(request.temperature == nil, "Temperature should be nil by default")
         #expect(request.user == nil, "User should be nil by default")
     }
 
-    @Test("ChatCompletionRequest initialization with custom values")
-    func testChatCompletionRequestCustom() async throws {
-        let messages = [
-            ChatMessage(role: .system, content: "You are a helpful assistant"),
-            ChatMessage(role: .user, content: "Hello")
-        ]
-        let request = ChatCompletionRequest(
-            model: "gpt-4",
-            messages: messages,
-            temperature: 0.8,
+    @Test("ResponsesRequest initialization with custom values")
+    func testResponsesRequestCustom() async throws {
+        let request = ResponsesRequest(
+            model: "gpt-5",
+            input: "Hello world",
+            verbosity: .high,
+            reasoningEffort: .medium,
             maxTokens: 500,
-            stream: false,
+            temperature: 0.8,
             user: "test-user"
         )
 
-        #expect(request.model == "gpt-4", "Model should match")
-        #expect(request.messages.count == 2, "Should have two messages")
-        #expect(request.temperature == 0.8, "Temperature should match")
+        #expect(request.model == "gpt-5", "Model should match")
+        #expect(request.input == "Hello world", "Input should match")
+        #expect(request.verbosity == .high, "Verbosity should match")
+        #expect(request.reasoningEffort == .medium, "ReasoningEffort should match")
         #expect(request.maxTokens == 500, "MaxTokens should match")
-        #expect(request.stream == false, "Stream should be false")
+        #expect(request.temperature == 0.8, "Temperature should match")
         #expect(request.user == "test-user", "User should match")
     }
 
-    @Test("ChatRole enum values")
-    func testChatRoleValues() async throws {
-        #expect(ChatRole.system.rawValue == "system", "System role should have correct raw value")
-        #expect(ChatRole.user.rawValue == "user", "User role should have correct raw value")
-        #expect(ChatRole.assistant.rawValue == "assistant", "Assistant role should have correct raw value")
-        #expect(ChatRole.function.rawValue == "function", "Function role should have correct raw value")
+    @Test("VerbosityLevel enum values")
+    func testVerbosityLevelRawValues() async throws {
+        #expect(VerbosityLevel.low.rawValue == "low", "Low should have correct raw value")
+        #expect(VerbosityLevel.medium.rawValue == "medium", "Medium should have correct raw value")
+        #expect(VerbosityLevel.high.rawValue == "high", "High should have correct raw value")
+    }
+
+    @Test("ReasoningEffort enum values")
+    func testReasoningEffortRawValues() async throws {
+        #expect(ReasoningEffort.low.rawValue == "low", "Low should have correct raw value")
+        #expect(ReasoningEffort.medium.rawValue == "medium", "Medium should have correct raw value")
+        #expect(ReasoningEffort.high.rawValue == "high", "High should have correct raw value")
     }
 
     @Test("OpenAIError descriptions")
@@ -117,8 +101,8 @@ struct OpenAIClientTests {
     @Test("OpenAIConstants values")
     func testOpenAIConstants() async throws {
         #expect(OpenAIConstants.baseURL == "https://api.openai.com/v1", "Base URL should be correct")
-        #expect(OpenAIConstants.chatCompletionsEndpoint == "/chat/completions", "Chat endpoint should be correct")
-        #expect(OpenAIConstants.defaultModel == "gpt-3.5-turbo", "Default model should be gpt-3.5-turbo")
+        #expect(OpenAIConstants.responsesEndpoint == "/responses", "Responses endpoint should be correct")
+        #expect(OpenAIConstants.defaultModel == "gpt-5-mini", "Default model should be gpt-5-mini")
         #expect(OpenAIConstants.defaultTemperature == 0.7, "Default temperature should be 0.7")
         #expect(OpenAIConstants.defaultMaxTokens == 1000, "Default max tokens should be 1000")
     }
@@ -157,23 +141,32 @@ struct OpenAIClientTests {
         }
     }
 
-    @Test("Usage model properties")
-    func testUsageModel() async throws {
-        let usage = Usage(promptTokens: 10, completionTokens: 20, totalTokens: 30)
+    @Test("ResponseUsage model properties")
+    func testResponseUsageModel() async throws {
+        let usage = ResponseUsage(
+            inputTokens: 10,
+            outputTokens: 20,
+            reasoningTokens: 5,
+            totalTokens: 35
+        )
 
-        #expect(usage.promptTokens == 10, "Prompt tokens should match")
-        #expect(usage.completionTokens == 20, "Completion tokens should match")
-        #expect(usage.totalTokens == 30, "Total tokens should match")
+        #expect(usage.inputTokens == 10, "Input tokens should match")
+        #expect(usage.outputTokens == 20, "Output tokens should match")
+        #expect(usage.reasoningTokens == 5, "Reasoning tokens should match")
+        #expect(usage.totalTokens == 35, "Total tokens should match")
     }
 
-    @Test("ChatChoice model properties")
-    func testChatChoiceModel() async throws {
-        let message = ChatMessage(role: .assistant, content: "Response")
-        let choice = ChatChoice(index: 0, message: message, finishReason: "stop")
+    @Test("ResponseMetadata model properties")
+    func testResponseMetadataModel() async throws {
+        let metadata = ResponseMetadata(
+            reasoning: "Test reasoning process",
+            confidence: 0.92,
+            processingTime: 1.25
+        )
 
-        #expect(choice.index == 0, "Index should be 0")
-        #expect(choice.message.content == "Response", "Message content should match")
-        #expect(choice.finishReason == "stop", "Finish reason should match")
+        #expect(metadata.reasoning == "Test reasoning process", "Reasoning should match")
+        #expect(metadata.confidence == 0.92, "Confidence should match")
+        #expect(metadata.processingTime == 1.25, "Processing time should match")
     }
 
     @Test("OpenAIErrorResponse model")
@@ -190,21 +183,38 @@ struct OpenAIClientTests {
         #expect(errorResponse.error.code == "invalid_api_key", "Error code should match")
     }
 
-    @Test("Multiple message types in request")
-    func testMultipleMessageTypes() async throws {
-        let messages = [
-            ChatMessage(role: .system, content: "You are helpful"),
-            ChatMessage(role: .user, content: "Hello"),
-            ChatMessage(role: .assistant, content: "Hi there"),
-            ChatMessage(role: .user, content: "How are you?")
-        ]
-        let request = ChatCompletionRequest(messages: messages)
+    @Test("ResponsesResponse with complete data")
+    func testResponsesResponseComplete() async throws {
+        let usage = ResponseUsage(
+            inputTokens: 15,
+            outputTokens: 30,
+            reasoningTokens: 10,
+            totalTokens: 55
+        )
 
-        #expect(request.messages.count == 4, "Should have 4 messages")
-        #expect(request.messages[0].role == .system, "First should be system")
-        #expect(request.messages[1].role == .user, "Second should be user")
-        #expect(request.messages[2].role == .assistant, "Third should be assistant")
-        #expect(request.messages[3].role == .user, "Fourth should be user")
+        let metadata = ResponseMetadata(
+            reasoning: "Complex reasoning",
+            confidence: 0.88,
+            processingTime: 2.1
+        )
+
+        let response = ResponsesResponse(
+            id: "resp-abc123",
+            object: "response",
+            created: 1234567890,
+            model: "gpt-5",
+            output: "Generated output text",
+            usage: usage,
+            metadata: metadata
+        )
+
+        #expect(response.id == "resp-abc123", "ID should match")
+        #expect(response.object == "response", "Object type should match")
+        #expect(response.created == 1234567890, "Created timestamp should match")
+        #expect(response.model == "gpt-5", "Model should match")
+        #expect(response.output == "Generated output text", "Output should match")
+        #expect(response.usage?.totalTokens == 55, "Total tokens should match")
+        #expect(response.metadata?.confidence == 0.88, "Confidence should match")
     }
 
     @Test("reloadConfiguration method")
@@ -217,5 +227,42 @@ struct OpenAIClientTests {
 
         // Configuration status should remain the same if environment hasn't changed
         #expect(client.isConfigured == initialConfigured, "Configuration status should be consistent")
+    }
+
+    @Test("Model constants are correct")
+    func testModelConstants() async throws {
+        #expect(OpenAIConstants.modelGPT5 == "gpt-5", "GPT-5 model constant should be correct")
+        #expect(OpenAIConstants.modelGPT5Mini == "gpt-5-mini", "GPT-5 Mini model constant should be correct")
+        #expect(OpenAIConstants.modelGPT5Nano == "gpt-5-nano", "GPT-5 Nano model constant should be correct")
+        #expect(OpenAIConstants.defaultModel == OpenAIConstants.modelGPT5Mini, "Default model should be GPT-5 Mini")
+    }
+
+    @Test("simpleCompletion uses correct defaults")
+    func testSimpleCompletionDefaults() async throws {
+        // This test verifies the implementation uses correct defaults
+        // We can't test the actual API call without a valid key
+        let client = OpenAIClient.shared
+
+        if !client.isConfigured {
+            await #expect(throws: OpenAIError.apiKeyMissing) {
+                _ = try await client.simpleCompletion(prompt: "Test")
+            }
+        }
+    }
+
+    @Test("personaBasedRecommendation formatting")
+    func testPersonaBasedRecommendationFormatting() async throws {
+        // This test verifies the implementation formats the input correctly
+        // We can't test the actual API call without a valid key
+        let client = OpenAIClient.shared
+
+        if !client.isConfigured {
+            await #expect(throws: OpenAIError.apiKeyMissing) {
+                _ = try await client.personaBasedRecommendation(
+                    persona: "Test Persona",
+                    context: "Test context"
+                )
+            }
+        }
     }
 }

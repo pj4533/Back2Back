@@ -65,89 +65,89 @@ enum OpenAIError: LocalizedError, CustomStringConvertible, Equatable {
     }
 }
 
-// MARK: - Chat Models
+// MARK: - Responses API Models
 
-struct ChatCompletionRequest: Codable {
+struct ResponsesRequest: Codable {
     let model: String
-    let messages: [ChatMessage]
-    let temperature: Double?
+    let input: String
+    let verbosity: VerbosityLevel?
+    let reasoningEffort: ReasoningEffort?
     let maxTokens: Int?
-    let stream: Bool?
+    let temperature: Double?
     let user: String?
 
     enum CodingKeys: String, CodingKey {
         case model
-        case messages
-        case temperature
+        case input
+        case verbosity
+        case reasoningEffort = "reasoning_effort"
         case maxTokens = "max_tokens"
-        case stream
+        case temperature
         case user
     }
 
-    init(model: String = "gpt-3.5-turbo",
-         messages: [ChatMessage],
-         temperature: Double? = nil,
+    init(model: String = "gpt-5-mini",
+         input: String,
+         verbosity: VerbosityLevel? = nil,
+         reasoningEffort: ReasoningEffort? = nil,
          maxTokens: Int? = nil,
-         stream: Bool? = nil,
+         temperature: Double? = nil,
          user: String? = nil) {
         self.model = model
-        self.messages = messages
-        self.temperature = temperature
+        self.input = input
+        self.verbosity = verbosity
+        self.reasoningEffort = reasoningEffort
         self.maxTokens = maxTokens
-        self.stream = stream
+        self.temperature = temperature
         self.user = user
     }
 }
 
-struct ChatMessage: Codable, Equatable {
-    let role: ChatRole
-    let content: String
-    let name: String?
-
-    init(role: ChatRole, content: String, name: String? = nil) {
-        self.role = role
-        self.content = content
-        self.name = name
-    }
+enum VerbosityLevel: String, Codable {
+    case low
+    case medium
+    case high
 }
 
-enum ChatRole: String, Codable {
-    case system
-    case user
-    case assistant
-    case function
+enum ReasoningEffort: String, Codable {
+    case low
+    case medium
+    case high
 }
 
-struct ChatCompletionResponse: Codable {
+struct ResponsesResponse: Codable {
     let id: String
     let object: String
     let created: Int
     let model: String
-    let choices: [ChatChoice]
-    let usage: Usage?
+    let output: String
+    let usage: ResponseUsage?
+    let metadata: ResponseMetadata?
 }
 
-struct ChatChoice: Codable {
-    let index: Int
-    let message: ChatMessage
-    let finishReason: String?
-
-    enum CodingKeys: String, CodingKey {
-        case index
-        case message
-        case finishReason = "finish_reason"
-    }
-}
-
-struct Usage: Codable {
-    let promptTokens: Int
-    let completionTokens: Int
+struct ResponseUsage: Codable {
+    let inputTokens: Int
+    let outputTokens: Int
+    let reasoningTokens: Int
     let totalTokens: Int
 
     enum CodingKeys: String, CodingKey {
-        case promptTokens = "prompt_tokens"
-        case completionTokens = "completion_tokens"
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case reasoningTokens = "reasoning_tokens"
         case totalTokens = "total_tokens"
+    }
+}
+
+struct ResponseMetadata: Codable {
+    let reasoning: String?
+    let confidence: Double?
+    let processingTime: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case reasoning
+        case confidence
+        case processingTime = "processing_time"
     }
 }
 
@@ -167,8 +167,13 @@ struct OpenAIErrorDetail: Codable {
 
 struct OpenAIConstants {
     static let baseURL = "https://api.openai.com/v1"
-    static let chatCompletionsEndpoint = "/chat/completions"
-    static let defaultModel = "gpt-3.5-turbo"
+    static let responsesEndpoint = "/responses"
+    static let defaultModel = "gpt-5-mini"
     static let defaultTemperature = 0.7
     static let defaultMaxTokens = 1000
+
+    // Model variants
+    static let modelGPT5 = "gpt-5"
+    static let modelGPT5Mini = "gpt-5-mini"
+    static let modelGPT5Nano = "gpt-5-nano"
 }

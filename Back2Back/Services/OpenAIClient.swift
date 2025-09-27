@@ -38,20 +38,20 @@ final class OpenAIClient {
 
     // MARK: - Public Methods
 
-    func chatCompletion(request: ChatCompletionRequest) async throws -> ChatCompletionResponse {
+    func responses(request: ResponsesRequest) async throws -> ResponsesResponse {
         guard let apiKey = apiKey, !apiKey.isEmpty else {
-            B2BLog.ai.error("API key missing when attempting chat completion")
+            B2BLog.ai.error("API key missing when attempting responses API call")
             throw OpenAIError.apiKeyMissing
         }
 
-        let urlString = OpenAIConstants.baseURL + OpenAIConstants.chatCompletionsEndpoint
+        let urlString = OpenAIConstants.baseURL + OpenAIConstants.responsesEndpoint
         guard let url = URL(string: urlString) else {
             B2BLog.ai.error("Invalid URL: \(urlString)")
             throw OpenAIError.invalidURL
         }
 
         B2BLog.network.debug("🌐 API: POST \(urlString)")
-        B2BLog.ai.debug("Model: \(request.model), Messages count: \(request.messages.count)")
+        B2BLog.ai.debug("Model: \(request.model), Input length: \(request.input.count) characters")
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -84,14 +84,14 @@ final class OpenAIClient {
             case 200:
                 do {
                     let decoder = JSONDecoder()
-                    let completionResponse = try decoder.decode(ChatCompletionResponse.self, from: data)
+                    let responsesResponse = try decoder.decode(ResponsesResponse.self, from: data)
 
-                    if let usage = completionResponse.usage {
-                        B2BLog.ai.debug("Tokens used - Prompt: \(usage.promptTokens), Completion: \(usage.completionTokens), Total: \(usage.totalTokens)")
+                    if let usage = responsesResponse.usage {
+                        B2BLog.ai.debug("Tokens used - Input: \(usage.inputTokens), Output: \(usage.outputTokens), Reasoning: \(usage.reasoningTokens), Total: \(usage.totalTokens)")
                     }
 
-                    B2BLog.ai.info("Chat completion successful")
-                    return completionResponse
+                    B2BLog.ai.info("Responses API call successful")
+                    return responsesResponse
                 } catch {
                     B2BLog.ai.error("❌ Failed to decode success response: \(error.localizedDescription)")
                     throw OpenAIError.decodingError(error)
@@ -127,55 +127,42 @@ final class OpenAIClient {
     // MARK: - Convenience Methods
 
     func simpleCompletion(prompt: String, model: String = OpenAIConstants.defaultModel) async throws -> String {
-        let messages = [
-            ChatMessage(role: .user, content: prompt)
-        ]
-
-        let request = ChatCompletionRequest(
+        let request = ResponsesRequest(
             model: model,
-            messages: messages,
-            temperature: OpenAIConstants.defaultTemperature,
-            maxTokens: OpenAIConstants.defaultMaxTokens
+            input: prompt,
+            verbosity: .medium,
+            reasoningEffort: .medium,
+            maxTokens: OpenAIConstants.defaultMaxTokens,
+            temperature: OpenAIConstants.defaultTemperature
         )
 
-        let response = try await chatCompletion(request: request)
-
-        guard let firstChoice = response.choices.first else {
-            B2BLog.ai.error("No choices in response")
-            throw OpenAIError.invalidResponse
-        }
-
-        return firstChoice.message.content
+        let response = try await responses(request: request)
+        return response.output
     }
 
     func personaBasedRecommendation(persona: String, context: String) async throws -> String {
-        let systemMessage = ChatMessage(
-            role: .system,
-            content: "You are a DJ assistant helping to select the next song in a back-to-back DJ session. Respond in the style of \(persona) and provide a song recommendation based on the context."
-        )
+        let input = """
+        You are a DJ assistant helping to select the next song in a back-to-back DJ session.
+        Respond in the style of \(persona) and provide a song recommendation based on the following context:
 
-        let userMessage = ChatMessage(
-            role: .user,
-            content: context
-        )
+        \(context)
+        """
 
-        let request = ChatCompletionRequest(
+        let request = ResponsesRequest(
             model: OpenAIConstants.defaultModel,
-            messages: [systemMessage, userMessage],
-            temperature: 0.8,
-            maxTokens: 500
+            input: input,
+            verbosity: .high,
+            reasoningEffort: .high,
+            maxTokens: 500,
+            temperature: 0.8
         )
 
         B2BLog.ai.info("Requesting song recommendation from persona: \(persona)")
 
-        let response = try await chatCompletion(request: request)
-
-        guard let recommendation = response.choices.first?.message.content else {
-            throw OpenAIError.invalidResponse
-        }
+        let response = try await responses(request: request)
 
         B2BLog.ai.info("Received recommendation from \(persona)")
-        return recommendation
+        return response.output
     }
 
     // MARK: - Configuration
