@@ -17,8 +17,14 @@ class MusicService: ObservableObject {
     private let player = ApplicationMusicPlayer.shared
     private var cancellables = Set<AnyCancellable>()
 
+    private static var isInitialized = false
+
     private init() {
-        B2BLog.musicKit.info("🎵 Initializing MusicService")
+        // Prevent duplicate initialization logs
+        if !Self.isInitialized {
+            B2BLog.musicKit.info("🎵 Initializing MusicService (singleton)")
+            Self.isInitialized = true
+        }
         updateAuthorizationStatus()
         setupPlaybackObservers()
     }
@@ -39,6 +45,8 @@ class MusicService: ObservableObject {
             .store(in: &cancellables)
     }
 
+    private var lastLoggedSongId: String?
+
     private func updatePlaybackState() {
         let oldState = playbackState
         playbackState = player.state.playbackStatus
@@ -52,16 +60,24 @@ class MusicService: ObservableObject {
                 do {
                     switch currentEntry.item {
                     case .song(let song):
+                        let wasPlaying = currentlyPlaying?.song.id
                         currentlyPlaying = NowPlayingItem(
                             song: song,
                             isPlaying: player.state.playbackStatus == .playing,
                             playbackTime: player.playbackTime,
                             duration: song.duration ?? 0
                         )
-                        B2BLog.playback.debug("Now playing: \(song.title) by \(song.artistName)")
+                        // Only log when the song actually changes, not on every state update
+                        if song.id.rawValue != lastLoggedSongId {
+                            B2BLog.playback.info("🎵 Now playing: \(song.title) by \(song.artistName)")
+                            lastLoggedSongId = song.id.rawValue
+                        }
                     default:
                         currentlyPlaying = nil
-                        B2BLog.playback.debug("Current queue entry is not a song")
+                        if lastLoggedSongId != nil {
+                            B2BLog.playback.debug("Current queue entry is not a song")
+                            lastLoggedSongId = nil
+                        }
                     }
                 } catch {
                     currentlyPlaying = nil
@@ -70,6 +86,7 @@ class MusicService: ObservableObject {
             }
         } else {
             currentlyPlaying = nil
+            lastLoggedSongId = nil
         }
     }
 

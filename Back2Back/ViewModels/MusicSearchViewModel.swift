@@ -7,16 +7,15 @@ import OSLog
 /// High-performance search implementation with non-blocking UI updates
 /// Uses Combine for debouncing to avoid excessive Task creation
 @MainActor
-@Observable
-class MusicSearchViewModel {
+class MusicSearchViewModel: ObservableObject {
     // MARK: - Observable State
     // Remove didSet to prevent synchronous updates
-    var searchText: String = ""
-    var searchResults: [MusicSearchResult] = []
-    var isSearching: Bool = false
-    var errorMessage: String?
-    var currentlyPlaying: NowPlayingItem?
-    var playbackState: ApplicationMusicPlayer.PlaybackStatus = .stopped
+    @Published var searchText: String = ""
+    @Published var searchResults: [MusicSearchResult] = []
+    @Published var isSearching: Bool = false
+    @Published var errorMessage: String?
+    @Published var currentlyPlaying: NowPlayingItem?
+    @Published var playbackState: ApplicationMusicPlayer.PlaybackStatus = .stopped
 
     // MARK: - Private Properties
     private let musicService = MusicService.shared
@@ -31,10 +30,8 @@ class MusicSearchViewModel {
 
     // MARK: - Initialization
     init() {
-        // Defer logging to avoid blocking initialization
-        Task { @MainActor in
-            B2BLog.search.info("🔍 Initializing MusicSearchViewModel with optimized performance")
-        }
+        // Use debug level for initialization logs to reduce noise
+        B2BLog.search.debug("Initializing MusicSearchViewModel")
         setupBindings()
         setupSearchPipeline()
     }

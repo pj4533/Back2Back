@@ -11,13 +11,19 @@ final class OpenAIClient {
     private let session: URLSession
     private var apiKey: String?
 
+    private static var isInitialized = false
+
     private init() {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 300
         self.session = URLSession(configuration: configuration)
 
-        B2BLog.ai.debug("OpenAIClient initialized")
+        // Prevent duplicate initialization logs
+        if !Self.isInitialized {
+            B2BLog.ai.debug("OpenAIClient initialized (singleton)")
+            Self.isInitialized = true
+        }
         loadAPIKey()
     }
 

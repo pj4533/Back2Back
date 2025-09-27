@@ -5,11 +5,16 @@ import OSLog
 @Observable
 @MainActor
 final class EnvironmentService {
+    // Use lazy initialization to prevent duplicate init logs
     static let shared = EnvironmentService()
 
     private let processInfo = ProcessInfo.processInfo
+    private var isInitialized = false
 
     private init() {
+        // Prevent duplicate initialization logs
+        guard !isInitialized else { return }
+        isInitialized = true
         B2BLog.general.debug("EnvironmentService initialized")
     }
 

@@ -2,7 +2,7 @@ import SwiftUI
 import MusicKit
 
 struct NowPlayingView: View {
-    @State private var viewModel = MusicSearchViewModel()
+    @StateObject private var viewModel = NowPlayingViewModel()
     @State private var isExpanded: Bool = false
 
     var body: some View {
