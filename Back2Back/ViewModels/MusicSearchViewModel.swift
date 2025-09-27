@@ -130,7 +130,7 @@ class MusicSearchViewModel {
                 let duration = Date().timeIntervalSince(startTime)
                 // Defer logging to avoid blocking UI updates
                 Task.detached(priority: .utility) {
-                    await B2BLog.search.performance("searchDuration", value: duration)
+                    await B2BLog.search.performance(metric: "searchDuration", value: duration)
                     await B2BLog.search.info("Found \(results.count) results for '\(searchTerm)' in \(String(format: "%.2f", duration))s")
                 }
 

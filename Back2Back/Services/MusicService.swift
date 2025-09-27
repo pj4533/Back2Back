@@ -127,7 +127,7 @@ class MusicService: ObservableObject {
             let results = response.songs.map { MusicSearchResult(song: $0) }
 
             let duration = Date().timeIntervalSince(startTime)
-            B2BLog.search.performance("searchDuration", value: duration)
+            B2BLog.search.performance(metric: "searchDuration", value: duration)
             B2BLog.search.info("Found \(results.count) results for '\(searchTerm)'")
 
             await MainActor.run {

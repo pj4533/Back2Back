@@ -64,7 +64,7 @@ final class OpenAIClient {
             let (data, response) = try await session.data(for: urlRequest)
             let elapsedTime = Date().timeIntervalSince(startTime)
 
-            B2BLog.search.performance("OpenAI API Response Time", value: elapsedTime)
+            B2BLog.network.performance(metric: "OpenAI API Response Time", value: elapsedTime)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 B2BLog.ai.error("Invalid response type")
