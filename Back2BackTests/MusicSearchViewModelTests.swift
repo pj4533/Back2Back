@@ -69,7 +69,7 @@ struct MusicSearchViewModelTests {
         viewModel.searchText = "test"
         viewModel.errorMessage = "error"
 
-        viewModel.clearSearch()
+        await viewModel.clearSearchAsync()
 
         #expect(viewModel.searchText.isEmpty)
         #expect(viewModel.searchResults.isEmpty)

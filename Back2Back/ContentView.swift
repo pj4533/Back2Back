@@ -12,6 +12,7 @@ import OSLog
 struct ContentView: View {
     @StateObject private var musicService = MusicService.shared
     @State private var showNowPlaying = false
+    @State private var showOpenAITest = false
 
     var body: some View {
         NavigationStack {
@@ -58,6 +59,16 @@ struct ContentView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
+
+                // OpenAI Test Button (for development)
+                Button(action: { showOpenAITest = true }) {
+                    Image(systemName: "bolt.circle")
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                }
+                .sheet(isPresented: $showOpenAITest) {
+                    OpenAITestView()
+                }
             }
             .padding()
         }
