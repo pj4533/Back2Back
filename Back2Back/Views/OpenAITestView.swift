@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 
 struct OpenAITestView: View {
     @State private var isLoading = false
@@ -111,7 +112,7 @@ struct OpenAITestView: View {
             B2BLog.ai.info("✅ OpenAI test successful")
             response = result
         } catch {
-            B2BLog.ai.error(error, context: "OpenAI connection test failed")
+            B2BLog.ai.error("❌ OpenAI connection test failed: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
         }
 

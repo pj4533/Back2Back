@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 @Observable
 @MainActor
@@ -43,7 +44,7 @@ final class OpenAIClient {
             throw OpenAIError.invalidURL
         }
 
-        B2BLog.network.apiCall("POST \(urlString)")
+        B2BLog.network.debug("🌐 API: POST \(urlString)")
         B2BLog.ai.debug("Model: \(request.model), Messages count: \(request.messages.count)")
 
         var urlRequest = URLRequest(url: url)
@@ -55,7 +56,7 @@ final class OpenAIClient {
             let encoder = JSONEncoder()
             urlRequest.httpBody = try encoder.encode(request)
         } catch {
-            B2BLog.ai.error(error, context: "Failed to encode request")
+            B2BLog.ai.error("❌ Failed to encode request: \(error.localizedDescription)")
             throw OpenAIError.encodingError(error)
         }
 
@@ -64,7 +65,7 @@ final class OpenAIClient {
             let (data, response) = try await session.data(for: urlRequest)
             let elapsedTime = Date().timeIntervalSince(startTime)
 
-            B2BLog.network.performance(metric: "OpenAI API Response Time", value: elapsedTime)
+            B2BLog.network.debug("⏱️ OpenAI API Response Time: \(elapsedTime)")
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 B2BLog.ai.error("Invalid response type")
@@ -86,7 +87,7 @@ final class OpenAIClient {
                     B2BLog.ai.info("Chat completion successful")
                     return completionResponse
                 } catch {
-                    B2BLog.ai.error(error, context: "Failed to decode success response")
+                    B2BLog.ai.error("❌ Failed to decode success response: \(error.localizedDescription)")
                     throw OpenAIError.decodingError(error)
                 }
 
@@ -112,7 +113,7 @@ final class OpenAIClient {
         } catch let error as OpenAIError {
             throw error
         } catch {
-            B2BLog.ai.error(error, context: "Network error")
+            B2BLog.ai.error("❌ Network error: \(error.localizedDescription)")
             throw OpenAIError.networkError(error)
         }
     }

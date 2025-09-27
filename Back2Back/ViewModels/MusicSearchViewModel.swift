@@ -130,7 +130,7 @@ class MusicSearchViewModel {
                 let duration = Date().timeIntervalSince(startTime)
                 // Defer logging to avoid blocking UI updates
                 Task.detached(priority: .utility) {
-                    await B2BLog.search.performance(metric: "searchDuration", value: duration)
+                    await B2BLog.search.debug("⏱️ searchDuration: \(duration)")
                     await B2BLog.search.info("Found \(results.count) results for '\(searchTerm)' in \(String(format: "%.2f", duration))s")
                 }
 
@@ -146,7 +146,7 @@ class MusicSearchViewModel {
                 self.isSearching = false
             } catch {
                 Task.detached(priority: .utility) {
-                    await B2BLog.search.error(error, context: "MusicSearchViewModel.performSearch")
+                    await B2BLog.search.error("❌ MusicSearchViewModel.performSearch: \(error.localizedDescription)")
                 }
                 self.errorMessage = "Search failed: \(error.localizedDescription)"
                 self.searchResults = []
@@ -161,7 +161,7 @@ class MusicSearchViewModel {
         request.limit = limit
 
         Task.detached(priority: .utility) {
-            await B2BLog.network.apiCall("MusicCatalogSearchRequest")
+            await B2BLog.network.debug("🌐 API: MusicCatalogSearchRequest")
         }
         let response = try await request.response()
 
@@ -174,7 +174,7 @@ class MusicSearchViewModel {
     func selectSong(_ song: Song) {
         Task {
             Task.detached(priority: .utility) {
-                await B2BLog.playback.userAction("Selected song: \(song.title)")
+                await B2BLog.playback.info("👤 Selected song: \(song.title)")
             }
             do {
                 try await musicService.playSong(song)
@@ -182,7 +182,7 @@ class MusicSearchViewModel {
             } catch {
                 errorMessage = "Failed to play song: \(error.localizedDescription)"
                 Task.detached(priority: .utility) {
-                    await B2BLog.playback.error(error, context: "MusicSearchViewModel.selectSong")
+                    await B2BLog.playback.error("❌ MusicSearchViewModel.selectSong: \(error.localizedDescription)")
                 }
             }
         }
@@ -195,7 +195,7 @@ class MusicSearchViewModel {
             } catch {
                 errorMessage = "Playback control failed: \(error.localizedDescription)"
                 Task.detached(priority: .utility) {
-                    await B2BLog.playback.error(error, context: "MusicSearchViewModel.togglePlayPause")
+                    await B2BLog.playback.error("❌ MusicSearchViewModel.togglePlayPause: \(error.localizedDescription)")
                 }
             }
         }
@@ -245,7 +245,7 @@ class MusicSearchViewModel {
 
     func clearSearchAsync() async {
         Task.detached(priority: .utility) {
-            await B2BLog.ui.userAction("Clear search")
+            await B2BLog.ui.info("👤 Clear search")
         }
 
         // Cancel any pending search operations

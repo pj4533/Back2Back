@@ -38,10 +38,10 @@ class MusicAuthViewModel: ObservableObject {
             do {
                 try await musicService.requestAuthorization()
                 checkCurrentAuthorizationStatus()
-                B2BLog.auth.success("Authorization request completed")
+                B2BLog.auth.info("✅ Authorization request completed")
             } catch {
                 errorMessage = error.localizedDescription
-                B2BLog.auth.error(error, context: "MusicAuthViewModel.requestAuthorization")
+                B2BLog.auth.error("❌ MusicAuthViewModel.requestAuthorization: \(error.localizedDescription)")
             }
 
             isRequestingAuthorization = false
@@ -72,7 +72,7 @@ class MusicAuthViewModel: ObservableObject {
     }
 
     func openSettings() {
-        B2BLog.ui.userAction("Open settings for music authorization")
+        B2BLog.ui.info("👤 Open settings for music authorization")
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
             B2BLog.ui.debug("Opened system settings")

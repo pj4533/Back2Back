@@ -44,7 +44,7 @@ class MusicService: ObservableObject {
         playbackState = player.state.playbackStatus
 
         if oldState != playbackState {
-            B2BLog.playback.stateChange(from: String(describing: oldState), to: String(describing: playbackState))
+            B2BLog.playback.info("🔄 State: \(String(describing: oldState)) → \(String(describing: self.playbackState))")
         }
 
         if let currentEntry = player.queue.currentEntry {
@@ -65,7 +65,7 @@ class MusicService: ObservableObject {
                     }
                 } catch {
                     currentlyPlaying = nil
-                    B2BLog.playback.error(error, context: "updatePlaybackState")
+                    B2BLog.playback.error("❌ updatePlaybackState: \(error.localizedDescription)")
                 }
             }
         } else {
@@ -94,11 +94,11 @@ class MusicService: ObservableObject {
             default:
                 error = MusicAuthorizationError.unknown
             }
-            B2BLog.auth.error(error, context: "requestAuthorization")
+            B2BLog.auth.error("❌ requestAuthorization: \(error.localizedDescription)")
             throw error
         }
 
-        B2BLog.auth.success("Music authorization granted")
+        B2BLog.auth.info("✅ Music authorization granted")
         B2BLog.auth.trace("← Exiting requestAuthorization")
     }
 
@@ -122,12 +122,12 @@ class MusicService: ObservableObject {
             var request = MusicCatalogSearchRequest(term: searchTerm, types: [Song.self])
             request.limit = limit
 
-            B2BLog.network.apiCall("MusicCatalogSearchRequest")
+            B2BLog.network.debug("🌐 API: MusicCatalogSearchRequest")
             let response = try await request.response()
             let results = response.songs.map { MusicSearchResult(song: $0) }
 
             let duration = Date().timeIntervalSince(startTime)
-            B2BLog.search.performance(metric: "searchDuration", value: duration)
+            B2BLog.search.debug("⏱️ searchDuration: \(duration)")
             B2BLog.search.info("Found \(results.count) results for '\(searchTerm)'")
 
             await MainActor.run {
@@ -135,7 +135,7 @@ class MusicService: ObservableObject {
                 isSearching = false
             }
         } catch {
-            B2BLog.search.error(error, context: "searchCatalog")
+            B2BLog.search.error("❌ searchCatalog: \(error.localizedDescription)")
             await MainActor.run {
                 isSearching = false
                 searchResults = []
@@ -145,15 +145,15 @@ class MusicService: ObservableObject {
     }
 
     func playSong(_ song: Song) async throws {
-        B2BLog.playback.userAction("Play song: \(song.title)")
+        B2BLog.playback.info("👤 Play song: \(song.title)")
 
         do {
             player.queue = ApplicationMusicPlayer.Queue(for: [song])
             try await player.play()
-            B2BLog.playback.success("Started playback: \(song.title) by \(song.artistName)")
+            B2BLog.playback.info("✅ Started playback: \(song.title) by \(song.artistName)")
         } catch {
             let playbackError = MusicPlaybackError.playbackFailed(error)
-            B2BLog.playback.error(playbackError, context: "playSong")
+            B2BLog.playback.error("❌ playSong: \(playbackError.localizedDescription)")
             throw playbackError
         }
     }
@@ -163,31 +163,31 @@ class MusicService: ObservableObject {
 
         do {
             try await player.queue.insert(song, position: .tail)
-            B2BLog.playback.success("Added to queue: \(song.title)")
+            B2BLog.playback.info("✅ Added to queue: \(song.title)")
         } catch {
             let queueError = MusicPlaybackError.queueFailed
-            B2BLog.playback.error(queueError, context: "addToQueue")
+            B2BLog.playback.error("❌ addToQueue: \(queueError.localizedDescription)")
             throw queueError
         }
     }
 
     func togglePlayPause() async throws {
         if player.state.playbackStatus == .playing {
-            B2BLog.playback.userAction("Pause playback")
+            B2BLog.playback.info("👤 Pause playback")
             player.pause()
         } else {
-            B2BLog.playback.userAction("Resume playback")
+            B2BLog.playback.info("👤 Resume playback")
             try await player.play()
         }
     }
 
     func skipToNext() async throws {
-        B2BLog.playback.userAction("Skip to next")
+        B2BLog.playback.info("👤 Skip to next")
         try await player.skipToNextEntry()
     }
 
     func skipToPrevious() async throws {
-        B2BLog.playback.userAction("Skip to previous")
+        B2BLog.playback.info("👤 Skip to previous")
         try await player.skipToPreviousEntry()
     }
 

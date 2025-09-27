@@ -84,7 +84,7 @@ struct ContentView: View {
                 do {
                     try await musicService.requestAuthorization()
                 } catch {
-                    B2BLog.auth.error(error, context: "ContentView.checkAuthorizationStatus")
+                    B2BLog.auth.error("❌ ContentView.checkAuthorizationStatus: \(error.localizedDescription)")
                 }
             }
         }
