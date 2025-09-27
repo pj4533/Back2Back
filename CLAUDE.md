@@ -1,5 +1,12 @@
 # Back2Back (B2B) Project Context
 
+## Current Environment (IMPORTANT)
+**Current Date**: 2025
+**iOS Version**: iOS 26 (latest)
+**Xcode Version**: Xcode 26 (latest)
+
+⚠️ **Note for web searches**: We are in 2025 using iOS 26 and Xcode 26. When searching for documentation or solutions, prioritize recent content from 2025 and iOS 26/Xcode 26 specific resources.
+
 ## Project Overview
 Back2Back is an iOS app that creates an interactive DJ experience where users and AI take turns selecting songs, creating a collaborative back-to-back DJ session. The AI selects tracks based on configurable personas (e.g., "Mark Ronson," "1970s NYC crate digger").
 
@@ -7,12 +14,12 @@ Back2Back is an iOS app that creates an interactive DJ experience where users an
 Primary requirements are documented in: `docs/back2back_requirements.md`
 
 ## Technology Stack
-- **Platform**: iOS 18+ (using latest available APIs)
+- **Platform**: iOS 26 (using latest available APIs)
 - **Language**: Swift 6+
 - **UI Framework**: SwiftUI
 - **Music Playback**: Apple MusicKit
 - **AI Integration**: OpenAI API for persona-based song recommendations
-- **Minimum iOS Version**: iOS 17.0+ (for latest MusicKit features)
+- **Minimum iOS Version**: iOS 26.0 (for latest MusicKit features)
 
 ## Key APIs & Documentation
 
@@ -84,7 +91,7 @@ Back2Back/
 ## Development Guidelines
 
 ### MusicKit Setup (Xcode 13+ Changes)
-**IMPORTANT**: Starting from Xcode 13 (and continuing in Xcode 16/26):
+**IMPORTANT**: Starting from Xcode 13 (and continuing in Xcode 26):
 - Info.plist is now integrated into the project settings as "Custom iOS Target Properties"
 - Access via: Project → Target → Info tab
 - NSAppleMusicUsageDescription should be set via INFOPLIST_KEY_NSAppleMusicUsageDescription in build settings
@@ -178,7 +185,7 @@ The app uses a comprehensive logging system with OSLog:
 
 ### Architecture Patterns
 - **MVVM**: Clear separation between Views and ViewModels
-- **@Observable**: Modern observation framework (iOS 17+)
+- **@Observable**: Modern observation framework (iOS 17+, enhanced in iOS 26)
 - **Singleton Pattern**: MusicService.shared for centralized state
 - **Swift Concurrency**: async/await throughout, no completion handlers
 - **@MainActor**: Ensures UI updates on main thread
