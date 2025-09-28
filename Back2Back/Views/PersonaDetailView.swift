@@ -49,24 +49,37 @@ struct PersonaDetailView: View {
                         if isGenerating {
                             // Show different icon based on status
                             Group {
-                                if generationStatusMessage.contains("✅") {
+                                if generationStatusMessage.lowercased().contains("complete") {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(.green)
                                         .font(.system(size: 36))
-                                } else if generationStatusMessage.contains("❌") {
-                                    Image(systemName: "xmark.circle.fill")
+                                } else if generationStatusMessage.lowercased().contains("error") {
+                                    Image(systemName: "exclamationmark.triangle.fill")
                                         .foregroundColor(.red)
                                         .font(.system(size: 36))
-                                } else if generationStatusMessage.contains("🔎") {
-                                    Image(systemName: "magnifyingglass.circle.fill")
+                                } else if generationStatusMessage.lowercased().contains("thinking") ||
+                                         generationStatusMessage.lowercased().contains("analysis") {
+                                    Image(systemName: "brain")
+                                        .foregroundColor(.purple)
+                                        .font(.system(size: 36))
+                                        .symbolEffect(.pulse, options: .repeating)
+                                } else if generationStatusMessage.lowercased().contains("search") {
+                                    Image(systemName: "magnifyingglass")
                                         .foregroundColor(.blue)
                                         .font(.system(size: 36))
                                         .symbolEffect(.pulse, options: .repeating)
-                                } else if generationStatusMessage.contains("✍️") {
-                                    Image(systemName: "pencil.circle.fill")
+                                } else if generationStatusMessage.lowercased().contains("writing") ||
+                                         generationStatusMessage.lowercased().contains("expanding") ||
+                                         generationStatusMessage.lowercased().contains("detailing") ||
+                                         generationStatusMessage.lowercased().contains("style guide") {
+                                    Image(systemName: "pencil")
                                         .foregroundColor(.orange)
                                         .font(.system(size: 36))
                                         .symbolEffect(.pulse, options: .repeating)
+                                } else if generationStatusMessage.lowercased().contains("citation") {
+                                    Image(systemName: "quote.bubble")
+                                        .foregroundColor(.indigo)
+                                        .font(.system(size: 36))
                                 } else {
                                     ProgressView()
                                         .scaleEffect(1.2)
@@ -74,12 +87,12 @@ struct PersonaDetailView: View {
                             }
                             .padding(.bottom, 8)
 
-                            Text(generationStatusMessage.isEmpty ? "Preparing to generate..." : generationStatusMessage)
-                                .font(.subheadline)
-                                .foregroundColor(generationStatusMessage.contains("❌") ? .red : .primary)
+                            Text(generationStatusMessage.isEmpty ? "Initializing..." : generationStatusMessage)
+                                .font(.system(.subheadline, design: .rounded))
+                                .foregroundColor(generationStatusMessage.lowercased().contains("error") ? .red : .primary)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: .infinity)
-                                .animation(.easeInOut(duration: 0.3), value: generationStatusMessage)
+                                .animation(.easeInOut(duration: 0.2), value: generationStatusMessage)
                         } else if !styleGuide.isEmpty {
                             // Show the generated style guide
                             ScrollView {
