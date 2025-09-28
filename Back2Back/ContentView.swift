@@ -37,42 +37,24 @@ struct ContentView: View {
 
     private var mainContent: some View {
         VStack(spacing: 0) {
-            headerView
-
-            MusicSearchView()
-
-            Spacer()
-        }
-        .navigationBarHidden(true)
-    }
-
-    private var headerView: some View {
-        VStack(spacing: 8) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Back2Back")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-
-                    Text("Let's DJ together")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-
-                // OpenAI Test Button (for development)
-                Button(action: { showOpenAITest = true }) {
-                    Image(systemName: "bolt.circle")
-                        .font(.title2)
-                        .foregroundColor(.blue)
+            // Session View is now the main content
+            SessionView()
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        // OpenAI Test Button (for development)
+                        Button(action: { showOpenAITest = true }) {
+                            Image(systemName: "bolt.circle")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                        }
+                    }
                 }
                 .sheet(isPresented: $showOpenAITest) {
                     OpenAITestView()
                 }
-            }
-            .padding()
         }
-        .background(Color(.systemBackground))
+        .navigationBarHidden(false)
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func checkAuthorizationStatus() {

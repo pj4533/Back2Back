@@ -6,6 +6,9 @@ struct MusicSearchView: View {
     @State private var localSearchText: String = ""  // Local state for immediate UI updates
     @FocusState private var isSearchFieldFocused: Bool
 
+    // Optional callback for when a song is selected (for modal usage)
+    var onSongSelected: ((Song) -> Void)?
+
     var body: some View {
         VStack(spacing: 0) {
             searchBar
@@ -79,7 +82,15 @@ struct MusicSearchView: View {
                 ForEach(viewModel.searchResults) { result in
                     SearchResultRow(
                         result: result,
-                        onTap: { viewModel.selectSong(result.song) }
+                        onTap: {
+                            if let callback = onSongSelected {
+                                // Use the callback if provided (modal mode)
+                                callback(result.song)
+                            } else {
+                                // Use the default behavior (standalone mode)
+                                viewModel.selectSong(result.song)
+                            }
+                        }
                     )
                     .id(result.id)  // Ensure proper view identity
 
