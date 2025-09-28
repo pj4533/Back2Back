@@ -82,6 +82,7 @@ final class PersonasViewModel {
             }
 
             isGeneratingStyleGuide = false
+            B2BLog.ai.info("📤 Returning style guide with length: \(result.styleGuide.count)")
             return result.styleGuide
         } catch {
             B2BLog.ai.error("❌ Failed to generate style guide: \(error)")

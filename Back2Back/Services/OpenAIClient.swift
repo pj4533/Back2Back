@@ -612,11 +612,52 @@ final class OpenAIClient {
 
             // Return the final response or construct one from accumulated data
             if let finalResponse = finalResponse {
-                B2BLog.ai.info("Streaming responses API call successful")
+                B2BLog.ai.info("Streaming responses API call successful - using finalResponse")
+                B2BLog.ai.info("📊 FinalResponse outputText before fix: \(finalResponse.outputText.isEmpty ? "[EMPTY]" : "[\(finalResponse.outputText.count) chars]")")
+                B2BLog.ai.info("📊 FinalResponse output items: \(finalResponse.output.count)")
+
+                // If we have accumulated text but the response doesn't have it, add it
+                if !accumulatedText.isEmpty && finalResponse.outputText.isEmpty {
+                    B2BLog.ai.info("🔧 Fixing empty outputText with accumulated text: \(accumulatedText.count) chars")
+                    let outputContent = ResponseContent(
+                        type: "output_text",
+                        text: accumulatedText,
+                        annotations: nil,
+                        logprobs: nil
+                    )
+                    let message = ResponseMessage(
+                        id: "msg_streaming",
+                        type: "message",
+                        content: [outputContent],
+                        role: "assistant",
+                        status: "completed"
+                    )
+                    // Create a new response with the message added to the output
+                    let fixedResponse = ResponsesResponse(
+                        id: finalResponse.id,
+                        object: finalResponse.object,
+                        createdAt: finalResponse.createdAt,
+                        model: finalResponse.model,
+                        output: finalResponse.output + [.message(message)],
+                        status: finalResponse.status,
+                        usage: finalResponse.usage,
+                        metadata: finalResponse.metadata,
+                        reasoning: finalResponse.reasoning,
+                        text: finalResponse.text,
+                        temperature: finalResponse.temperature,
+                        topP: finalResponse.topP,
+                        billing: finalResponse.billing,
+                        webSearchCall: finalResponse.webSearchCall ?? WebSearchCall(action: sources.isEmpty ? nil : WebSearchAction(sources: sources))
+                    )
+                    B2BLog.ai.info("📊 Fixed response outputText: \(fixedResponse.outputText.isEmpty ? "[EMPTY]" : "[\(fixedResponse.outputText.count) chars]")")
+                    return fixedResponse
+                }
+
+                B2BLog.ai.info("📊 FinalResponse outputText: \(finalResponse.outputText.isEmpty ? "[EMPTY]" : "[\(finalResponse.outputText.count) chars]")")
                 return finalResponse
             } else if !accumulatedText.isEmpty {
                 // Construct a response from the accumulated text
-                B2BLog.ai.info("Constructing response from accumulated text")
+                B2BLog.ai.info("Constructing response from accumulated text: \(accumulatedText.count) chars")
                 let outputContent = ResponseContent(
                     type: "output_text",
                     text: accumulatedText,
@@ -646,6 +687,7 @@ final class OpenAIClient {
                     billing: nil,
                     webSearchCall: WebSearchCall(action: sources.isEmpty ? nil : WebSearchAction(sources: sources))
                 )
+                B2BLog.ai.info("📊 Constructed response outputText: \(constructedResponse.outputText.isEmpty ? "[EMPTY]" : "[\(constructedResponse.outputText.count) chars]")")
                 return constructedResponse
             } else {
                 // This should not happen in normal operation
@@ -698,6 +740,58 @@ final class OpenAIClient {
         return response.outputText
     }
 
+    // MARK: - Helper Methods
+
+    private func stripCitations(from text: String) -> String {
+        // Remove various citation formats:
+        // [1], [2], etc. - numbered citations in brackets
+        // ^1^, ^2^, etc. - superscript style citations
+        // (1), (2), etc. - numbered citations in parentheses
+        // [[1]], [[2]], etc. - double bracket citations
+
+        var cleanedText = text
+
+        // Remove [number] style citations
+        cleanedText = cleanedText.replacingOccurrences(
+            of: #"\[\d+\]"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // Remove ^number^ style citations
+        cleanedText = cleanedText.replacingOccurrences(
+            of: #"\^\d+\^"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // Remove [[number]] style citations
+        cleanedText = cleanedText.replacingOccurrences(
+            of: #"\[\[\d+\]\]"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // Remove footnote-style citations like ¹, ², ³, etc.
+        cleanedText = cleanedText.replacingOccurrences(
+            of: #"[¹²³⁴⁵⁶⁷⁸⁹⁰]+"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // Clean up any double spaces left behind
+        cleanedText = cleanedText.replacingOccurrences(
+            of: #"\s{2,}"#,
+            with: " ",
+            options: .regularExpression
+        )
+
+        // Trim whitespace
+        cleanedText = cleanedText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return cleanedText
+    }
+
     // MARK: - Persona Style Guide Generation
 
     func generatePersonaStyleGuide(
@@ -717,8 +811,7 @@ final class OpenAIClient {
         Format the guide to optimize song selection decisions.
 
         IMPORTANT FORMATTING REQUIREMENTS:
-        - DO NOT include any source annotations, citations, or reference numbers in the style guide
-        - Focus ONLY on actionable information for song selection
+        - Focus on actionable information for song selection
         - Keep the total guide between 2000-5000 characters for optimal use
         - Write in clear, direct prose without excessive detail
         - Prioritize practical guidance over encyclopedic information
@@ -744,7 +837,6 @@ final class OpenAIClient {
         - How to maintain thematic coherence in selections
         - Key mood and energy considerations for song flow
 
-        Remember: NO citations, NO annotations, NO reference markers - just pure, actionable guidance.
         """
 
         let request = ResponsesRequest(
@@ -929,11 +1021,17 @@ final class OpenAIClient {
                 B2BLog.ai.debug("Extracted \(sources.count) sources from final response")
             }
 
+            // Strip any citations that OpenAI might have included despite our request
+            let cleanedStyleGuide = stripCitations(from: response.outputText)
+
             let result = PersonaGenerationResult(
                 name: name,
-                styleGuide: response.outputText,
+                styleGuide: cleanedStyleGuide,
                 sources: sources
             )
+
+            B2BLog.ai.info("📝 Original style guide length: \(response.outputText.count) chars")
+            B2BLog.ai.info("🧹 Cleaned style guide length: \(cleanedStyleGuide.count) chars")
 
             B2BLog.ai.info("✅ Generated style guide for: \(name)")
             if !sources.isEmpty {

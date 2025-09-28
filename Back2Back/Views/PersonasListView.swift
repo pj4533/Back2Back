@@ -46,12 +46,12 @@ struct PersonasListView: View {
         }
         .sheet(item: $showingDetailView) { persona in
             NavigationStack {
-                PersonaDetailView(persona: persona, viewModel: viewModel)
+                PersonaDetailView(persona: persona, personasViewModel: viewModel)
             }
         }
         .sheet(isPresented: $showingAddPersona) {
             NavigationStack {
-                PersonaDetailView(persona: nil, viewModel: viewModel)
+                PersonaDetailView(persona: nil, personasViewModel: viewModel)
             }
         }
         .alert("Delete Persona", isPresented: $showingDeleteAlert, presenting: personaToDelete) { persona in
