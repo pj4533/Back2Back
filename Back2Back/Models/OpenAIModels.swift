@@ -72,23 +72,31 @@ struct ResponsesRequest: Codable {
     let input: String
     let text: TextConfig?
     let reasoning: ReasoningConfig?
+    let tools: [[String: String]]?
+    let include: [String]?
 
     enum CodingKeys: String, CodingKey {
         case model
         case input
         case text
         case reasoning
+        case tools
+        case include
     }
 
     init(model: String = "gpt-5",
          input: String,
          verbosity: VerbosityLevel? = nil,
          reasoningEffort: ReasoningEffort? = nil,
-         format: TextFormat? = nil) {
+         format: TextFormat? = nil,
+         tools: [[String: String]]? = nil,
+         include: [String]? = nil) {
         self.model = model
         self.input = input
         self.text = (verbosity != nil || format != nil) ? TextConfig(verbosity: verbosity, format: format) : nil
         self.reasoning = reasoningEffort.map { ReasoningConfig(effort: $0) }
+        self.tools = tools
+        self.include = include
     }
 }
 
@@ -132,6 +140,7 @@ struct ResponsesResponse: Codable {
     let temperature: Double?
     let topP: Double?
     let billing: ResponseBilling?
+    let webSearchCall: WebSearchCall?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -147,6 +156,7 @@ struct ResponsesResponse: Codable {
         case temperature
         case topP = "top_p"
         case billing
+        case webSearchCall = "web_search_call"
     }
 
     // Custom decoding to handle metadata as [String: Any]
@@ -166,6 +176,7 @@ struct ResponsesResponse: Codable {
         temperature = try container.decodeIfPresent(Double.self, forKey: .temperature)
         topP = try container.decodeIfPresent(Double.self, forKey: .topP)
         billing = try container.decodeIfPresent(ResponseBilling.self, forKey: .billing)
+        webSearchCall = try container.decodeIfPresent(WebSearchCall.self, forKey: .webSearchCall)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -183,6 +194,7 @@ struct ResponsesResponse: Codable {
         try container.encodeIfPresent(temperature, forKey: .temperature)
         try container.encodeIfPresent(topP, forKey: .topP)
         try container.encodeIfPresent(billing, forKey: .billing)
+        try container.encodeIfPresent(webSearchCall, forKey: .webSearchCall)
     }
 
     // Computed property to get the text output
@@ -411,6 +423,22 @@ struct OutputTokensDetails: Codable {
 }
 
 // Remove old ResponseMetadata since the actual API uses a generic dictionary
+
+// MARK: - Web Search Models
+
+struct WebSearchCall: Codable {
+    let action: WebSearchAction?
+}
+
+struct WebSearchAction: Codable {
+    let sources: [WebSearchSource]?
+}
+
+struct WebSearchSource: Codable {
+    let title: String?
+    let url: String?
+    let snippet: String?
+}
 
 // MARK: - Error Response
 

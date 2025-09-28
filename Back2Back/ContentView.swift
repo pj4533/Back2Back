@@ -13,21 +13,22 @@ struct ContentView: View {
     @ObservedObject private var musicService = MusicService.shared
     @State private var showNowPlaying = false
     @State private var showOpenAITest = false
+    @State private var selectedTab = 0
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .bottom) {
-                if musicService.isAuthorized {
-                    mainContent
-                } else {
+        ZStack(alignment: .bottom) {
+            if musicService.isAuthorized {
+                mainContent
+            } else {
+                NavigationStack {
                     MusicAuthorizationView()
                 }
+            }
 
-                if musicService.currentlyPlaying != nil {
-                    NowPlayingView()
-                        .transition(.move(edge: .bottom))
-                        .zIndex(1)
-                }
+            if musicService.currentlyPlaying != nil {
+                NowPlayingView()
+                    .transition(.move(edge: .bottom))
+                    .zIndex(1)
             }
         }
         .onAppear {
@@ -36,25 +37,36 @@ struct ContentView: View {
     }
 
     private var mainContent: some View {
-        VStack(spacing: 0) {
-            // Session View is now the main content
-            SessionView()
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        // OpenAI Test Button (for development)
-                        Button(action: { showOpenAITest = true }) {
-                            Image(systemName: "bolt.circle")
-                                .font(.title3)
-                                .foregroundColor(.blue)
+        TabView(selection: $selectedTab) {
+            NavigationStack {
+                SessionView()
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            // OpenAI Test Button (for development)
+                            Button(action: { showOpenAITest = true }) {
+                                Image(systemName: "bolt.circle")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                            }
                         }
                     }
-                }
-                .sheet(isPresented: $showOpenAITest) {
-                    OpenAITestView()
-                }
+                    .sheet(isPresented: $showOpenAITest) {
+                        OpenAITestView()
+                    }
+            }
+            .tabItem {
+                Label("Session", systemImage: "music.note.list")
+            }
+            .tag(0)
+
+            NavigationStack {
+                PersonasListView()
+            }
+            .tabItem {
+                Label("Personas", systemImage: "person.3.fill")
+            }
+            .tag(1)
         }
-        .navigationBarHidden(false)
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func checkAuthorizationStatus() {

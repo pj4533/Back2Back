@@ -16,9 +16,9 @@ final class OpenAIClient {
 
     private init() {
         let configuration = URLSessionConfiguration.default
-        // Set long timeouts for AI generation - can take significant time
-        configuration.timeoutIntervalForRequest = 120  // 2 minutes for individual requests
-        configuration.timeoutIntervalForResource = 600  // 10 minutes for total resource time
+        // Disable timeouts for AI generation - web search can take very long
+        configuration.timeoutIntervalForRequest = 0  // No timeout
+        configuration.timeoutIntervalForResource = 0  // No timeout
         self.session = URLSession(configuration: configuration)
 
         // Prevent duplicate initialization logs
@@ -218,6 +218,82 @@ final class OpenAIClient {
 
         B2BLog.ai.info("Received recommendation from \(persona)")
         return response.outputText
+    }
+
+    // MARK: - Persona Style Guide Generation
+
+    func generatePersonaStyleGuide(
+        name: String,
+        description: String
+    ) async throws -> PersonaGenerationResult {
+        B2BLog.ai.info("Generating style guide for persona: \(name)")
+
+        let prompt = """
+        Generate a DJ persona style guide for making song selections based on this description:
+        \(description)
+
+        Research real information about this style/person/era using web search.
+
+        This style guide will be used by an AI to select songs in a back-to-back DJ session.
+        Format the guide to optimize song selection decisions.
+
+        IMPORTANT: The persona description might be music-related OR completely unrelated to music:
+
+        - For MUSIC-RELATED descriptions (genres, time periods, musicians, DJs):
+          Create a style guide that DIRECTLY reflects those musical characteristics.
+          Example: "1970s disco" → songs from that era and genre
+
+        - For NON-MUSIC descriptions (scientists, historical figures, concepts, etc.):
+          Create a style guide that captures the ESSENCE of the description through song choices.
+          The songs should be INSPIRED BY the persona's characteristics, achievements, or themes.
+          Example: "Albert Einstein" → songs with scientific themes, references to relativity,
+          space, time, mathematics, or genius in titles/lyrics
+
+        The style guide should enable intelligent, thematic song selections that embody the persona.
+
+        Respond with a comprehensive style guide that includes:
+        - Musical preferences and characteristics
+        - Preferred genres, eras, and styles
+        - Song selection criteria
+        - Specific artists or tracks that exemplify this persona
+        - How to maintain thematic coherence in selections
+        """
+
+        let request = ResponsesRequest(
+            model: "gpt-5",
+            input: prompt,
+            verbosity: .high,
+            reasoningEffort: .high,
+            tools: [["type": "web_search"]],
+            include: ["web_search_call.action.sources"]
+        )
+
+        do {
+            let response = try await responses(request: request)
+
+            // Extract sources from web search if available
+            var sources: [String] = []
+            if let webSearchCalls = response.webSearchCall?.action?.sources {
+                sources = webSearchCalls.compactMap { $0.url }
+                B2BLog.ai.debug("Web search returned \(sources.count) sources")
+            }
+
+            let result = PersonaGenerationResult(
+                name: name,
+                styleGuide: response.outputText,
+                sources: sources
+            )
+
+            B2BLog.ai.info("✅ Generated style guide for: \(name)")
+            if !sources.isEmpty {
+                B2BLog.ai.debug("Sources used: \(sources.joined(separator: ", "))")
+            }
+
+            return result
+        } catch {
+            B2BLog.ai.error("Failed to generate style guide: \(error)")
+            throw error
+        }
     }
 
     // MARK: - Song Selection

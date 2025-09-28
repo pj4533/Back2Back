@@ -122,7 +122,7 @@ final class SessionViewModel {
         }
 
         let recommendation = try await openAIClient.selectNextSong(
-            persona: sessionService.currentPersona,
+            persona: sessionService.currentPersonaStyleGuide,
             sessionHistory: sessionService.sessionHistory
         )
 
@@ -130,7 +130,7 @@ final class SessionViewModel {
         if sessionService.hasSongBeenPlayed(artist: recommendation.artist, title: recommendation.song) {
             B2BLog.ai.warning("AI tried to select already-played song, retrying")
             // Try once more with emphasis on no repeats
-            let retryPersona = sessionService.currentPersona + "\n\nIMPORTANT: Never select a song that has already been played in this session."
+            let retryPersona = sessionService.currentPersonaStyleGuide + "\n\nIMPORTANT: Never select a song that has already been played in this session."
             return try await openAIClient.selectNextSong(
                 persona: retryPersona,
                 sessionHistory: sessionService.sessionHistory

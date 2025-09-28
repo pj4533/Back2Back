@@ -42,6 +42,10 @@ struct SessionView: View {
                         }
                     }
                 }
+
+                Text("AI Persona: \(sessionService.currentPersonaName)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 .padding(.horizontal)
             }
             .padding()
