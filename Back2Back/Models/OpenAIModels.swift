@@ -159,6 +159,28 @@ struct ResponsesResponse: Codable {
         case webSearchCall = "web_search_call"
     }
 
+    // Custom initializer for creating from streaming events
+    init(id: String, object: String, createdAt: Double, model: String, output: [ResponseOutputItem],
+         status: String, usage: ResponseUsage? = nil, metadata: [String: Any]? = nil,
+         reasoning: ResponseReasoning? = nil, text: ResponseTextConfig? = nil,
+         temperature: Double? = nil, topP: Double? = nil, billing: ResponseBilling? = nil,
+         webSearchCall: WebSearchCall? = nil) {
+        self.id = id
+        self.object = object
+        self.createdAt = createdAt
+        self.model = model
+        self.output = output
+        self.status = status
+        self.usage = usage
+        self.metadata = metadata
+        self.reasoning = reasoning
+        self.text = text
+        self.temperature = temperature
+        self.topP = topP
+        self.billing = billing
+        self.webSearchCall = webSearchCall
+    }
+
     // Custom decoding to handle metadata as [String: Any]
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -209,7 +231,7 @@ struct ResponsesResponse: Codable {
                         }
                     }
                 }
-            case .reasoning:
+            case .reasoning, .webSearchCall:
                 continue
             }
         }
@@ -221,6 +243,7 @@ struct ResponsesResponse: Codable {
 enum ResponseOutputItem: Codable {
     case reasoning(ResponseReasoningItem)
     case message(ResponseMessage)
+    case webSearchCall(ResponseWebSearchCall)
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -229,6 +252,7 @@ enum ResponseOutputItem: Codable {
         case content
         case role
         case status
+        case action
     }
 
     init(from decoder: Decoder) throws {
@@ -246,6 +270,11 @@ enum ResponseOutputItem: Codable {
             let role = try container.decode(String.self, forKey: .role)
             let status = try container.decodeIfPresent(String.self, forKey: .status)
             self = .message(ResponseMessage(id: id, type: type, content: content, role: role, status: status))
+        case "web_search_call":
+            let id = try container.decode(String.self, forKey: .id)
+            let status = try container.decodeIfPresent(String.self, forKey: .status)
+            let action = try container.decodeIfPresent(WebSearchAction.self, forKey: .action)
+            self = .webSearchCall(ResponseWebSearchCall(id: id, type: type, status: status, action: action))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type,
                                                     in: container,
@@ -266,6 +295,11 @@ enum ResponseOutputItem: Codable {
             try container.encodeIfPresent(message.content, forKey: .content)
             try container.encode(message.role, forKey: .role)
             try container.encodeIfPresent(message.status, forKey: .status)
+        case .webSearchCall(let webSearch):
+            try container.encode(webSearch.type, forKey: .type)
+            try container.encode(webSearch.id, forKey: .id)
+            try container.encodeIfPresent(webSearch.status, forKey: .status)
+            try container.encodeIfPresent(webSearch.action, forKey: .action)
         }
     }
 }
@@ -284,10 +318,17 @@ struct ResponseMessage: Codable {
     let status: String?
 }
 
+struct ResponseWebSearchCall: Codable {
+    let id: String
+    let type: String
+    let status: String?
+    let action: WebSearchAction?
+}
+
 struct ResponseContent: Codable {
     let type: String
     let text: String?
-    let annotations: [String]?
+    let annotations: [ResponseAnnotation]?
     let logprobs: [String]?
 
     enum CodingKeys: String, CodingKey {
@@ -295,6 +336,22 @@ struct ResponseContent: Codable {
         case text
         case annotations
         case logprobs
+    }
+}
+
+struct ResponseAnnotation: Codable {
+    let type: String
+    let startIndex: Int?
+    let endIndex: Int?
+    let title: String?
+    let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case startIndex = "start_index"
+        case endIndex = "end_index"
+        case title
+        case url
     }
 }
 
@@ -423,6 +480,209 @@ struct OutputTokensDetails: Codable {
 }
 
 // Remove old ResponseMetadata since the actual API uses a generic dictionary
+
+// MARK: - Streaming Event Models
+
+enum StreamEventType: String, Codable, CustomStringConvertible {
+    case responseCreated = "response.created"
+    case responseInProgress = "response.in_progress"
+    case responseCompleted = "response.completed"
+    case responseError = "response.error"
+    case responseOutputItemAdded = "response.output_item.added"
+    case responseOutputItemDone = "response.output_item.done"
+    case responseContentPartAdded = "response.content_part.added"
+    case responseContentPartDone = "response.content_part.done"
+    case outputTextDelta = "response.output_text.delta"
+    case responseOutputTextAnnotationAdded = "response.output_text.annotation.added"
+    case responseOutputTextDone = "response.output_text.done"
+    case webSearchInProgress = "response.web_search_call.in_progress"
+    case webSearchSearching = "response.web_search_call.searching"
+    case webSearchCompleted = "response.web_search_call.completed"
+    // Additional streaming events based on the API
+    case responseOutput = "response.output"
+    case responseReasoning = "response.reasoning"
+    case responseContent = "response.content"
+    case responseReasoningDelta = "response.reasoning.delta"
+    case responseContentDelta = "response.content.delta"
+    case responseDone = "response.done"
+    case other
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+        self = StreamEventType(rawValue: value) ?? .other
+    }
+
+    var description: String {
+        switch self {
+        case .other:
+            return "other"
+        default:
+            return rawValue
+        }
+    }
+}
+
+// Stream event item structures for detailed event handling
+struct StreamEventItem: Codable {
+    let id: String
+    let type: String
+    let status: String?
+    let summary: [String]?
+    let action: StreamEventAction?
+    let content: [ResponseContent]?
+    let role: String?
+}
+
+struct StreamEventAction: Codable {
+    let type: String
+    let query: String?
+    let sources: [WebSearchSource]?
+}
+
+struct StreamEventPart: Codable {
+    let type: String
+    let text: String?
+    let annotations: [StreamEventAnnotation]?
+    let logprobs: [String]?
+}
+
+struct StreamEventAnnotation: Codable {
+    let type: String
+    let startIndex: Int?
+    let endIndex: Int?
+    let title: String?
+    let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case startIndex = "start_index"
+        case endIndex = "end_index"
+        case title
+        case url
+    }
+}
+
+struct StreamEventResponse: Codable {
+    let id: String
+    let object: String
+    let createdAt: Double?
+    let status: String
+    let output: [ResponseOutputItem]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case object
+        case createdAt = "created_at"
+        case status
+        case output
+    }
+}
+
+struct StreamEvent: Codable {
+    let type: StreamEventType
+    let delta: String?
+    let webSearchCallId: String?
+    let results: WebSearchStreamResults?
+    let error: StreamError?
+    let output: [ResponseOutputItem]?
+    let id: String?
+    let object: String?
+    let createdAt: Double?
+    let model: String?
+    let status: String?
+    let usage: ResponseUsage?
+    let sequenceNumber: Int?
+    let outputIndex: Int?
+    let contentIndex: Int?
+    let annotationIndex: Int?
+    let itemId: String?
+    let item: StreamEventItem?
+    let part: StreamEventPart?
+    let annotation: StreamEventAnnotation?
+    let response: StreamEventResponse?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case delta
+        case webSearchCallId = "web_search_call_id"
+        case results
+        case error
+        case output
+        case id
+        case object
+        case createdAt = "created_at"
+        case model
+        case status
+        case usage
+        case sequenceNumber = "sequence_number"
+        case outputIndex = "output_index"
+        case contentIndex = "content_index"
+        case annotationIndex = "annotation_index"
+        case itemId = "item_id"
+        case item
+        case part
+        case annotation
+        case response
+    }
+
+    // Computed property to extract text delta from output items
+    var textDelta: String? {
+        if let delta = delta {
+            return delta
+        }
+
+        // For response.output_text.delta events, the text might be in the output array
+        if let output = output {
+            for item in output {
+                switch item {
+                case .message(let message):
+                    if let content = message.content {
+                        for contentItem in content {
+                            if contentItem.type == "output_text", let text = contentItem.text {
+                                return text
+                            }
+                        }
+                    }
+                case .reasoning, .webSearchCall:
+                    continue
+                }
+            }
+        }
+
+        return nil
+    }
+}
+
+struct StreamError: Codable {
+    let message: String
+    let type: String?
+    let code: String?
+}
+
+struct WebSearchStreamResults: Codable {
+    let sources: [WebSearchSource]?
+}
+
+// Streaming-specific event for receiving partial responses
+struct StreamingEvent {
+    let type: StreamEventType
+    let delta: String?
+    let sources: [WebSearchSource]?
+    let error: StreamError?
+    let response: ResponsesResponse?
+    let item: StreamEventItem?
+
+    init(type: StreamEventType, delta: String? = nil, sources: [WebSearchSource]? = nil,
+         error: StreamError? = nil, response: ResponsesResponse? = nil, item: StreamEventItem? = nil) {
+        self.type = type
+        self.delta = delta
+        self.sources = sources
+        self.error = error
+        self.response = response
+        self.item = item
+    }
+}
 
 // MARK: - Web Search Models
 

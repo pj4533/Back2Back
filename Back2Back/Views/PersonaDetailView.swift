@@ -1,16 +1,30 @@
 import SwiftUI
+import OSLog
 
 struct PersonaDetailView: View {
     let persona: Persona?
-    var viewModel: PersonasViewModel
+    let personasViewModel: PersonasViewModel
+    @Bindable var viewModel: PersonaDetailViewModel
 
-    @State private var name: String = ""
-    @State private var description: String = ""
-    @State private var styleGuide: String = ""
-    @State private var isGenerating = false
-    @State private var generationStatusMessage = ""
-    @State private var showingSources = false
+    @FocusState private var focusedField: Field?
     @Environment(\.dismiss) var dismiss
+    @State private var showingSources = false
+
+    enum Field: Hashable {
+        case name
+        case description
+    }
+
+    init(persona: Persona?, personasViewModel: PersonasViewModel) {
+        self.persona = persona
+        self.personasViewModel = personasViewModel
+        // Use @Bindable for @Observable classes in iOS 17+
+        // This properly sets up observation and binding
+        self.viewModel = PersonaDetailViewModel(
+            persona: persona,
+            personasViewModel: personasViewModel
+        )
+    }
 
     var isNewPersona: Bool {
         persona == nil
@@ -18,197 +32,254 @@ struct PersonaDetailView: View {
 
     var body: some View {
         Form {
-            Section("Persona Details") {
-                TextField("Name", text: $name)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Description")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    TextEditor(text: $description)
-                        .frame(minHeight: 80)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                }
-            }
-
-            Section("Style Guide") {
-                if styleGuide.isEmpty && isNewPersona {
-                    VStack(alignment: .center, spacing: 12) {
-                        if isGenerating {
-                            ProgressView()
-                                .scaleEffect(1.2)
-                                .padding(.bottom, 8)
-                            Text(generationStatusMessage.isEmpty ? "Preparing to generate..." : generationStatusMessage)
-                                .font(.subheadline)
-                                .foregroundColor(.primary)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            Text("Style guide will be generated after creation")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .padding(.vertical, 20)
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("AI-Generated Guide")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-
-                            Spacer()
-
-                            if !viewModel.lastGeneratedSources.isEmpty {
-                                Button(action: { showingSources = true }) {
-                                    Label("Sources", systemImage: "link.circle")
-                                        .font(.caption)
-                                }
-                            }
-                        }
-
-                        // Show status during generation
-                        if isGenerating && !generationStatusMessage.isEmpty {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                Text(generationStatusMessage)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                        }
-
-                        ScrollView {
-                            Text(styleGuide)
-                                .font(.system(.body, design: .default))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(12)
-                                .background(Color.gray.opacity(0.05))
-                                .cornerRadius(8)
-                        }
-                        .frame(minHeight: 150, maxHeight: 300)
-                        .opacity(isGenerating ? 0.5 : 1.0)
-
-                        Button(action: {
-                            Task {
-                                isGenerating = true
-                                generationStatusMessage = ""
-
-                                // Create a task to monitor status updates
-                                Task {
-                                    while isGenerating {
-                                        generationStatusMessage = viewModel.generationStatus
-                                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-                                    }
-                                    generationStatusMessage = ""
-                                }
-
-                                await viewModel.generateStyleGuide(for: name, description: description)
-                                if let updatedPersona = viewModel.personas.first(where: { $0.name == name }) {
-                                    styleGuide = updatedPersona.styleGuide
-                                }
-                                isGenerating = false
-                            }
-                        }) {
-                            HStack {
-                                if isGenerating {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                        .frame(width: 20, height: 20)
-                                } else {
-                                    Image(systemName: "arrow.clockwise.circle.fill")
-                                }
-                                Text(styleGuide.isEmpty ? "Generate Style Guide" : "Regenerate Style Guide")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isGenerating || name.isEmpty || description.isEmpty)
-                    }
-                }
-            }
-
-            if let error = viewModel.generationError {
-                Section {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-            }
+            personaDetailsSection
+            styleGuideSection
+            errorSection
         }
         .navigationTitle(isNewPersona ? "New Persona" : "Edit Persona")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel") {
-                    dismiss()
-                }
-            }
-
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Save") {
-                    savePersona()
-                }
-                .fontWeight(.bold)
-                .disabled(name.isEmpty || description.isEmpty)
-            }
+            navigationBarToolbar
+            keyboardToolbar
         }
         .sheet(isPresented: $showingSources) {
             NavigationStack {
                 SourcesListView(sources: viewModel.lastGeneratedSources)
             }
         }
-        .onAppear {
-            if let persona = persona {
-                name = persona.name
-                description = persona.description
-                styleGuide = persona.styleGuide
+        .overlay {
+            if viewModel.showingGenerationModal {
+                generationModalOverlay
             }
         }
     }
 
-    private func savePersona() {
-        if isNewPersona {
-            Task {
-                isGenerating = true
-                generationStatusMessage = ""
+    // MARK: - View Components
 
-                // Create a task to monitor status updates
-                Task {
-                    while isGenerating {
-                        generationStatusMessage = viewModel.generationStatus
-                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+    @ViewBuilder
+    private var personaDetailsSection: some View {
+        Section("Persona Details") {
+            TextField("Name", text: $viewModel.name)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .focused($focusedField, equals: .name)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Description")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                TextEditor(text: $viewModel.description)
+                    .frame(minHeight: 80)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    )
+                    .focused($focusedField, equals: .description)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var styleGuideSection: some View {
+        Section("Style Guide") {
+            VStack(alignment: .leading, spacing: 12) {
+                if viewModel.styleGuide.isEmpty {
+                    emptyStyleGuideView
+                } else {
+                    populatedStyleGuideView
+                        .onAppear {
+                            B2BLog.ui.info("✅ PopulatedStyleGuideView appeared with \(viewModel.styleGuide.count) chars")
+                        }
+                }
+
+                // Hint when style guide is empty and fields are filled
+                if viewModel.styleGuide.isEmpty && viewModel.canGenerate {
+                    Text("Use the keyboard toolbar button to generate")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStyleGuideView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 40))
+                .foregroundColor(.secondary.opacity(0.5))
+
+            Text("A style guide is required to save this persona")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+
+            if isNewPersona {
+                Text("Tap the button below to generate one")
+                    .font(.caption)
+                    .foregroundColor(.secondary.opacity(0.8))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 120)
+        .padding()
+        .background(Color.gray.opacity(0.05))
+        .cornerRadius(8)
+    }
+
+    @ViewBuilder
+    private var populatedStyleGuideView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Generated Style Guide")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                if !viewModel.lastGeneratedSources.isEmpty {
+                    Button(action: { showingSources = true }) {
+                        Label(
+                            "\(viewModel.lastGeneratedSources.count) Sources",
+                            systemImage: "link.circle"
+                        )
+                        .font(.caption)
                     }
-                    generationStatusMessage = ""
+                }
+            }
+
+            ScrollView {
+                Text(viewModel.styleGuide)
+                    .font(.system(.body, design: .default))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color.gray.opacity(0.05))
+                    .cornerRadius(8)
+            }
+            .frame(minHeight: 150, maxHeight: 300)
+        }
+    }
+
+    @ViewBuilder
+    private var errorSection: some View {
+        if let error = viewModel.generationError {
+            Section {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var generationModalOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    if !viewModel.isGenerating {
+                        viewModel.showingGenerationModal = false
+                    }
                 }
 
-                await viewModel.createPersona(name: name, description: description)
+            GenerationProgressView(
+                statusMessage: viewModel.generationStatusMessage,
+                onCancel: nil // Could implement cancellation later
+            )
+            .frame(width: 320, height: 350)
+            .background(Color(UIColor.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .shadow(radius: 20)
+            .transition(.scale.combined(with: .opacity))
+        }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.showingGenerationModal)
+    }
 
-                // Update the style guide if it was generated
-                if let createdPersona = viewModel.personas.first(where: { $0.name == name }) {
-                    styleGuide = createdPersona.styleGuide
-                }
+    // MARK: - Toolbar Items
 
-                isGenerating = false
+    @ToolbarContentBuilder
+    private var navigationBarToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button("Cancel") {
                 dismiss()
             }
-        } else if var existingPersona = persona {
-            existingPersona.name = name
-            existingPersona.description = description
-            existingPersona.styleGuide = styleGuide
-            viewModel.updatePersona(existingPersona)
-            dismiss()
+        }
+
+        ToolbarItem(placement: .navigationBarTrailing) {
+            HStack(spacing: 16) {
+                // Show generate button in nav bar when keyboard is not shown
+                if focusedField == nil &&
+                   viewModel.styleGuide.isEmpty &&
+                   viewModel.canGenerate {
+                    Button(action: {
+                        Task {
+                            await viewModel.generateStyleGuide()
+                        }
+                    }) {
+                        Image(systemName: "sparkles")
+                    }
+                    .disabled(viewModel.isGenerating)
+                }
+
+                Button("Save") {
+                    Task {
+                        if await viewModel.savePersona(originalPersona: persona) {
+                            dismiss()
+                        }
+                    }
+                }
+                .fontWeight(.bold)
+                .disabled(!viewModel.isValid)
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var keyboardToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .keyboard) {
+            if focusedField != nil && viewModel.canGenerate {
+                Spacer()
+
+                KeyboardToolbarGenerateButton(
+                    hasStyleGuide: viewModel.hasStyleGuide,
+                    isGenerating: viewModel.isGenerating
+                ) {
+                    focusedField = nil
+                    Task {
+                        await viewModel.generateStyleGuide()
+                    }
+                }
+            }
         }
     }
 }
+
+// MARK: - Keyboard Toolbar Button Component
+
+struct KeyboardToolbarGenerateButton: View {
+    let hasStyleGuide: Bool
+    let isGenerating: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: hasStyleGuide ? "arrow.clockwise" : "sparkles.rectangle.stack.fill")
+                Text(hasStyleGuide ? "Regenerate" : "Generate")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .disabled(isGenerating)
+        .buttonStyle(.plain) // Prevent default button styling
+    }
+}
+
+// MARK: - Supporting Views
 
 struct SourcesListView: View {
     let sources: [String]
@@ -252,8 +323,73 @@ struct SourcesListView: View {
     }
 }
 
+struct GenerationProgressView: View {
+    let statusMessage: String
+    let onCancel: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Generating Style Guide")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .padding(.top)
+
+            statusIcon
+                .frame(height: 60)
+
+            Text(statusMessage.isEmpty ? "Initializing..." : statusMessage)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 250)
+                .animation(.easeInOut(duration: 0.3), value: statusMessage)
+                .padding(.bottom)
+        }
+        .padding(.horizontal)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        Group {
+            if statusMessage.lowercased().contains("complete") {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.system(size: 50))
+                    .symbolEffect(.bounce)
+            } else if statusMessage.lowercased().contains("error") {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.red)
+                    .font(.system(size: 50))
+            } else if statusMessage.lowercased().contains("analyzing") ||
+                     statusMessage.lowercased().contains("processing") {
+                Image(systemName: "brain")
+                    .foregroundColor(.purple)
+                    .font(.system(size: 50))
+                    .symbolEffect(.pulse, options: .repeating)
+            } else if statusMessage.lowercased().contains("search") {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.blue)
+                    .font(.system(size: 50))
+                    .symbolEffect(.pulse, options: .repeating)
+            } else if statusMessage.lowercased().contains("writing") ||
+                     statusMessage.lowercased().contains("expanding") ||
+                     statusMessage.lowercased().contains("generating") {
+                Image(systemName: "pencil")
+                    .foregroundColor(.orange)
+                    .font(.system(size: 50))
+                    .symbolEffect(.pulse, options: .repeating)
+            } else {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .frame(height: 50)
+            }
+        }
+    }
+}
+
 #Preview {
     NavigationStack {
-        PersonaDetailView(persona: nil, viewModel: PersonasViewModel())
+        PersonaDetailView(persona: nil, personasViewModel: PersonasViewModel())
     }
 }

@@ -212,4 +212,257 @@ struct OpenAIModelsTests {
         #expect(OpenAIConstants.defaultTemperature == 0.7, "Default temperature should be correct")
         #expect(OpenAIConstants.defaultMaxTokens == 1000, "Default max tokens should be correct")
     }
+
+    // MARK: - Streaming Event Tests
+
+    @Test("StreamEventType raw values and decoding")
+    func testStreamEventTypeDecoding() async throws {
+        // Test all event types have correct raw values
+        #expect(StreamEventType.responseCreated.rawValue == "response.created", "Response created raw value")
+        #expect(StreamEventType.responseCompleted.rawValue == "response.completed", "Response completed raw value")
+        #expect(StreamEventType.responseError.rawValue == "response.error", "Response error raw value")
+        #expect(StreamEventType.outputTextDelta.rawValue == "response.output_text.delta", "Output text delta raw value")
+        #expect(StreamEventType.webSearchInProgress.rawValue == "response.web_search_call.in_progress", "Web search in progress raw value")
+        #expect(StreamEventType.webSearchSearching.rawValue == "response.web_search_call.searching", "Web search searching raw value")
+        #expect(StreamEventType.webSearchCompleted.rawValue == "response.web_search_call.completed", "Web search completed raw value")
+
+        // Test decoding from JSON strings
+        let jsonStrings = [
+            "\"response.created\"",
+            "\"response.completed\"",
+            "\"response.error\"",
+            "\"response.output_text.delta\"",
+            "\"response.web_search_call.in_progress\"",
+            "\"response.web_search_call.searching\"",
+            "\"response.web_search_call.completed\"",
+            "\"unknown.event.type\""
+        ]
+
+        let expectedTypes: [StreamEventType] = [
+            .responseCreated,
+            .responseCompleted,
+            .responseError,
+            .outputTextDelta,
+            .webSearchInProgress,
+            .webSearchSearching,
+            .webSearchCompleted,
+            .other
+        ]
+
+        for (jsonString, expectedType) in zip(jsonStrings, expectedTypes) {
+            let decoder = JSONDecoder()
+            let type = try decoder.decode(StreamEventType.self, from: jsonString.data(using: .utf8)!)
+            #expect(type == expectedType, "Should decode \(jsonString) to \(expectedType)")
+        }
+    }
+
+    @Test("StreamEvent decoding with web search results")
+    func testStreamEventWebSearchResults() async throws {
+        let json = """
+        {
+            "type": "response.web_search_call.completed",
+            "web_search_call_id": "search123",
+            "results": {
+                "sources": [
+                    {
+                        "title": "Example Title",
+                        "url": "https://example.com",
+                        "snippet": "Example snippet text"
+                    },
+                    {
+                        "title": "Another Title",
+                        "url": "https://another.com",
+                        "snippet": "Another snippet"
+                    }
+                ]
+            }
+        }
+        """
+
+        let decoder = JSONDecoder()
+        let event = try decoder.decode(StreamEvent.self, from: json.data(using: .utf8)!)
+
+        #expect(event.type == .webSearchCompleted, "Type should be web search completed")
+        #expect(event.webSearchCallId == "search123", "Web search call ID should match")
+        #expect(event.results?.sources?.count == 2, "Should have 2 sources")
+
+        if let firstSource = event.results?.sources?.first {
+            #expect(firstSource.title == "Example Title", "First source title should match")
+            #expect(firstSource.url == "https://example.com", "First source URL should match")
+            #expect(firstSource.snippet == "Example snippet text", "First source snippet should match")
+        }
+    }
+
+    @Test("StreamEvent decoding with text delta")
+    func testStreamEventTextDelta() async throws {
+        let json = """
+        {
+            "type": "response.output_text.delta",
+            "delta": "This is some generated text"
+        }
+        """
+
+        let decoder = JSONDecoder()
+        let event = try decoder.decode(StreamEvent.self, from: json.data(using: .utf8)!)
+
+        #expect(event.type == .outputTextDelta, "Type should be output text delta")
+        #expect(event.delta == "This is some generated text", "Delta text should match")
+        #expect(event.textDelta == "This is some generated text", "textDelta computed property should return delta")
+    }
+
+    @Test("StreamEvent decoding with error")
+    func testStreamEventError() async throws {
+        let json = """
+        {
+            "type": "response.error",
+            "error": {
+                "message": "API rate limit exceeded",
+                "type": "rate_limit_error",
+                "code": "RATE_LIMIT"
+            }
+        }
+        """
+
+        let decoder = JSONDecoder()
+        let event = try decoder.decode(StreamEvent.self, from: json.data(using: .utf8)!)
+
+        #expect(event.type == .responseError, "Type should be response error")
+        #expect(event.error?.message == "API rate limit exceeded", "Error message should match")
+        #expect(event.error?.type == "rate_limit_error", "Error type should match")
+        #expect(event.error?.code == "RATE_LIMIT", "Error code should match")
+    }
+
+    @Test("StreamEvent textDelta from output array")
+    func testStreamEventTextDeltaFromOutput() async throws {
+        // Create a test response content with output_text type
+        let responseContent = ResponseContent(
+            type: "output_text",
+            text: "Text from output array",
+            annotations: nil,
+            logprobs: nil
+        )
+
+        let responseMessage = ResponseMessage(
+            id: "msg123",
+            type: "message",
+            content: [responseContent],
+            role: "assistant",
+            status: nil
+        )
+
+        // Create output item with the message
+        let outputItem = ResponseOutputItem.message(responseMessage)
+
+        // Create stream event with output array
+        // We'll need to create this manually since we can't easily construct a StreamEvent directly
+        let json = """
+        {
+            "type": "response.output_text.delta",
+            "output": [{
+                "type": "message",
+                "id": "msg123",
+                "content": [{
+                    "type": "output_text",
+                    "text": "Text from output array"
+                }],
+                "role": "assistant"
+            }]
+        }
+        """
+
+        let decoder = JSONDecoder()
+        let event = try decoder.decode(StreamEvent.self, from: json.data(using: .utf8)!)
+
+        #expect(event.type == .outputTextDelta, "Type should be output text delta")
+        #expect(event.textDelta == "Text from output array", "Should extract text from output array")
+    }
+
+    @Test("WebSearchSource decoding with optional fields")
+    func testWebSearchSourceOptionalFields() async throws {
+        // All fields present
+        let fullJson = """
+        {
+            "title": "Full Source",
+            "url": "https://example.com/full",
+            "snippet": "Full snippet text"
+        }
+        """
+
+        let decoder = JSONDecoder()
+        let fullSource = try decoder.decode(WebSearchSource.self, from: fullJson.data(using: .utf8)!)
+        #expect(fullSource.title == "Full Source", "Title should match")
+        #expect(fullSource.url == "https://example.com/full", "URL should match")
+        #expect(fullSource.snippet == "Full snippet text", "Snippet should match")
+
+        // Missing fields
+        let minimalJson = """
+        {
+            "url": "https://minimal.com"
+        }
+        """
+
+        let minimalSource = try decoder.decode(WebSearchSource.self, from: minimalJson.data(using: .utf8)!)
+        #expect(minimalSource.title == nil, "Title should be nil")
+        #expect(minimalSource.url == "https://minimal.com", "URL should match")
+        #expect(minimalSource.snippet == nil, "Snippet should be nil")
+    }
+
+    @Test("StreamingEvent construction")
+    func testStreamingEventConstruction() async throws {
+        // Test web search in progress event
+        let webSearchEvent = StreamingEvent(
+            type: .webSearchInProgress,
+            delta: nil,
+            sources: nil,
+            error: nil,
+            response: nil
+        )
+        #expect(webSearchEvent.type == .webSearchInProgress, "Type should be web search in progress")
+        #expect(webSearchEvent.delta == nil, "Delta should be nil")
+        #expect(webSearchEvent.sources == nil, "Sources should be nil")
+
+        // Test text delta event
+        let textEvent = StreamingEvent(
+            type: .outputTextDelta,
+            delta: "Some text",
+            sources: nil,
+            error: nil,
+            response: nil
+        )
+        #expect(textEvent.type == .outputTextDelta, "Type should be output text delta")
+        #expect(textEvent.delta == "Some text", "Delta should match")
+
+        // Test web search completed with sources
+        let sources = [
+            WebSearchSource(title: "Test", url: "https://test.com", snippet: "Test snippet")
+        ]
+        let completedEvent = StreamingEvent(
+            type: .webSearchCompleted,
+            delta: nil,
+            sources: sources,
+            error: nil,
+            response: nil
+        )
+        #expect(completedEvent.type == .webSearchCompleted, "Type should be web search completed")
+        #expect(completedEvent.sources?.count == 1, "Should have one source")
+        #expect(completedEvent.sources?.first?.title == "Test", "Source title should match")
+    }
+
+    @Test("StreamError decoding")
+    func testStreamErrorDecoding() async throws {
+        let json = """
+        {
+            "message": "Request failed",
+            "type": "server_error",
+            "code": "500"
+        }
+        """
+
+        let decoder = JSONDecoder()
+        let error = try decoder.decode(StreamError.self, from: json.data(using: .utf8)!)
+
+        #expect(error.message == "Request failed", "Message should match")
+        #expect(error.type == "server_error", "Type should match")
+        #expect(error.code == "500", "Code should match")
+    }
 }

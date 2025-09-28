@@ -153,29 +153,53 @@ Docs: Streaming responses / Streaming API reference; Web Search tool.
 
 ## 4) **Web Search** tool — Events & UX Mapping
 
-OpenAI emits **Web Search–specific** streaming events while the search is underway:
+OpenAI emits **multiple streaming events** during response generation and web search:
 
-- **`response.web_search_call.in_progress`** — the web search call is initiated (good moment to show “🔎 Starting web search…”).  
-- **`response.web_search_call.searching`** — the search is actively running (show “🔎 Searching the web…”; you can animate a spinner).  
-- **`response.web_search_call.completed`** — search results are ready (show “✅ Found results — drafting answer…”, optionally list sources).
+### Core Response Events:
+- **`response.created`** — Initial response creation
+- **`response.in_progress`** — Response is being processed (includes metadata)
+- **`response.completed`** — Response finalization (deprecated, use response.done)
+- **`response.done`** — Final completion event
+- **`response.error`** — Error occurred during processing
 
-References (event pages in the streaming API reference):  
-- `response.web_search_call.in_progress` (Responses streaming reference)  
-- `response.web_search_call.searching` (Responses streaming reference)  
-- `response.web_search_call.completed` (Responses streaming reference)  
-Also see: **Web Search** tool guide (how results & citations appear in the final message).
+### Output Item Events:
+- **`response.output_item.added`** — New output item added (reasoning, web_search_call, message)
+- **`response.output_item.done`** — Output item processing completed
+
+### Content Events:
+- **`response.content_part.added`** — New content part being added
+- **`response.content_part.done`** — Content part completed
+- **`response.output_text.delta`** — Incremental text output
+- **`response.output_text.annotation.added`** — URL citation/annotation added to text
+- **`response.output_text.done`** — Text output completed
+
+### Web Search-specific Events:
+- **`response.web_search_call.in_progress`** — the web search call is initiated (good moment to show "🔎 Starting web search…").
+- **`response.web_search_call.searching`** — the search is actively running (show "🔎 Searching the web…"; you can animate a spinner).
+- **`response.web_search_call.completed`** — search results are ready (show "✅ Found results — drafting answer…", optionally list sources).
+
+> Note: The web_search_call events are embedded within output_item events. Monitor response.output_item.added/done for type="web_search_call" to catch all web search activity.
+
+References (event pages in the streaming API reference):
+- Responses streaming reference: All events above
+- Web Search tool guide: How results & citations appear in the final message
 
 **Recommended UX mapping:**
 
 | Event | Suggested status |
 |---|---|
-| `response.created` | “Thinking…” |
-| `response.web_search_call.in_progress` | “🔎 Starting web search…” |
-| `response.web_search_call.searching` | “🔎 Searching the web…” |
-| `response.web_search_call.completed` | “✅ Results found — drafting answer…” (show sources) |
-| `response.output_text.delta` | Append text to the transcript |
-| `response.completed` | “Done.” |
-| `response.error` | “⚠️ Error — tap for details” |
+| `response.created` | "🎯 Starting persona style guide generation..." |
+| `response.in_progress` | "Processing request..." |
+| `response.output_item.added` (type="web_search_call") | "🔎 Starting web search..." |
+| `response.web_search_call.in_progress` | "🔎 Starting web search for information..." |
+| `response.web_search_call.searching` | "🔎 Searching the web..." |
+| `response.output_item.done` (type="web_search_call") | "✅ Search complete" (extract sources) |
+| `response.web_search_call.completed` | "✅ Results found — drafting answer…" (show sources) |
+| `response.output_text.delta` | Append text, update word count |
+| `response.output_text.annotation.added` | Track citation count |
+| `response.output_text.done` | "Finalizing content..." |
+| `response.completed` or `response.done` | "✅ Complete!" |
+| `response.error` | "⚠️ Error — tap for details" |
 
 ---
 
@@ -225,10 +249,23 @@ import Foundation
 // MARK: - Event Models
 
 enum StreamEventType: String, Decodable {
+    // Core response events
     case responseCreated             = "response.created"
+    case responseInProgress          = "response.in_progress"
     case responseCompleted           = "response.completed"
+    case responseDone                = "response.done"
     case responseError               = "response.error"
+
+    // Output item events
+    case responseOutputItemAdded     = "response.output_item.added"
+    case responseOutputItemDone      = "response.output_item.done"
+
+    // Content events
+    case responseContentPartAdded    = "response.content_part.added"
+    case responseContentPartDone     = "response.content_part.done"
     case outputTextDelta             = "response.output_text.delta"
+    case outputTextAnnotationAdded   = "response.output_text.annotation.added"
+    case outputTextDone              = "response.output_text.done"
 
     // Web Search–specific:
     case webSearchInProgress         = "response.web_search_call.in_progress"
@@ -325,7 +362,16 @@ final class ResponsesStreamer {
 
             switch evt.type {
             case .responseCreated:
-                showStatus("Thinking…")
+                showStatus("🎯 Starting generation…")
+            case .responseInProgress:
+                showStatus("Processing request…")
+            case .responseOutputItemAdded:
+                // Check if it's a web search call
+                // In real implementation, decode evt.item for details
+                break
+            case .responseOutputItemDone:
+                // Web search completion with sources can be extracted here
+                break
             case .webSearchInProgress:
                 showStatus("🔎 Starting web search…")
             case .webSearchSearching:
@@ -337,13 +383,18 @@ final class ResponsesStreamer {
                 }
             case .outputTextDelta:
                 if let d = evt.delta { appendText(d) }
-            case .responseCompleted:
-                showStatus("Done.")
+            case .outputTextAnnotationAdded:
+                // Track citations being added
+                break
+            case .outputTextDone:
+                showStatus("Finalizing response…")
+            case .responseCompleted, .responseDone:
+                showStatus("✅ Complete!")
             case .responseError:
                 showStatus("⚠️ Error")
                 if let errorMsg = evt.error?.message { appendText("\n[error] \(errorMsg)") }
-            case .other:
-                // Handle future event types as needed
+            default:
+                // Handle other event types as needed
                 break
             }
         }
@@ -384,7 +435,77 @@ final class ChatVM: ObservableObject {
 
 Each SSE `data:` line is a single JSON object. Key examples with Web Search:
 
-### 7.1 Web Search begins
+### 7.1 Response in progress
+```jsonc
+{
+  "type": "response.in_progress",
+  "sequence_number": 1,
+  "response": {
+    "id": "resp_68d95e19d30881939ce3af055b2101220ec173c3826f1333",
+    "object": "response",
+    "created_at": 1759075865,
+    "status": "in_progress",
+    "model": "gpt-5"
+  }
+}
+```
+
+### 7.2 Output item added (web search)
+```jsonc
+{
+  "type": "response.output_item.added",
+  "sequence_number": 4,
+  "output_index": 1,
+  "item": {
+    "id": "ws_68d95e20d7a481938dad0743e508f4bc0ec173c3826f1333",
+    "type": "web_search_call",
+    "status": "in_progress"
+  }
+}
+```
+
+### 7.3 Output item done (web search with sources)
+```jsonc
+{
+  "type": "response.output_item.done",
+  "sequence_number": 8,
+  "output_index": 1,
+  "item": {
+    "id": "ws_68d95e20d7a481938dad0743e508f4bc0ec173c3826f1333",
+    "type": "web_search_call",
+    "status": "completed",
+    "action": {
+      "type": "search",
+      "query": "Mark Ronson 1990s New York DJ",
+      "sources": [
+        {"type": "url", "url": "https://example.com/article1"},
+        {"type": "url", "url": "https://example.com/article2"}
+      ]
+    }
+  }
+}
+```
+
+### 7.4 Text annotation added (citation)
+```jsonc
+{
+  "type": "response.output_text.annotation.added",
+  "sequence_number": 76,
+  "item_id": "msg_68d95e8b7f3c81939e72d1aaa93f549b0ec173c3826f1333",
+  "output_index": 13,
+  "content_index": 0,
+  "annotation_index": 0,
+  "annotation": {
+    "type": "url_citation",
+    "start_index": 489,
+    "end_index": 623,
+    "title": "Article Title",
+    "url": "https://example.com/article"
+  }
+}
+```
+
+### 7.5 Web Search begins
 ```jsonc
 {
   "type": "response.web_search_call.in_progress",
@@ -394,7 +515,7 @@ Each SSE `data:` line is a single JSON object. Key examples with Web Search:
 }
 ```
 
-### 7.2 Web Search searching
+### 7.6 Web Search searching
 ```jsonc
 {
   "type": "response.web_search_call.searching",
@@ -403,7 +524,7 @@ Each SSE `data:` line is a single JSON object. Key examples with Web Search:
 }
 ```
 
-### 7.3 Web Search completed
+### 7.7 Web Search completed
 ```jsonc
 {
   "type": "response.web_search_call.completed",
@@ -417,7 +538,7 @@ Each SSE `data:` line is a single JSON object. Key examples with Web Search:
 }
 ```
 
-### 7.4 Text delta chunks
+### 7.8 Text delta chunks
 ```jsonc
 {
   "type": "response.output_text.delta",
@@ -427,7 +548,7 @@ Each SSE `data:` line is a single JSON object. Key examples with Web Search:
 }
 ```
 
-### 7.5 Completed / Error
+### 7.9 Completed / Error
 ```jsonc
 { "type": "response.completed", "response_id": "resp_abc123" }
 ```
