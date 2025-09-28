@@ -51,3 +51,36 @@ enum MusicPlaybackError: LocalizedError {
         }
     }
 }
+
+enum QueueStatus: CustomStringConvertible {
+    case playing
+    case upNext
+    case queuedIfUserSkips
+    case played
+
+    var displayText: String {
+        switch self {
+        case .playing:
+            return "Now Playing"
+        case .upNext:
+            return "Up Next"
+        case .queuedIfUserSkips:
+            return "Queued (AI continues if no user selection)"
+        case .played:
+            return ""
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .playing:
+            return "playing"
+        case .upNext:
+            return "upNext"
+        case .queuedIfUserSkips:
+            return "queuedIfUserSkips"
+        case .played:
+            return "played"
+        }
+    }
+}

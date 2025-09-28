@@ -51,8 +51,8 @@ struct SessionView: View {
             .padding()
             .background(Color(UIColor.systemGroupedBackground))
 
-            // Session history
-            if sessionService.sessionHistory.isEmpty {
+            // Session history and queue
+            if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty {
                 ContentUnavailableView(
                     "No Songs Yet",
                     systemImage: "music.note.list",
@@ -63,7 +63,18 @@ struct SessionView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 8) {
+                            // Show history (played songs)
                             ForEach(sessionService.sessionHistory) { sessionSong in
+                                SessionSongRow(sessionSong: sessionSong)
+                                    .id(sessionSong.id)
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .opacity
+                                    ))
+                            }
+
+                            // Show queue (upcoming songs)
+                            ForEach(sessionService.songQueue) { sessionSong in
                                 SessionSongRow(sessionSong: sessionSong)
                                     .id(sessionSong.id)
                                     .transition(.asymmetric(
@@ -73,12 +84,15 @@ struct SessionView: View {
                             }
                         }
                         .padding()
-                        .animation(.spring(response: 0.3), value: sessionService.sessionHistory.count)
+                        .animation(.spring(response: 0.3), value: sessionService.sessionHistory.count + sessionService.songQueue.count)
                     }
-                    .onChange(of: sessionService.sessionHistory.count) { _, _ in
+                    .onChange(of: sessionService.sessionHistory.count + sessionService.songQueue.count) { _, _ in
                         withAnimation {
-                            if let lastSong = sessionService.sessionHistory.last {
-                                proxy.scrollTo(lastSong.id, anchor: .bottom)
+                            // Scroll to last item (whether in history or queue)
+                            if let lastQueued = sessionService.songQueue.last {
+                                proxy.scrollTo(lastQueued.id, anchor: .bottom)
+                            } else if let lastHistory = sessionService.sessionHistory.last {
+                                proxy.scrollTo(lastHistory.id, anchor: .bottom)
                             }
                         }
                     }
@@ -153,14 +167,11 @@ struct SessionView: View {
         B2BLog.session.info("User selected song: \(song.title)")
 
         // Use SessionViewModel to handle the selection
+        // This will automatically queue the AI's next song
         await sessionViewModel.handleUserSongSelection(song)
 
-        // After user selection, AI should select next if OpenAI is configured
-        if sessionService.currentTurn == .ai && OpenAIClient.shared.isConfigured {
-            // Give a small delay for UX
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-            await sessionViewModel.triggerAISelection()
-        }
+        // No need to manually trigger AI selection anymore -
+        // it will happen automatically when the user's song ends
     }
 }
 
@@ -181,9 +192,45 @@ struct SessionSongRow: View {
 
             // Song details
             VStack(alignment: .leading, spacing: 4) {
-                Text(sessionSong.song.title)
-                    .font(.headline)
-                    .lineLimit(1)
+                HStack {
+                    Text(sessionSong.song.title)
+                        .font(.headline)
+                        .lineLimit(1)
+
+                    // Queue status badge
+                    if sessionSong.queueStatus == .upNext {
+                        Text("Up Next")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(4)
+                    } else if sessionSong.queueStatus == .playing {
+                        HStack(spacing: 3) {
+                            Image(systemName: "speaker.wave.2.fill")
+                                .font(.caption2)
+                            Text("Now Playing")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(4)
+                    } else if sessionSong.queueStatus == .queuedIfUserSkips {
+                        Text("Queued (AI continues)")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.8))
+                            .foregroundColor(.white)
+                            .cornerRadius(4)
+                    }
+                }
 
                 Text(sessionSong.song.artistName)
                     .font(.subheadline)
@@ -200,16 +247,41 @@ struct SessionSongRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Timestamp
-            Text(formatTime(sessionSong.timestamp))
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            // Timestamp or queue indicator
+            VStack(alignment: .trailing, spacing: 2) {
+                if sessionSong.queueStatus == .played {
+                    Text(formatTime(sessionSong.timestamp))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                } else if sessionSong.queueStatus == .queuedIfUserSkips {
+                    // Additional visual hint for conditional queue
+                    Image(systemName: "questionmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
         }
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(UIColor.secondarySystemGroupedBackground))
+                .fill(
+                    sessionSong.queueStatus == .playing || sessionSong.queueStatus == .upNext
+                        ? Color(UIColor.systemBackground)
+                        : (sessionSong.queueStatus == .queuedIfUserSkips
+                            ? Color(UIColor.secondarySystemGroupedBackground).opacity(0.6)
+                            : Color(UIColor.secondarySystemGroupedBackground))
+                )
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    sessionSong.queueStatus == .playing ? Color.blue.opacity(0.5) :
+                    (sessionSong.queueStatus == .upNext ? Color.green.opacity(0.3) :
+                    (sessionSong.queueStatus == .queuedIfUserSkips ? Color.orange.opacity(0.2) : Color.clear)),
+                    lineWidth: sessionSong.queueStatus == .playing ? 2 : 1
+                )
+        )
+        .opacity(sessionSong.queueStatus == .queuedIfUserSkips ? 0.85 : 1.0)
     }
 
     private func formatTime(_ date: Date) -> String {
