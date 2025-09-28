@@ -212,4 +212,9 @@ class MusicService: ObservableObject {
         B2BLog.playback.info("🗑️ Clearing playback queue")
         player.queue = ApplicationMusicPlayer.Queue()
     }
+
+    func getCurrentPlaybackTime() -> TimeInterval {
+        // Return the current real-time playback position
+        return player.playbackTime
+    }
 }

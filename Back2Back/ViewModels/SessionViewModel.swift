@@ -263,26 +263,28 @@ final class SessionViewModel {
 
         if let nowPlaying = musicService.currentlyPlaying {
             let currentSongId = nowPlaying.song.id.rawValue
-            let progress = nowPlaying.duration > 0 ? (nowPlaying.playbackTime / nowPlaying.duration) : 0
+            // Get real-time playback position directly from the player
+            let currentPlaybackTime = musicService.getCurrentPlaybackTime()
+            let progress = nowPlaying.duration > 0 ? (currentPlaybackTime / nowPlaying.duration) : 0
 
             // Check if this is a new song
             if currentSongId != lastSongId {
                 B2BLog.playback.info("🎵 New song detected: \(nowPlaying.song.title)")
                 lastSongId = currentSongId
                 hasTriggeredEndOfSong = false
-                lastPlaybackTime = nowPlaying.playbackTime
+                lastPlaybackTime = currentPlaybackTime
                 return
             }
 
             // Log current state for debugging (less frequently)
-            if Int(nowPlaying.playbackTime) % 10 == 0 {
-                B2BLog.playback.trace("Playback - \(nowPlaying.song.title): \(Int(nowPlaying.playbackTime))s/\(Int(nowPlaying.duration))s (\(Int(progress * 100))%)")
+            if Int(currentPlaybackTime) % 10 == 0 && Int(currentPlaybackTime) != Int(lastPlaybackTime) {
+                B2BLog.playback.trace("Playback - \(nowPlaying.song.title): \(Int(currentPlaybackTime))s/\(Int(nowPlaying.duration))s (\(Int(progress * 100))%)")
             }
 
-            // Check if song is near the end (>90% complete) and we haven't triggered yet
-            if progress > 0.90 && !hasTriggeredEndOfSong && nowPlaying.duration > 0 {
+            // Check if song has ended (100% complete or very close) and we haven't triggered yet
+            if progress >= 0.99 && !hasTriggeredEndOfSong && nowPlaying.duration > 0 {
                 hasTriggeredEndOfSong = true
-                B2BLog.playback.info("🎵 Song ending (\(Int(progress * 100))% complete), advancing queue")
+                B2BLog.playback.info("🎵 Song ended, advancing to next song")
                 B2BLog.playback.debug("Queue state - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
 
                 // Mark current song as played
@@ -292,7 +294,7 @@ final class SessionViewModel {
                 await triggerAISelection()
             }
 
-            lastPlaybackTime = nowPlaying.playbackTime
+            lastPlaybackTime = currentPlaybackTime
 
         } else if lastSongId != nil {
             // Was playing but now nothing - song ended
