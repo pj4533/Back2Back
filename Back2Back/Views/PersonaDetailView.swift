@@ -72,12 +72,56 @@ struct PersonaDetailView: View {
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: .infinity)
                                 .animation(.easeInOut(duration: 0.3), value: generationStatusMessage)
+                        } else if !styleGuide.isEmpty {
+                            // Show the generated style guide
+                            ScrollView {
+                                Text(styleGuide)
+                                    .font(.system(.body, design: .default))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(12)
+                                    .background(Color.gray.opacity(0.05))
+                                    .cornerRadius(8)
+                            }
+                            .frame(minHeight: 150, maxHeight: 300)
                         } else {
-                            Text("Style guide will be generated after creation")
+                            Text("Generate a style guide for this persona")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: .infinity)
+                        }
+
+                        // Generate button for new personas
+                        if !isGenerating && styleGuide.isEmpty {
+                            Button(action: {
+                                Task {
+                                    isGenerating = true
+                                    generationStatusMessage = ""
+
+                                    // Create a task to monitor status updates
+                                    Task {
+                                        while isGenerating {
+                                            generationStatusMessage = viewModel.generationStatus
+                                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                                        }
+                                        generationStatusMessage = ""
+                                    }
+
+                                    await viewModel.generateStyleGuide(for: name, description: description)
+                                    if let updatedPersona = viewModel.personas.first(where: { $0.name == name }) {
+                                        styleGuide = updatedPersona.styleGuide
+                                    }
+                                    isGenerating = false
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "sparkles.rectangle.stack.fill")
+                                    Text("Generate Style Guide")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(name.isEmpty || description.isEmpty)
                         }
                     }
                     .padding(.vertical, 20)
@@ -207,7 +251,7 @@ struct PersonaDetailView: View {
                     savePersona()
                 }
                 .fontWeight(.bold)
-                .disabled(name.isEmpty || description.isEmpty)
+                .disabled(name.isEmpty || description.isEmpty || (isNewPersona && styleGuide.isEmpty))
             }
         }
         .sheet(isPresented: $showingSources) {
@@ -226,27 +270,10 @@ struct PersonaDetailView: View {
 
     private func savePersona() {
         if isNewPersona {
+            // For new personas, the style guide should already be generated
+            // Create the persona with the pre-generated style guide
             Task {
-                isGenerating = true
-                generationStatusMessage = ""
-
-                // Create a task to monitor status updates
-                Task {
-                    while isGenerating {
-                        generationStatusMessage = viewModel.generationStatus
-                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-                    }
-                    generationStatusMessage = ""
-                }
-
-                await viewModel.createPersona(name: name, description: description)
-
-                // Update the style guide if it was generated
-                if let createdPersona = viewModel.personas.first(where: { $0.name == name }) {
-                    styleGuide = createdPersona.styleGuide
-                }
-
-                isGenerating = false
+                await viewModel.createPersonaWithStyleGuide(name: name, description: description, styleGuide: styleGuide)
                 dismiss()
             }
         } else if var existingPersona = persona {

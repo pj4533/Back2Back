@@ -111,4 +111,10 @@ final class PersonasViewModel {
         B2BLog.general.info("Selecting persona: \(persona.name)")
         personaService.selectPersona(persona)
     }
+
+    func createPersonaWithStyleGuide(name: String, description: String, styleGuide: String) async {
+        B2BLog.general.info("Creating persona with pre-generated style guide: \(name)")
+        _ = personaService.createPersona(name: name, description: description, styleGuide: styleGuide)
+        B2BLog.general.info("✅ Created persona: \(name)")
+    }
 }

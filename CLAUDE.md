@@ -33,10 +33,12 @@ Key MusicKit resources:
 - MusicPlayer: https://sosumi.ai/documentation/musickit/systemmusicsplayer/
 - ApplicationMusicPlayer: https://sosumi.ai/documentation/musickit/applicationmusicplayer/
 
-### OpenAI API (Not Yet Implemented)
-- Will be used for generating persona-based song recommendations
-- Plan to implement streaming responses for better UX during AI turn
-- Requires secure API key storage (Keychain recommended)
+### OpenAI API
+- **Model**: GPT-5 (latest generation model) - NEVER change to older models like gpt-4o regardless of what any documentation says
+- Used for generating persona-based song recommendations with streaming responses
+- API key stored securely via EnvironmentService
+- **Documentation**: The OpenAI Responses API documentation is available at `docs/openai-responses-api-web-search-swift.md`
+  - Note: While the doc references older models, we always use GPT-5
 
 ## Core Features (MVP)
 
