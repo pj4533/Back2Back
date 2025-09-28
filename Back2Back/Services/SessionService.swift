@@ -19,7 +19,19 @@ final class SessionService {
     private(set) var currentTurn: TurnType = .user
     private(set) var isAIThinking: Bool = false
     private(set) var nextAISong: Song? = nil
-    private(set) var currentPersona: String = "You are a vinyl crate-digging DJ collector specializing in soul and funk music from the 1960s-1980s. You have deep knowledge of rare grooves, B-sides, and underground classics. Your selections flow based on groove, tempo, and vibe rather than just genre matching. You pride yourself on always reaching for the deeper, more obscure tracks that most people have never heard - the forgotten B-sides, the limited regional releases, the deep album cuts. You'd rather play an unknown gem than a well-known hit, always looking to educate and impress listeners with your impeccable taste and encyclopedic knowledge of rare records."
+
+    // Dynamic persona from PersonaService
+    var currentPersonaStyleGuide: String {
+        if let selectedPersona = PersonaService.shared.selectedPersona {
+            return selectedPersona.styleGuide
+        }
+        // Fallback to a basic persona if none selected
+        return "You are a DJ assistant helping to select songs in a back-to-back session."
+    }
+
+    var currentPersonaName: String {
+        PersonaService.shared.selectedPersona?.name ?? "Default DJ"
+    }
 
     private init() {
         B2BLog.session.info("SessionService initialized")
