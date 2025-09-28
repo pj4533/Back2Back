@@ -226,45 +226,24 @@ final class OpenAIClient {
 
         let prompt = buildDJPrompt(persona: persona, history: sessionHistory)
 
-        let songSelectionSchema: [String: Any] = [
-            "type": "object",
-            "properties": [
-                "artist": [
-                    "type": "string",
-                    "description": "The artist name"
-                ],
-                "song": [
-                    "type": "string",
-                    "description": "The song title"
-                ],
-                "rationale": [
-                    "type": "string",
-                    "description": "Brief explanation of selection",
-                    "maxLength": 200
-                ]
-            ],
-            "required": ["artist", "song", "rationale"],
-            "additionalProperties": false
-        ]
-
-        let format = TextFormat(
-            type: "json_schema",
-            name: "song_selection",
-            strict: true,
-            schema: songSelectionSchema
-        )
-
+        // For the Responses API, we need to pass the verbosity but not the format
+        // The format would need different API structure than we currently have
+        // For now, let's use plain text output and parse it
         let request = ResponsesRequest(
             model: "gpt-5",
-            input: prompt,
+            input: prompt + "\n\nIMPORTANT: Respond ONLY with a valid JSON object in this exact format: {\"artist\": \"Artist Name\", \"song\": \"Song Title\", \"rationale\": \"Brief explanation (max 200 characters)\"}",
             verbosity: .high,
-            reasoningEffort: .high,
-            format: format
+            reasoningEffort: .high
         )
 
         do {
             let response = try await responses(request: request)
-            let jsonData = response.outputText.data(using: .utf8)!
+
+            // The response should contain JSON in the outputText
+            guard let jsonData = response.outputText.data(using: .utf8) else {
+                throw OpenAIError.decodingError(NSError(domain: "OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not convert output to data"]))
+            }
+
             let recommendation = try JSONDecoder().decode(SongRecommendation.self, from: jsonData)
 
             B2BLog.ai.info("AI selected: \(recommendation.song) by \(recommendation.artist)")
@@ -296,10 +275,10 @@ final class OpenAIClient {
         2. Reflects your DJ persona's taste
         3. Doesn't repeat any previous songs
 
-        Respond with a JSON object containing:
-        - artist: The artist name
-        - song: The song title
-        - rationale: A brief explanation (max 200 characters) of why you chose this song
+        You MUST respond with ONLY a valid JSON object (no markdown, no extra text) in this exact format:
+        {"artist": "Artist Name", "song": "Song Title", "rationale": "Brief explanation of your choice"}
+
+        The rationale must be under 200 characters.
         """
     }
 
