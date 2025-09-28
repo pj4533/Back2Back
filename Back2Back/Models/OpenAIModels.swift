@@ -231,7 +231,7 @@ struct ResponsesResponse: Codable {
                         }
                     }
                 }
-            case .reasoning:
+            case .reasoning, .webSearchCall:
                 continue
             }
         }
@@ -243,6 +243,7 @@ struct ResponsesResponse: Codable {
 enum ResponseOutputItem: Codable {
     case reasoning(ResponseReasoningItem)
     case message(ResponseMessage)
+    case webSearchCall(ResponseWebSearchCall)
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -251,6 +252,7 @@ enum ResponseOutputItem: Codable {
         case content
         case role
         case status
+        case action
     }
 
     init(from decoder: Decoder) throws {
@@ -268,6 +270,11 @@ enum ResponseOutputItem: Codable {
             let role = try container.decode(String.self, forKey: .role)
             let status = try container.decodeIfPresent(String.self, forKey: .status)
             self = .message(ResponseMessage(id: id, type: type, content: content, role: role, status: status))
+        case "web_search_call":
+            let id = try container.decode(String.self, forKey: .id)
+            let status = try container.decodeIfPresent(String.self, forKey: .status)
+            let action = try container.decodeIfPresent(WebSearchAction.self, forKey: .action)
+            self = .webSearchCall(ResponseWebSearchCall(id: id, type: type, status: status, action: action))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type,
                                                     in: container,
@@ -288,6 +295,11 @@ enum ResponseOutputItem: Codable {
             try container.encodeIfPresent(message.content, forKey: .content)
             try container.encode(message.role, forKey: .role)
             try container.encodeIfPresent(message.status, forKey: .status)
+        case .webSearchCall(let webSearch):
+            try container.encode(webSearch.type, forKey: .type)
+            try container.encode(webSearch.id, forKey: .id)
+            try container.encodeIfPresent(webSearch.status, forKey: .status)
+            try container.encodeIfPresent(webSearch.action, forKey: .action)
         }
     }
 }
@@ -306,10 +318,17 @@ struct ResponseMessage: Codable {
     let status: String?
 }
 
+struct ResponseWebSearchCall: Codable {
+    let id: String
+    let type: String
+    let status: String?
+    let action: WebSearchAction?
+}
+
 struct ResponseContent: Codable {
     let type: String
     let text: String?
-    let annotations: [String]?
+    let annotations: [ResponseAnnotation]?
     let logprobs: [String]?
 
     enum CodingKeys: String, CodingKey {
@@ -317,6 +336,22 @@ struct ResponseContent: Codable {
         case text
         case annotations
         case logprobs
+    }
+}
+
+struct ResponseAnnotation: Codable {
+    let type: String
+    let startIndex: Int?
+    let endIndex: Int?
+    let title: String?
+    let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case startIndex = "start_index"
+        case endIndex = "end_index"
+        case title
+        case url
     }
 }
 
@@ -609,7 +644,7 @@ struct StreamEvent: Codable {
                             }
                         }
                     }
-                default:
+                case .reasoning, .webSearchCall:
                     continue
                 }
             }
