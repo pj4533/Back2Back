@@ -65,91 +65,271 @@ enum OpenAIError: LocalizedError, CustomStringConvertible, Equatable {
     }
 }
 
-// MARK: - Chat Models
+// MARK: - Responses API Models
 
-struct ChatCompletionRequest: Codable {
+struct ResponsesRequest: Codable {
     let model: String
-    let messages: [ChatMessage]
-    let temperature: Double?
-    let maxTokens: Int?
-    let stream: Bool?
-    let user: String?
+    let input: String
+    let text: TextConfig?
+    let reasoning: ReasoningConfig?
 
     enum CodingKeys: String, CodingKey {
         case model
-        case messages
-        case temperature
-        case maxTokens = "max_tokens"
-        case stream
-        case user
+        case input
+        case text
+        case reasoning
     }
 
-    init(model: String = "gpt-3.5-turbo",
-         messages: [ChatMessage],
-         temperature: Double? = nil,
-         maxTokens: Int? = nil,
-         stream: Bool? = nil,
-         user: String? = nil) {
+    init(model: String = "gpt-5",
+         input: String,
+         verbosity: VerbosityLevel? = nil,
+         reasoningEffort: ReasoningEffort? = nil) {
         self.model = model
-        self.messages = messages
-        self.temperature = temperature
-        self.maxTokens = maxTokens
-        self.stream = stream
-        self.user = user
+        self.input = input
+        self.text = verbosity.map { TextConfig(verbosity: $0) }
+        self.reasoning = reasoningEffort.map { ReasoningConfig(effort: $0) }
     }
 }
 
-struct ChatMessage: Codable, Equatable {
-    let role: ChatRole
-    let content: String
-    let name: String?
-
-    init(role: ChatRole, content: String, name: String? = nil) {
-        self.role = role
-        self.content = content
-        self.name = name
-    }
+struct TextConfig: Codable {
+    let verbosity: VerbosityLevel
 }
 
-enum ChatRole: String, Codable {
-    case system
-    case user
-    case assistant
-    case function
+struct ReasoningConfig: Codable {
+    let effort: ReasoningEffort
 }
 
-struct ChatCompletionResponse: Codable {
+enum VerbosityLevel: String, Codable {
+    case low
+    case medium
+    case high
+}
+
+enum ReasoningEffort: String, Codable {
+    case low
+    case medium
+    case high
+}
+
+struct ResponsesResponse: Codable {
     let id: String
     let object: String
-    let created: Int
+    let createdAt: Double
     let model: String
-    let choices: [ChatChoice]
-    let usage: Usage?
-}
-
-struct ChatChoice: Codable {
-    let index: Int
-    let message: ChatMessage
-    let finishReason: String?
+    let output: [ResponseOutputItem]
+    let status: String
+    let usage: ResponseUsage?
+    let metadata: [String: Any]?
+    let reasoning: ResponseReasoning?
+    let text: ResponseTextConfig?
+    let temperature: Double?
+    let topP: Double?
+    let billing: ResponseBilling?
 
     enum CodingKeys: String, CodingKey {
-        case index
-        case message
-        case finishReason = "finish_reason"
+        case id
+        case object
+        case createdAt = "created_at"
+        case model
+        case output
+        case status
+        case usage
+        case metadata
+        case reasoning
+        case text
+        case temperature
+        case topP = "top_p"
+        case billing
+    }
+
+    // Custom decoding to handle metadata as [String: Any]
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        object = try container.decode(String.self, forKey: .object)
+        createdAt = try container.decode(Double.self, forKey: .createdAt)
+        model = try container.decode(String.self, forKey: .model)
+        output = try container.decode([ResponseOutputItem].self, forKey: .output)
+        status = try container.decode(String.self, forKey: .status)
+        usage = try container.decodeIfPresent(ResponseUsage.self, forKey: .usage)
+        // Skip metadata since it's a dictionary that we don't really need
+        metadata = nil
+        reasoning = try container.decodeIfPresent(ResponseReasoning.self, forKey: .reasoning)
+        text = try container.decodeIfPresent(ResponseTextConfig.self, forKey: .text)
+        temperature = try container.decodeIfPresent(Double.self, forKey: .temperature)
+        topP = try container.decodeIfPresent(Double.self, forKey: .topP)
+        billing = try container.decodeIfPresent(ResponseBilling.self, forKey: .billing)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(object, forKey: .object)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(model, forKey: .model)
+        try container.encode(output, forKey: .output)
+        try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(usage, forKey: .usage)
+        // Skip metadata for encoding
+        try container.encodeIfPresent(reasoning, forKey: .reasoning)
+        try container.encodeIfPresent(text, forKey: .text)
+        try container.encodeIfPresent(temperature, forKey: .temperature)
+        try container.encodeIfPresent(topP, forKey: .topP)
+        try container.encodeIfPresent(billing, forKey: .billing)
+    }
+
+    // Computed property to get the text output
+    var outputText: String {
+        for item in output {
+            switch item {
+            case .message(let message):
+                if let content = message.content {
+                    for contentItem in content {
+                        if contentItem.type == "output_text", let text = contentItem.text {
+                            return text
+                        }
+                    }
+                }
+            case .reasoning:
+                continue
+            }
+        }
+        return ""
     }
 }
 
-struct Usage: Codable {
-    let promptTokens: Int
-    let completionTokens: Int
+// Enum to handle different types of output items
+enum ResponseOutputItem: Codable {
+    case reasoning(ResponseReasoningItem)
+    case message(ResponseMessage)
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case id
+        case summary
+        case content
+        case role
+        case status
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+
+        switch type {
+        case "reasoning":
+            let id = try container.decode(String.self, forKey: .id)
+            let summary = try container.decodeIfPresent([String].self, forKey: .summary) ?? []
+            self = .reasoning(ResponseReasoningItem(id: id, type: type, summary: summary))
+        case "message":
+            let id = try container.decode(String.self, forKey: .id)
+            let content = try container.decodeIfPresent([ResponseContent].self, forKey: .content)
+            let role = try container.decode(String.self, forKey: .role)
+            let status = try container.decodeIfPresent(String.self, forKey: .status)
+            self = .message(ResponseMessage(id: id, type: type, content: content, role: role, status: status))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .type,
+                                                    in: container,
+                                                    debugDescription: "Unknown output type: \(type)")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .reasoning(let item):
+            try container.encode(item.type, forKey: .type)
+            try container.encode(item.id, forKey: .id)
+            try container.encode(item.summary, forKey: .summary)
+        case .message(let message):
+            try container.encode(message.type, forKey: .type)
+            try container.encode(message.id, forKey: .id)
+            try container.encodeIfPresent(message.content, forKey: .content)
+            try container.encode(message.role, forKey: .role)
+            try container.encodeIfPresent(message.status, forKey: .status)
+        }
+    }
+}
+
+struct ResponseReasoningItem: Codable {
+    let id: String
+    let type: String
+    let summary: [String]
+}
+
+struct ResponseMessage: Codable {
+    let id: String
+    let type: String
+    let content: [ResponseContent]?
+    let role: String
+    let status: String?
+}
+
+struct ResponseContent: Codable {
+    let type: String
+    let text: String?
+    let annotations: [String]?
+    let logprobs: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case text
+        case annotations
+        case logprobs
+    }
+}
+
+struct ResponseReasoning: Codable {
+    let effort: String?
+    let summary: String?
+}
+
+struct ResponseTextConfig: Codable {
+    let format: ResponseTextFormat?
+    let verbosity: String?
+}
+
+struct ResponseTextFormat: Codable {
+    let type: String
+}
+
+struct ResponseBilling: Codable {
+    let payer: String
+}
+
+struct ResponseUsage: Codable {
+    let inputTokens: Int
+    let outputTokens: Int
+    let inputTokensDetails: InputTokensDetails?
+    let outputTokensDetails: OutputTokensDetails?
     let totalTokens: Int
 
     enum CodingKeys: String, CodingKey {
-        case promptTokens = "prompt_tokens"
-        case completionTokens = "completion_tokens"
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case inputTokensDetails = "input_tokens_details"
+        case outputTokensDetails = "output_tokens_details"
         case totalTokens = "total_tokens"
     }
 }
+
+struct InputTokensDetails: Codable {
+    let cachedTokens: Int
+
+    enum CodingKeys: String, CodingKey {
+        case cachedTokens = "cached_tokens"
+    }
+}
+
+struct OutputTokensDetails: Codable {
+    let reasoningTokens: Int
+
+    enum CodingKeys: String, CodingKey {
+        case reasoningTokens = "reasoning_tokens"
+    }
+}
+
+// Remove old ResponseMetadata since the actual API uses a generic dictionary
 
 // MARK: - Error Response
 
@@ -167,8 +347,13 @@ struct OpenAIErrorDetail: Codable {
 
 struct OpenAIConstants {
     static let baseURL = "https://api.openai.com/v1"
-    static let chatCompletionsEndpoint = "/chat/completions"
-    static let defaultModel = "gpt-3.5-turbo"
+    static let responsesEndpoint = "/responses"
+    static let defaultModel = "gpt-5"
     static let defaultTemperature = 0.7
     static let defaultMaxTokens = 1000
+
+    // Model variants
+    static let modelGPT5 = "gpt-5"
+    static let modelGPT5Mini = "gpt-5-mini"
+    static let modelGPT5Nano = "gpt-5-nano"
 }
