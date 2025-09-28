@@ -14,9 +14,12 @@ struct PersonasListView: View {
                           isSelected: persona.isSelected)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        showingDetailView = persona
+                        // Tap to select the persona
+                        if !persona.isSelected {
+                            viewModel.selectPersona(persona)
+                        }
                     }
-                    .swipeActions(edge: .trailing) {
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
                             personaToDelete = persona
                             showingDeleteAlert = true
@@ -24,14 +27,12 @@ struct PersonasListView: View {
                             Label("Delete", systemImage: "trash")
                         }
 
-                        if !persona.isSelected {
-                            Button {
-                                viewModel.selectPersona(persona)
-                            } label: {
-                                Label("Select", systemImage: "checkmark")
-                            }
-                            .tint(.blue)
+                        Button {
+                            showingDetailView = persona
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
                         }
+                        .tint(.orange)
                     }
             }
         }
@@ -75,22 +76,16 @@ struct PersonaRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(persona.name)
-                        .font(.headline)
+            // Checkmark on the left
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(isSelected ? .blue : .gray)
+                .font(.title2)
+                .animation(.easeInOut(duration: 0.2), value: isSelected)
 
-                    if isSelected {
-                        Text("SELECTED")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue)
-                            .cornerRadius(4)
-                    }
-                }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(persona.name)
+                    .font(.headline)
+                    .foregroundColor(isSelected ? .primary : .primary)
 
                 Text(persona.description)
                     .font(.subheadline)
@@ -100,10 +95,12 @@ struct PersonaRow: View {
 
             Spacer()
 
+            // Small indicator that it's the active persona
             if isSelected {
-                Image(systemName: "checkmark.circle.fill")
+                Text("Active")
+                    .font(.caption)
+                    .fontWeight(.medium)
                     .foregroundColor(.blue)
-                    .font(.title2)
             }
         }
         .padding(.vertical, 4)
