@@ -207,21 +207,29 @@ final class OpenAIClient {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Add streaming-specific headers
-        urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        // Note: Do NOT set Accept header for streaming - OpenAI handles this automatically
 
         // Create streaming request by adding stream parameter
         if let requestData = try? JSONEncoder().encode(request),
            var jsonObject = try? JSONSerialization.jsonObject(with: requestData, options: []) as? [String: Any] {
             jsonObject["stream"] = true
-            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: jsonObject, options: [])
+            let requestBody = try JSONSerialization.data(withJSONObject: jsonObject, options: [])
+            urlRequest.httpBody = requestBody
+
+            // Log the full request for debugging
+            if let requestString = String(data: requestBody, encoding: .utf8) {
+                B2BLog.ai.debug("Request body: \(requestString)")
+            }
+            // Log headers (but mask the API key)
+            let maskedKey = apiKey.prefix(10) + "..." + apiKey.suffix(4)
+            B2BLog.ai.debug("Authorization header: Bearer \(maskedKey)")
         } else {
             throw OpenAIError.encodingError(NSError(domain: "OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create streaming request"]))
         }
 
         do {
             let startTime = Date()
-            let (bytes, response) = try await URLSession.shared.bytes(for: urlRequest)
+            let (bytes, response) = try await session.bytes(for: urlRequest)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 B2BLog.ai.error("Invalid response type for streaming")
@@ -231,13 +239,47 @@ final class OpenAIClient {
             B2BLog.ai.debug("Streaming HTTP Status Code: \(httpResponse.statusCode)")
 
             guard httpResponse.statusCode == 200 else {
-                // Handle error cases
+                // Try to read error response body
+                var errorMessage = "Streaming request failed"
+                if httpResponse.statusCode == 400 {
+                    // For 400 errors, try to read the error details
+                    var errorBody = ""
+                    do {
+                        for try await line in bytes.lines {
+                            errorBody += line + "\n"
+                            // Limit reading to prevent hanging
+                            if errorBody.count > 10000 {
+                                break
+                            }
+                        }
+                    } catch {
+                        B2BLog.ai.warning("Failed to read error body: \(error)")
+                    }
+
+                    if !errorBody.isEmpty {
+                        errorMessage = errorBody
+                        B2BLog.ai.error("400 Error Response Body: \(errorBody)")
+
+                        // Try to parse as JSON error
+                        if let jsonData = errorBody.data(using: .utf8),
+                           let jsonObject = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                            B2BLog.ai.error("Parsed error JSON: \(jsonObject)")
+
+                            if let error = jsonObject["error"] as? [String: Any],
+                               let message = error["message"] as? String {
+                                errorMessage = message
+                            }
+                        }
+                    }
+                }
+
+                // Handle specific error cases
                 if httpResponse.statusCode == 401 {
                     throw OpenAIError.unauthorized
                 } else if httpResponse.statusCode == 429 {
                     throw OpenAIError.rateLimitExceeded
                 } else {
-                    throw OpenAIError.httpError(statusCode: httpResponse.statusCode, message: "Streaming request failed")
+                    throw OpenAIError.httpError(statusCode: httpResponse.statusCode, message: errorMessage)
                 }
             }
 
