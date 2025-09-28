@@ -10,7 +10,9 @@ struct PersonaDetailView: View {
     @State private var isGenerating = false
     @State private var generationStatusMessage = ""
     @State private var showingSources = false
+    @State private var showingGenerationModal = false
     @FocusState private var focusedField: Field?
+    @FocusState private var isTextEditorFocused: Bool
     @Environment(\.dismiss) var dismiss
 
     enum Field: Hashable {
@@ -40,61 +42,54 @@ struct PersonaDetailView: View {
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
                         .focused($focusedField, equals: .description)
+                        .focused($isTextEditorFocused)
                 }
             }
 
             Section("Style Guide") {
-                if styleGuide.isEmpty && isNewPersona {
-                    VStack(alignment: .center, spacing: 12) {
-                        if isGenerating {
-                            // Show different icon based on status
-                            Group {
-                                if generationStatusMessage.lowercased().contains("complete") {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                        .font(.system(size: 36))
-                                } else if generationStatusMessage.lowercased().contains("error") {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundColor(.red)
-                                        .font(.system(size: 36))
-                                } else if generationStatusMessage.lowercased().contains("thinking") ||
-                                         generationStatusMessage.lowercased().contains("analysis") {
-                                    Image(systemName: "brain")
-                                        .foregroundColor(.purple)
-                                        .font(.system(size: 36))
-                                        .symbolEffect(.pulse, options: .repeating)
-                                } else if generationStatusMessage.lowercased().contains("search") {
-                                    Image(systemName: "magnifyingglass")
-                                        .foregroundColor(.blue)
-                                        .font(.system(size: 36))
-                                        .symbolEffect(.pulse, options: .repeating)
-                                } else if generationStatusMessage.lowercased().contains("writing") ||
-                                         generationStatusMessage.lowercased().contains("expanding") ||
-                                         generationStatusMessage.lowercased().contains("detailing") ||
-                                         generationStatusMessage.lowercased().contains("style guide") {
-                                    Image(systemName: "pencil")
-                                        .foregroundColor(.orange)
-                                        .font(.system(size: 36))
-                                        .symbolEffect(.pulse, options: .repeating)
-                                } else if generationStatusMessage.lowercased().contains("citation") {
-                                    Image(systemName: "quote.bubble")
-                                        .foregroundColor(.indigo)
-                                        .font(.system(size: 36))
-                                } else {
-                                    ProgressView()
-                                        .scaleEffect(1.2)
+                VStack(alignment: .leading, spacing: 12) {
+                    // Always show the style guide content area
+                    if styleGuide.isEmpty {
+                        // Empty state with clear call to action
+                        VStack(spacing: 16) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary.opacity(0.5))
+
+                            Text("A style guide is required to save this persona")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+
+                            if isNewPersona {
+                                Text("Tap the button below to generate one")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary.opacity(0.8))
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 120)
+                        .padding()
+                        .background(Color.gray.opacity(0.05))
+                        .cornerRadius(8)
+                    } else {
+                        // Show the generated style guide
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Generated Style Guide")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+
+                                Spacer()
+
+                                if !viewModel.lastGeneratedSources.isEmpty {
+                                    Button(action: { showingSources = true }) {
+                                        Label("\(viewModel.lastGeneratedSources.count) Sources", systemImage: "link.circle")
+                                            .font(.caption)
+                                    }
                                 }
                             }
-                            .padding(.bottom, 8)
 
-                            Text(generationStatusMessage.isEmpty ? "Initializing..." : generationStatusMessage)
-                                .font(.system(.subheadline, design: .rounded))
-                                .foregroundColor(generationStatusMessage.lowercased().contains("error") ? .red : .primary)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                                .animation(.easeInOut(duration: 0.2), value: generationStatusMessage)
-                        } else if !styleGuide.isEmpty {
-                            // Show the generated style guide
                             ScrollView {
                                 Text(styleGuide)
                                     .font(.system(.body, design: .default))
@@ -104,152 +99,16 @@ struct PersonaDetailView: View {
                                     .cornerRadius(8)
                             }
                             .frame(minHeight: 150, maxHeight: 300)
-                        } else {
-                            Text("Generate a style guide for this persona")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                        }
-
-                        // Generate button for new personas
-                        if !isGenerating && styleGuide.isEmpty {
-                            Button(action: {
-                                // Dismiss keyboard
-                                focusedField = nil
-
-                                Task {
-                                    isGenerating = true
-                                    generationStatusMessage = ""
-
-                                    // Create a task to monitor status updates
-                                    Task {
-                                        while isGenerating {
-                                            generationStatusMessage = viewModel.generationStatus
-                                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-                                        }
-                                        generationStatusMessage = ""
-                                    }
-
-                                    if let generatedGuide = await viewModel.generateStyleGuide(for: name, description: description) {
-                                        styleGuide = generatedGuide
-                                    }
-                                    isGenerating = false
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: "sparkles.rectangle.stack.fill")
-                                    Text("Generate Style Guide")
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(name.isEmpty || description.isEmpty)
                         }
                     }
-                    .padding(.vertical, 20)
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("AI-Generated Guide")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
 
-                            Spacer()
-
-                            if !viewModel.lastGeneratedSources.isEmpty {
-                                Button(action: { showingSources = true }) {
-                                    Label("Sources", systemImage: "link.circle")
-                                        .font(.caption)
-                                }
-                            }
-                        }
-
-                        // Show status during generation
-                        if isGenerating && !generationStatusMessage.isEmpty {
-                            HStack(spacing: 8) {
-                                // Show different icon based on status
-                                if generationStatusMessage.contains("✅") {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
-                                        .font(.system(size: 14))
-                                } else if generationStatusMessage.contains("❌") {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
-                                        .font(.system(size: 14))
-                                } else if generationStatusMessage.contains("🔎") {
-                                    Image(systemName: "magnifyingglass.circle.fill")
-                                        .foregroundColor(.blue)
-                                        .font(.system(size: 14))
-                                } else if generationStatusMessage.contains("✍️") {
-                                    Image(systemName: "pencil.circle.fill")
-                                        .foregroundColor(.orange)
-                                        .font(.system(size: 14))
-                                } else {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                }
-
-                                Text(generationStatusMessage)
-                                    .font(.subheadline)
-                                    .foregroundColor(generationStatusMessage.contains("❌") ? .red : .primary)
-                                    .animation(.easeInOut(duration: 0.3), value: generationStatusMessage)
-                            }
+                    // Show a hint when style guide is empty
+                    if styleGuide.isEmpty && !name.isEmpty && !description.isEmpty {
+                        Text("Use the keyboard toolbar button to generate")
+                            .font(.caption)
+                            .foregroundColor(.blue)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(Color.gray.opacity(0.05))
-                            .cornerRadius(6)
-                            .animation(.spring(response: 0.3), value: generationStatusMessage)
-                        }
-
-                        ScrollView {
-                            Text(styleGuide)
-                                .font(.system(.body, design: .default))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(12)
-                                .background(Color.gray.opacity(0.05))
-                                .cornerRadius(8)
-                        }
-                        .frame(minHeight: 150, maxHeight: 300)
-                        .opacity(isGenerating ? 0.5 : 1.0)
-
-                        Button(action: {
-                            // Dismiss keyboard
-                            focusedField = nil
-
-                            Task {
-                                isGenerating = true
-                                generationStatusMessage = ""
-
-                                // Create a task to monitor status updates
-                                Task {
-                                    while isGenerating {
-                                        generationStatusMessage = viewModel.generationStatus
-                                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-                                    }
-                                    generationStatusMessage = ""
-                                }
-
-                                if let generatedGuide = await viewModel.generateStyleGuide(for: name, description: description) {
-                                    styleGuide = generatedGuide
-                                }
-                                isGenerating = false
-                            }
-                        }) {
-                            HStack {
-                                if isGenerating {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                        .frame(width: 20, height: 20)
-                                } else {
-                                    Image(systemName: "arrow.clockwise.circle.fill")
-                                }
-                                Text(styleGuide.isEmpty ? "Generate Style Guide" : "Regenerate Style Guide")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isGenerating || name.isEmpty || description.isEmpty)
+                            .padding(.top, 8)
                     }
                 }
             }
@@ -272,16 +131,102 @@ struct PersonaDetailView: View {
             }
 
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Save") {
-                    savePersona()
+                HStack(spacing: 16) {
+                    // Show generate button in nav bar when keyboard is not shown
+                    if !isTextEditorFocused && styleGuide.isEmpty && !name.isEmpty && !description.isEmpty {
+                        Button(action: {
+                            showingGenerationModal = true
+
+                            Task {
+                                isGenerating = true
+                                generationStatusMessage = ""
+
+                                // Monitor status updates
+                                Task {
+                                    while isGenerating {
+                                        generationStatusMessage = viewModel.generationStatus
+                                        try? await Task.sleep(nanoseconds: 100_000_000)
+                                    }
+                                }
+
+                                // Generate the style guide
+                                if let generatedGuide = await viewModel.generateStyleGuide(for: name, description: description) {
+                                    styleGuide = generatedGuide
+                                }
+
+                                isGenerating = false
+                                showingGenerationModal = false
+                            }
+                        }) {
+                            Image(systemName: "sparkles")
+                        }
+                        .disabled(isGenerating)
+                    }
+
+                    Button("Save") {
+                        savePersona()
+                    }
+                    .fontWeight(.bold)
+                    .disabled(name.isEmpty || description.isEmpty || styleGuide.isEmpty)
                 }
-                .fontWeight(.bold)
-                .disabled(name.isEmpty || description.isEmpty || (isNewPersona && styleGuide.isEmpty))
             }
         }
         .sheet(isPresented: $showingSources) {
             NavigationStack {
                 SourcesListView(sources: viewModel.lastGeneratedSources)
+            }
+        }
+        .sheet(isPresented: $showingGenerationModal) {
+            GenerationProgressView(
+                statusMessage: generationStatusMessage,
+                onCancel: {
+                    // For now, we can't cancel generation
+                    // This could be implemented later
+                }
+            )
+            .interactiveDismissDisabled(isGenerating)
+        }
+        .toolbar {
+            // Add keyboard toolbar when description field is focused
+            ToolbarItemGroup(placement: .keyboard) {
+                if isTextEditorFocused && !name.isEmpty && !description.isEmpty {
+                    Spacer()
+
+                    Button(action: {
+                        focusedField = nil
+                        isTextEditorFocused = false
+                        showingGenerationModal = true
+
+                        Task {
+                            isGenerating = true
+                            generationStatusMessage = ""
+
+                            // Monitor status updates
+                            Task {
+                                while isGenerating {
+                                    generationStatusMessage = viewModel.generationStatus
+                                    try? await Task.sleep(nanoseconds: 100_000_000)
+                                }
+                            }
+
+                            // Generate the style guide
+                            if let generatedGuide = await viewModel.generateStyleGuide(for: name, description: description) {
+                                styleGuide = generatedGuide
+                            }
+
+                            isGenerating = false
+                            showingGenerationModal = false
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: styleGuide.isEmpty ? "sparkles.rectangle.stack.fill" : "arrow.clockwise")
+                            Text(styleGuide.isEmpty ? "Generate" : "Regenerate")
+                        }
+                    }
+                    .tint(.blue)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isGenerating)
+                }
             }
         }
         .onAppear {
@@ -350,6 +295,69 @@ struct SourcesListView: View {
             return urlString
         }
         return host.replacingOccurrences(of: "www.", with: "")
+    }
+}
+
+struct GenerationProgressView: View {
+    let statusMessage: String
+    let onCancel: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Text("Generating Style Guide")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            // Dynamic icon based on status
+            Group {
+                if statusMessage.lowercased().contains("complete") {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 60))
+                        .symbolEffect(.bounce)
+                } else if statusMessage.lowercased().contains("error") {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                        .font(.system(size: 60))
+                } else if statusMessage.lowercased().contains("analyzing") ||
+                         statusMessage.lowercased().contains("processing") {
+                    Image(systemName: "brain")
+                        .foregroundColor(.purple)
+                        .font(.system(size: 60))
+                        .symbolEffect(.pulse, options: .repeating)
+                } else if statusMessage.lowercased().contains("search") {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 60))
+                        .symbolEffect(.pulse, options: .repeating)
+                } else if statusMessage.lowercased().contains("writing") ||
+                         statusMessage.lowercased().contains("expanding") ||
+                         statusMessage.lowercased().contains("generating") {
+                    Image(systemName: "pencil")
+                        .foregroundColor(.orange)
+                        .font(.system(size: 60))
+                        .symbolEffect(.pulse, options: .repeating)
+                } else {
+                    ProgressView()
+                        .scaleEffect(2)
+                        .frame(height: 60)
+                }
+            }
+            .padding()
+
+            Text(statusMessage.isEmpty ? "Initializing..." : statusMessage)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 250)
+                .animation(.easeInOut(duration: 0.3), value: statusMessage)
+
+            Spacer()
+        }
+        .padding()
+        .padding(.top, 40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(UIColor.systemBackground))
     }
 }
 

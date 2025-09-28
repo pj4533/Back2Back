@@ -764,8 +764,8 @@ final class OpenAIClient {
             var webSearchCount = 0
             var currentWordCount = 0
             var annotationsAdded = 0
-            var isReasoning = false
             var reasoningStartTime = Date()
+            var totalSourcesFound = 0
 
             // Use streaming API with real-time status updates
             let response = try await streamingResponses(request: request) { event in
@@ -783,16 +783,21 @@ final class OpenAIClient {
                     if let item = event.item {
                         switch item.type {
                         case "reasoning":
-                            isReasoning = true
                             reasoningStartTime = Date()
-                            await onStatusUpdate?("Thinking...")
+                            if totalSourcesFound > 0 {
+                                await onStatusUpdate?("Analyzing \(totalSourcesFound) source\(totalSourcesFound == 1 ? "" : "s")...")
+                            } else if webSearchCount > 0 {
+                                await onStatusUpdate?("Processing search results...")
+                            } else {
+                                await onStatusUpdate?("Thinking...")
+                            }
                             B2BLog.ai.debug("Reasoning started")
                         case "web_search_call":
                             webSearchCount += 1
                             if webSearchCount == 1 {
                                 await onStatusUpdate?("Starting web search...")
                             } else {
-                                await onStatusUpdate?("Search \(webSearchCount): Gathering more information...")
+                                await onStatusUpdate?("Search #\(webSearchCount): Looking for more details...")
                             }
                             B2BLog.ai.debug("Web search \(webSearchCount) initiated")
                         case "message":
@@ -807,16 +812,26 @@ final class OpenAIClient {
                     if let item = event.item {
                         switch item.type {
                         case "reasoning":
-                            isReasoning = false
                             let reasoningDuration = Date().timeIntervalSince(reasoningStartTime)
                             B2BLog.ai.debug("Reasoning completed in \(String(format: "%.1f", reasoningDuration))s")
-                            await onStatusUpdate?("Analysis complete")
+                            if totalSourcesFound > 0 {
+                                await onStatusUpdate?("Analysis of \(totalSourcesFound) source\(totalSourcesFound == 1 ? "" : "s") complete")
+                            } else {
+                                await onStatusUpdate?("Analysis complete")
+                            }
                         case "web_search_call":
                             if let action = item.action, let eventSources = action.sources {
                                 sources.append(contentsOf: eventSources.compactMap { $0.url })
                                 let sourceCount = eventSources.count
+                                totalSourcesFound += sourceCount
                                 if sourceCount > 0 {
-                                    await onStatusUpdate?("Found \(sourceCount) source\(sourceCount == 1 ? "" : "s")")
+                                    if webSearchCount == 1 {
+                                        await onStatusUpdate?("Found \(sourceCount) relevant source\(sourceCount == 1 ? "" : "s")")
+                                    } else {
+                                        await onStatusUpdate?("Search #\(webSearchCount) found \(sourceCount) more source\(sourceCount == 1 ? "" : "s") (\(totalSourcesFound) total)")
+                                    }
+                                } else {
+                                    await onStatusUpdate?("Search #\(webSearchCount) complete (no new sources)")
                                 }
                                 B2BLog.ai.debug("Web search \(webSearchCount) completed with \(sourceCount) sources")
                             }
@@ -826,17 +841,30 @@ final class OpenAIClient {
                     }
 
                 case .webSearchInProgress:
-                    await onStatusUpdate?("Searching the web...")
+                    if webSearchCount > 1 {
+                        await onStatusUpdate?("Search #\(webSearchCount) in progress...")
+                    } else {
+                        await onStatusUpdate?("Searching the web...")
+                    }
                     B2BLog.ai.debug("Web search in progress")
 
                 case .webSearchSearching:
-                    await onStatusUpdate?("Searching for relevant information...")
+                    if webSearchCount > 1 {
+                        await onStatusUpdate?("Search #\(webSearchCount): Querying sources...")
+                    } else {
+                        await onStatusUpdate?("Searching for relevant information...")
+                    }
                     B2BLog.ai.debug("Web search actively searching")
 
                 case .webSearchCompleted:
                     if let eventSources = event.sources {
                         let sourceCount = eventSources.count
-                        await onStatusUpdate?("Search complete (\(sourceCount) source\(sourceCount == 1 ? "" : "s"))")
+                        totalSourcesFound += sourceCount
+                        if webSearchCount > 1 {
+                            await onStatusUpdate?("Search #\(webSearchCount) complete (\(sourceCount) new, \(totalSourcesFound) total sources)")
+                        } else {
+                            await onStatusUpdate?("Search complete (\(sourceCount) source\(sourceCount == 1 ? "" : "s"))")
+                        }
                         B2BLog.ai.debug("Web search completed with \(sourceCount) sources")
                     }
 
