@@ -10,7 +10,13 @@ struct PersonaDetailView: View {
     @State private var isGenerating = false
     @State private var generationStatusMessage = ""
     @State private var showingSources = false
+    @FocusState private var focusedField: Field?
     @Environment(\.dismiss) var dismiss
+
+    enum Field: Hashable {
+        case name
+        case description
+    }
 
     var isNewPersona: Bool {
         persona == nil
@@ -21,6 +27,7 @@ struct PersonaDetailView: View {
             Section("Persona Details") {
                 TextField("Name", text: $name)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .focused($focusedField, equals: .name)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Description")
@@ -32,6 +39,7 @@ struct PersonaDetailView: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
+                        .focused($focusedField, equals: .description)
                 }
             }
 
@@ -94,6 +102,9 @@ struct PersonaDetailView: View {
                         // Generate button for new personas
                         if !isGenerating && styleGuide.isEmpty {
                             Button(action: {
+                                // Dismiss keyboard
+                                focusedField = nil
+
                                 Task {
                                     isGenerating = true
                                     generationStatusMessage = ""
@@ -107,9 +118,8 @@ struct PersonaDetailView: View {
                                         generationStatusMessage = ""
                                     }
 
-                                    await viewModel.generateStyleGuide(for: name, description: description)
-                                    if let updatedPersona = viewModel.personas.first(where: { $0.name == name }) {
-                                        styleGuide = updatedPersona.styleGuide
+                                    if let generatedGuide = await viewModel.generateStyleGuide(for: name, description: description) {
+                                        styleGuide = generatedGuide
                                     }
                                     isGenerating = false
                                 }
@@ -191,6 +201,9 @@ struct PersonaDetailView: View {
                         .opacity(isGenerating ? 0.5 : 1.0)
 
                         Button(action: {
+                            // Dismiss keyboard
+                            focusedField = nil
+
                             Task {
                                 isGenerating = true
                                 generationStatusMessage = ""
@@ -204,9 +217,8 @@ struct PersonaDetailView: View {
                                     generationStatusMessage = ""
                                 }
 
-                                await viewModel.generateStyleGuide(for: name, description: description)
-                                if let updatedPersona = viewModel.personas.first(where: { $0.name == name }) {
-                                    styleGuide = updatedPersona.styleGuide
+                                if let generatedGuide = await viewModel.generateStyleGuide(for: name, description: description) {
+                                    styleGuide = generatedGuide
                                 }
                                 isGenerating = false
                             }

@@ -159,6 +159,28 @@ struct ResponsesResponse: Codable {
         case webSearchCall = "web_search_call"
     }
 
+    // Custom initializer for creating from streaming events
+    init(id: String, object: String, createdAt: Double, model: String, output: [ResponseOutputItem],
+         status: String, usage: ResponseUsage? = nil, metadata: [String: Any]? = nil,
+         reasoning: ResponseReasoning? = nil, text: ResponseTextConfig? = nil,
+         temperature: Double? = nil, topP: Double? = nil, billing: ResponseBilling? = nil,
+         webSearchCall: WebSearchCall? = nil) {
+        self.id = id
+        self.object = object
+        self.createdAt = createdAt
+        self.model = model
+        self.output = output
+        self.status = status
+        self.usage = usage
+        self.metadata = metadata
+        self.reasoning = reasoning
+        self.text = text
+        self.temperature = temperature
+        self.topP = topP
+        self.billing = billing
+        self.webSearchCall = webSearchCall
+    }
+
     // Custom decoding to handle metadata as [String: Any]
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -426,7 +448,7 @@ struct OutputTokensDetails: Codable {
 
 // MARK: - Streaming Event Models
 
-enum StreamEventType: String, Decodable, CustomStringConvertible {
+enum StreamEventType: String, Codable, CustomStringConvertible {
     case responseCreated = "response.created"
     case responseCompleted = "response.completed"
     case responseError = "response.error"
@@ -434,6 +456,12 @@ enum StreamEventType: String, Decodable, CustomStringConvertible {
     case webSearchInProgress = "response.web_search_call.in_progress"
     case webSearchSearching = "response.web_search_call.searching"
     case webSearchCompleted = "response.web_search_call.completed"
+    // Additional streaming events based on the API
+    case responseOutput = "response.output"
+    case responseReasoning = "response.reasoning"
+    case responseContent = "response.content"
+    case responseReasoningDelta = "response.reasoning.delta"
+    case responseContentDelta = "response.content.delta"
     case other
 
     init(from decoder: Decoder) throws {
@@ -452,7 +480,7 @@ enum StreamEventType: String, Decodable, CustomStringConvertible {
     }
 }
 
-struct StreamEvent: Decodable {
+struct StreamEvent: Codable {
     let type: StreamEventType
     let delta: String?
     let webSearchCallId: String?
@@ -509,13 +537,13 @@ struct StreamEvent: Decodable {
     }
 }
 
-struct StreamError: Decodable {
+struct StreamError: Codable {
     let message: String
     let type: String?
     let code: String?
 }
 
-struct WebSearchStreamResults: Decodable {
+struct WebSearchStreamResults: Codable {
     let sources: [WebSearchSource]?
 }
 

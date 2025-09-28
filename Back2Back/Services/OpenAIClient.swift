@@ -308,7 +308,30 @@ final class OpenAIClient {
                 }
 
                 do {
-                    // First try to decode as a full ResponsesResponse (for response.completed events)
+                    // First, let's check what type of event this is by parsing as generic JSON
+                    if let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+                        let eventType = jsonObject["type"] as? String ?? "unknown"
+
+                        // Log raw JSON for any event type we don't explicitly handle
+                        let knownEventTypes = [
+                            "response.created",
+                            "response.completed",
+                            "response.error",
+                            "response.output_text.delta",
+                            "response.web_search_call.in_progress",
+                            "response.web_search_call.searching",
+                            "response.web_search_call.completed"
+                        ]
+
+                        if !knownEventTypes.contains(eventType) {
+                            // This is an unknown event type - log the complete raw JSON
+                            B2BLog.ai.debug("Unknown stream event type: \(eventType)")
+                            B2BLog.ai.debug("Full raw event JSON: \(jsonString)")
+                            continue  // Skip processing this unknown event
+                        }
+                    }
+
+                    // Now try to decode as a full ResponsesResponse (for response.completed events)
                     if let fullResponse = try? JSONDecoder().decode(ResponsesResponse.self, from: jsonData) {
                         finalResponse = fullResponse
                         B2BLog.ai.debug("Received full response in stream")
@@ -397,17 +420,70 @@ final class OpenAIClient {
 
                     case .responseCreated:
                         B2BLog.ai.debug("Response created event")
+                        let event = StreamingEvent(
+                            type: .responseCreated,
+                            delta: nil,
+                            sources: nil,
+                            error: nil,
+                            response: nil
+                        )
+                        await onEvent(event)
 
                     case .responseCompleted:
                         B2BLog.ai.debug("Response completed event")
+                        // Try to extract the full response from this event
+                        if streamEvent.output != nil {
+                            // Build a ResponsesResponse from the stream event data
+                            let fullResponse = ResponsesResponse(
+                                id: streamEvent.id ?? "resp_streaming",
+                                object: streamEvent.object ?? "response",
+                                createdAt: streamEvent.createdAt ?? Date().timeIntervalSince1970,
+                                model: streamEvent.model ?? request.model,
+                                output: streamEvent.output ?? [],
+                                status: streamEvent.status ?? "completed",
+                                usage: streamEvent.usage,
+                                metadata: nil,
+                                reasoning: nil,
+                                text: nil,
+                                temperature: nil,
+                                topP: nil,
+                                billing: nil,
+                                webSearchCall: nil
+                            )
+                            finalResponse = fullResponse
+                        }
+                        let event = StreamingEvent(
+                            type: .responseCompleted,
+                            delta: nil,
+                            sources: sources.isEmpty ? nil : sources,
+                            error: nil,
+                            response: finalResponse
+                        )
+                        await onEvent(event)
+
+                    case .responseOutput, .responseReasoning, .responseContent:
+                        // These are informational events, just log them
+                        B2BLog.ai.debug("Stream event: \(streamEvent.type)")
+                        // Also log the raw JSON to see what data they contain
+                        B2BLog.ai.debug("Event raw JSON: \(jsonString)")
+
+                    case .responseReasoningDelta, .responseContentDelta:
+                        // These might contain additional text deltas
+                        B2BLog.ai.debug("Stream delta event: \(streamEvent.type)")
+                        B2BLog.ai.debug("Delta event raw JSON: \(jsonString)")
+                        if let textDelta = streamEvent.textDelta {
+                            accumulatedText += textDelta
+                        }
 
                     default:
-                        B2BLog.ai.debug("Unknown stream event type: \(streamEvent.type)")
+                        // This shouldn't happen now since we pre-filter unknown events
+                        B2BLog.ai.debug("Unhandled stream event type: \(streamEvent.type)")
+                        B2BLog.ai.debug("Unhandled event raw JSON: \(jsonString)")
                     }
 
                 } catch {
                     B2BLog.ai.warning("Failed to decode stream event: \(error)")
-                    B2BLog.ai.debug("Raw event data: \(jsonString)")
+                    B2BLog.ai.debug("Failed event raw JSON: \(jsonString)")
                 }
             }
 
@@ -418,10 +494,42 @@ final class OpenAIClient {
             if let finalResponse = finalResponse {
                 B2BLog.ai.info("Streaming responses API call successful")
                 return finalResponse
+            } else if !accumulatedText.isEmpty {
+                // Construct a response from the accumulated text
+                B2BLog.ai.info("Constructing response from accumulated text")
+                let outputContent = ResponseContent(
+                    type: "output_text",
+                    text: accumulatedText,
+                    annotations: nil,
+                    logprobs: nil
+                )
+                let message = ResponseMessage(
+                    id: "msg_streaming",
+                    type: "message",
+                    content: [outputContent],
+                    role: "assistant",
+                    status: "completed"
+                )
+                let constructedResponse = ResponsesResponse(
+                    id: "resp_streaming",
+                    object: "response",
+                    createdAt: Date().timeIntervalSince1970,
+                    model: request.model,
+                    output: [.message(message)],
+                    status: "completed",
+                    usage: nil,
+                    metadata: nil,
+                    reasoning: nil,
+                    text: nil,
+                    temperature: nil,
+                    topP: nil,
+                    billing: nil,
+                    webSearchCall: WebSearchCall(action: sources.isEmpty ? nil : WebSearchAction(sources: sources))
+                )
+                return constructedResponse
             } else {
-                // If we didn't get a complete response object, construct one with the accumulated text
-                // This is a fallback and shouldn't normally happen
-                B2BLog.ai.warning("No final response received, constructing from accumulated text")
+                // This should not happen in normal operation
+                B2BLog.ai.error("No response data received from streaming API")
                 throw OpenAIError.invalidResponse
             }
 
