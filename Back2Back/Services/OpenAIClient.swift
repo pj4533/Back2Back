@@ -716,6 +716,13 @@ final class OpenAIClient {
         This style guide will be used by an AI to select songs in a back-to-back DJ session.
         Format the guide to optimize song selection decisions.
 
+        IMPORTANT FORMATTING REQUIREMENTS:
+        - DO NOT include any source annotations, citations, or reference numbers in the style guide
+        - Focus ONLY on actionable information for song selection
+        - Keep the total guide between 2000-5000 characters for optimal use
+        - Write in clear, direct prose without excessive detail
+        - Prioritize practical guidance over encyclopedic information
+
         IMPORTANT: The persona description might be music-related OR completely unrelated to music:
 
         - For MUSIC-RELATED descriptions (genres, time periods, musicians, DJs):
@@ -733,9 +740,11 @@ final class OpenAIClient {
         Respond with a comprehensive style guide that includes:
         - Musical preferences and characteristics
         - Preferred genres, eras, and styles
-        - Song selection criteria
-        - Specific artists or tracks that exemplify this persona
+        - Song selection criteria and decision-making approach
         - How to maintain thematic coherence in selections
+        - Key mood and energy considerations for song flow
+
+        Remember: NO citations, NO annotations, NO reference markers - just pure, actionable guidance.
         """
 
         let request = ResponsesRequest(
