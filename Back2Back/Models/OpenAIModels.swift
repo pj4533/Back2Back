@@ -83,16 +83,23 @@ struct ResponsesRequest: Codable {
     init(model: String = "gpt-5",
          input: String,
          verbosity: VerbosityLevel? = nil,
-         reasoningEffort: ReasoningEffort? = nil) {
+         reasoningEffort: ReasoningEffort? = nil,
+         format: TextFormat? = nil) {
         self.model = model
         self.input = input
-        self.text = verbosity.map { TextConfig(verbosity: $0) }
+        self.text = (verbosity != nil || format != nil) ? TextConfig(verbosity: verbosity, format: format) : nil
         self.reasoning = reasoningEffort.map { ReasoningConfig(effort: $0) }
     }
 }
 
 struct TextConfig: Codable {
-    let verbosity: VerbosityLevel
+    let verbosity: VerbosityLevel?
+    let format: TextFormat?
+
+    init(verbosity: VerbosityLevel? = nil, format: TextFormat? = nil) {
+        self.verbosity = verbosity
+        self.format = format
+    }
 }
 
 struct ReasoningConfig: Codable {
@@ -287,6 +294,80 @@ struct ResponseReasoning: Codable {
 struct ResponseTextConfig: Codable {
     let format: ResponseTextFormat?
     let verbosity: String?
+}
+
+struct TextFormat: Codable {
+    let type: String
+    let name: String?
+    let strict: Bool?
+    let schema: [String: Any]?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case name
+        case strict
+        case schema
+    }
+
+    init(type: String = "json_schema", name: String? = nil, strict: Bool? = nil, schema: [String: Any]? = nil) {
+        self.type = type
+        self.name = name
+        self.strict = strict
+        self.schema = schema
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(type, forKey: .type)
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(strict, forKey: .strict)
+        if let schema = schema {
+            let jsonData = try JSONSerialization.data(withJSONObject: schema, options: [])
+            if let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+                try container.encode(AnyEncodable(jsonObject), forKey: .schema)
+            }
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        strict = try container.decodeIfPresent(Bool.self, forKey: .strict)
+        schema = nil // We don't need to decode schema for responses
+    }
+}
+
+// Helper struct for encoding Any types
+struct AnyEncodable: Encodable {
+    private let value: Any
+
+    init(_ value: Any) {
+        self.value = value
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+
+        if let intValue = value as? Int {
+            try container.encode(intValue)
+        } else if let doubleValue = value as? Double {
+            try container.encode(doubleValue)
+        } else if let boolValue = value as? Bool {
+            try container.encode(boolValue)
+        } else if let stringValue = value as? String {
+            try container.encode(stringValue)
+        } else if let arrayValue = value as? [Any] {
+            try container.encode(arrayValue.map { AnyEncodable($0) })
+        } else if let dictValue = value as? [String: Any] {
+            try container.encode(dictValue.mapValues { AnyEncodable($0) })
+        } else {
+            throw EncodingError.invalidValue(value, EncodingError.Context(
+                codingPath: encoder.codingPath,
+                debugDescription: "Unsupported type"
+            ))
+        }
+    }
 }
 
 struct ResponseTextFormat: Codable {

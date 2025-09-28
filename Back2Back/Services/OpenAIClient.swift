@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import OSLog
+import MusicKit
 
 @Observable
 @MainActor
@@ -183,7 +184,7 @@ final class OpenAIClient {
 
     // MARK: - Convenience Methods
 
-    func simpleCompletion(prompt: String, model: String = OpenAIConstants.defaultModel) async throws -> String {
+    func simpleCompletion(prompt: String, model: String = "gpt-5") async throws -> String {
         let request = ResponsesRequest(
             model: model,
             input: prompt,
@@ -204,7 +205,7 @@ final class OpenAIClient {
         """
 
         let request = ResponsesRequest(
-            model: OpenAIConstants.defaultModel,
+            model: "gpt-5",
             input: input,
             verbosity: .high,
             reasoningEffort: .high
@@ -218,6 +219,96 @@ final class OpenAIClient {
         return response.outputText
     }
 
+    // MARK: - Song Selection
+
+    func selectNextSong(persona: String, sessionHistory: [SessionSong]) async throws -> SongRecommendation {
+        B2BLog.ai.info("Requesting AI song selection with persona")
+
+        let prompt = buildDJPrompt(persona: persona, history: sessionHistory)
+
+        let songSelectionSchema: [String: Any] = [
+            "type": "object",
+            "properties": [
+                "artist": [
+                    "type": "string",
+                    "description": "The artist name"
+                ],
+                "song": [
+                    "type": "string",
+                    "description": "The song title"
+                ],
+                "rationale": [
+                    "type": "string",
+                    "description": "Brief explanation of selection",
+                    "maxLength": 200
+                ]
+            ],
+            "required": ["artist", "song", "rationale"],
+            "additionalProperties": false
+        ]
+
+        let format = TextFormat(
+            type: "json_schema",
+            name: "song_selection",
+            strict: true,
+            schema: songSelectionSchema
+        )
+
+        let request = ResponsesRequest(
+            model: "gpt-5",
+            input: prompt,
+            verbosity: .high,
+            reasoningEffort: .high,
+            format: format
+        )
+
+        do {
+            let response = try await responses(request: request)
+            let jsonData = response.outputText.data(using: .utf8)!
+            let recommendation = try JSONDecoder().decode(SongRecommendation.self, from: jsonData)
+
+            B2BLog.ai.info("AI selected: \(recommendation.song) by \(recommendation.artist)")
+            B2BLog.ai.debug("Rationale: \(recommendation.rationale)")
+
+            return recommendation
+        } catch {
+            B2BLog.ai.error("Failed to get AI song selection: \(error)")
+            throw error
+        }
+    }
+
+    private func buildDJPrompt(persona: String, history: [SessionSong]) -> String {
+        var historyText = ""
+        if !history.isEmpty {
+            historyText = """
+
+            Session history (in order played):
+            \(formatSessionHistory(history))
+
+            """
+        }
+
+        return """
+        \(persona)
+        \(historyText)
+        Select the next song that:
+        1. Complements the musical journey so far
+        2. Reflects your DJ persona's taste
+        3. Doesn't repeat any previous songs
+
+        Respond with a JSON object containing:
+        - artist: The artist name
+        - song: The song title
+        - rationale: A brief explanation (max 200 characters) of why you chose this song
+        """
+    }
+
+    private func formatSessionHistory(_ history: [SessionSong]) -> String {
+        history.enumerated().map { index, sessionSong in
+            "\(index + 1). '\(sessionSong.song.title)' by \(sessionSong.song.artistName) [\(sessionSong.selectedBy.rawValue)]"
+        }.joined(separator: "\n")
+    }
+
     // MARK: - Configuration
 
     var isConfigured: Bool {
@@ -228,4 +319,12 @@ final class OpenAIClient {
         B2BLog.ai.debug("Reloading OpenAI configuration")
         loadAPIKey()
     }
+}
+
+// MARK: - Song Recommendation Model
+
+struct SongRecommendation: Codable {
+    let artist: String
+    let song: String
+    let rationale: String
 }
