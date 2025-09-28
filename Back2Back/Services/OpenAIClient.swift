@@ -16,9 +16,9 @@ final class OpenAIClient {
 
     private init() {
         let configuration = URLSessionConfiguration.default
-        // Set long timeouts for AI generation - can take significant time
-        configuration.timeoutIntervalForRequest = 120  // 2 minutes for individual requests
-        configuration.timeoutIntervalForResource = 600  // 10 minutes for total resource time
+        // Disable timeouts for AI generation - web search can take very long
+        configuration.timeoutIntervalForRequest = 0  // No timeout
+        configuration.timeoutIntervalForResource = 0  // No timeout
         self.session = URLSession(configuration: configuration)
 
         // Prevent duplicate initialization logs
