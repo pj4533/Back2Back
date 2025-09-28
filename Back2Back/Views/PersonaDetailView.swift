@@ -39,14 +39,39 @@ struct PersonaDetailView: View {
                 if styleGuide.isEmpty && isNewPersona {
                     VStack(alignment: .center, spacing: 12) {
                         if isGenerating {
-                            ProgressView()
-                                .scaleEffect(1.2)
-                                .padding(.bottom, 8)
+                            // Show different icon based on status
+                            Group {
+                                if generationStatusMessage.contains("✅") {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                        .font(.system(size: 36))
+                                } else if generationStatusMessage.contains("❌") {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.red)
+                                        .font(.system(size: 36))
+                                } else if generationStatusMessage.contains("🔎") {
+                                    Image(systemName: "magnifyingglass.circle.fill")
+                                        .foregroundColor(.blue)
+                                        .font(.system(size: 36))
+                                        .symbolEffect(.pulse, options: .repeating)
+                                } else if generationStatusMessage.contains("✍️") {
+                                    Image(systemName: "pencil.circle.fill")
+                                        .foregroundColor(.orange)
+                                        .font(.system(size: 36))
+                                        .symbolEffect(.pulse, options: .repeating)
+                                } else {
+                                    ProgressView()
+                                        .scaleEffect(1.2)
+                                }
+                            }
+                            .padding(.bottom, 8)
+
                             Text(generationStatusMessage.isEmpty ? "Preparing to generate..." : generationStatusMessage)
                                 .font(.subheadline)
-                                .foregroundColor(.primary)
+                                .foregroundColor(generationStatusMessage.contains("❌") ? .red : .primary)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: .infinity)
+                                .animation(.easeInOut(duration: 0.3), value: generationStatusMessage)
                         } else {
                             Text("Style guide will be generated after creation")
                                 .font(.subheadline)
@@ -76,14 +101,38 @@ struct PersonaDetailView: View {
                         // Show status during generation
                         if isGenerating && !generationStatusMessage.isEmpty {
                             HStack(spacing: 8) {
-                                ProgressView()
-                                    .scaleEffect(0.7)
+                                // Show different icon based on status
+                                if generationStatusMessage.contains("✅") {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                        .font(.system(size: 14))
+                                } else if generationStatusMessage.contains("❌") {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.red)
+                                        .font(.system(size: 14))
+                                } else if generationStatusMessage.contains("🔎") {
+                                    Image(systemName: "magnifyingglass.circle.fill")
+                                        .foregroundColor(.blue)
+                                        .font(.system(size: 14))
+                                } else if generationStatusMessage.contains("✍️") {
+                                    Image(systemName: "pencil.circle.fill")
+                                        .foregroundColor(.orange)
+                                        .font(.system(size: 14))
+                                } else {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                }
+
                                 Text(generationStatusMessage)
                                     .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(generationStatusMessage.contains("❌") ? .red : .primary)
+                                    .animation(.easeInOut(duration: 0.3), value: generationStatusMessage)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
+                            .background(Color.gray.opacity(0.05))
+                            .cornerRadius(6)
+                            .animation(.spring(response: 0.3), value: generationStatusMessage)
                         }
 
                         ScrollView {

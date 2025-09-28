@@ -183,6 +183,214 @@ final class OpenAIClient {
         }
     }
 
+    // MARK: - Streaming Methods
+
+    func streamingResponses(
+        request: ResponsesRequest,
+        onEvent: @escaping (StreamingEvent) async -> Void
+    ) async throws -> ResponsesResponse {
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            B2BLog.ai.error("API key missing when attempting streaming responses API call")
+            throw OpenAIError.apiKeyMissing
+        }
+
+        let urlString = OpenAIConstants.baseURL + OpenAIConstants.responsesEndpoint
+        guard let url = URL(string: urlString) else {
+            B2BLog.ai.error("Invalid URL: \(urlString)")
+            throw OpenAIError.invalidURL
+        }
+
+        B2BLog.network.debug("🌐 Streaming API: POST \(urlString)")
+        B2BLog.ai.debug("Model: \(request.model), Input length: \(request.input.count) characters")
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Add streaming-specific headers
+        urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+
+        // Create streaming request by adding stream parameter
+        if let requestData = try? JSONEncoder().encode(request),
+           var jsonObject = try? JSONSerialization.jsonObject(with: requestData, options: []) as? [String: Any] {
+            jsonObject["stream"] = true
+            urlRequest.httpBody = try JSONSerialization.data(withJSONObject: jsonObject, options: [])
+        } else {
+            throw OpenAIError.encodingError(NSError(domain: "OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create streaming request"]))
+        }
+
+        do {
+            let startTime = Date()
+            let (bytes, response) = try await URLSession.shared.bytes(for: urlRequest)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                B2BLog.ai.error("Invalid response type for streaming")
+                throw OpenAIError.invalidResponse
+            }
+
+            B2BLog.ai.debug("Streaming HTTP Status Code: \(httpResponse.statusCode)")
+
+            guard httpResponse.statusCode == 200 else {
+                // Handle error cases
+                if httpResponse.statusCode == 401 {
+                    throw OpenAIError.unauthorized
+                } else if httpResponse.statusCode == 429 {
+                    throw OpenAIError.rateLimitExceeded
+                } else {
+                    throw OpenAIError.httpError(statusCode: httpResponse.statusCode, message: "Streaming request failed")
+                }
+            }
+
+            var accumulatedText = ""
+            var finalResponse: ResponsesResponse?
+            var sources: [WebSearchSource] = []
+
+            // Process the stream
+            for try await line in bytes.lines {
+                // Skip empty lines and non-data lines
+                guard line.hasPrefix("data: ") else { continue }
+
+                // Extract the JSON data after "data: "
+                let jsonString = String(line.dropFirst(6))
+
+                // Skip the [DONE] message
+                if jsonString == "[DONE]" {
+                    B2BLog.ai.debug("Stream completed")
+                    break
+                }
+
+                // Parse the event
+                guard let jsonData = jsonString.data(using: .utf8) else {
+                    B2BLog.ai.warning("Failed to convert SSE line to data: \(jsonString)")
+                    continue
+                }
+
+                do {
+                    // First try to decode as a full ResponsesResponse (for response.completed events)
+                    if let fullResponse = try? JSONDecoder().decode(ResponsesResponse.self, from: jsonData) {
+                        finalResponse = fullResponse
+                        B2BLog.ai.debug("Received full response in stream")
+
+                        // Create a completed event
+                        let event = StreamingEvent(
+                            type: .responseCompleted,
+                            delta: nil,
+                            sources: sources.isEmpty ? nil : sources,
+                            error: nil,
+                            response: fullResponse
+                        )
+                        await onEvent(event)
+                        continue
+                    }
+
+                    // Otherwise, try to decode as a stream event
+                    let decoder = JSONDecoder()
+                    let streamEvent = try decoder.decode(StreamEvent.self, from: jsonData)
+
+                    // Process the event based on type
+                    switch streamEvent.type {
+                    case .webSearchInProgress:
+                        B2BLog.ai.debug("🔎 Web search in progress")
+                        let event = StreamingEvent(
+                            type: .webSearchInProgress,
+                            delta: nil,
+                            sources: nil,
+                            error: nil,
+                            response: nil
+                        )
+                        await onEvent(event)
+
+                    case .webSearchSearching:
+                        B2BLog.ai.debug("🔎 Web search actively searching")
+                        let event = StreamingEvent(
+                            type: .webSearchSearching,
+                            delta: nil,
+                            sources: nil,
+                            error: nil,
+                            response: nil
+                        )
+                        await onEvent(event)
+
+                    case .webSearchCompleted:
+                        if let eventSources = streamEvent.results?.sources {
+                            sources = eventSources
+                            B2BLog.ai.debug("✅ Web search completed with \(sources.count) sources")
+                        }
+                        let event = StreamingEvent(
+                            type: .webSearchCompleted,
+                            delta: nil,
+                            sources: sources.isEmpty ? nil : sources,
+                            error: nil,
+                            response: nil
+                        )
+                        await onEvent(event)
+
+                    case .outputTextDelta:
+                        if let textDelta = streamEvent.textDelta {
+                            accumulatedText += textDelta
+                            let event = StreamingEvent(
+                                type: .outputTextDelta,
+                                delta: textDelta,
+                                sources: nil,
+                                error: nil,
+                                response: nil
+                            )
+                            await onEvent(event)
+                        }
+
+                    case .responseError:
+                        B2BLog.ai.error("Stream error event received")
+                        let event = StreamingEvent(
+                            type: .responseError,
+                            delta: nil,
+                            sources: nil,
+                            error: streamEvent.error,
+                            response: nil
+                        )
+                        await onEvent(event)
+
+                        if let error = streamEvent.error {
+                            throw OpenAIError.apiError(error.message)
+                        }
+
+                    case .responseCreated:
+                        B2BLog.ai.debug("Response created event")
+
+                    case .responseCompleted:
+                        B2BLog.ai.debug("Response completed event")
+
+                    default:
+                        B2BLog.ai.debug("Unknown stream event type: \(streamEvent.type)")
+                    }
+
+                } catch {
+                    B2BLog.ai.warning("Failed to decode stream event: \(error)")
+                    B2BLog.ai.debug("Raw event data: \(jsonString)")
+                }
+            }
+
+            let elapsedTime = Date().timeIntervalSince(startTime)
+            B2BLog.network.debug("⏱️ Streaming API Response Time: \(elapsedTime)")
+
+            // Return the final response or construct one from accumulated data
+            if let finalResponse = finalResponse {
+                B2BLog.ai.info("Streaming responses API call successful")
+                return finalResponse
+            } else {
+                // If we didn't get a complete response object, construct one with the accumulated text
+                // This is a fallback and shouldn't normally happen
+                B2BLog.ai.warning("No final response received, constructing from accumulated text")
+                throw OpenAIError.invalidResponse
+            }
+
+        } catch let error as OpenAIError {
+            throw error
+        } catch {
+            B2BLog.ai.error("❌ Streaming network error: \(error.localizedDescription)")
+            throw OpenAIError.networkError(error)
+        }
+    }
+
     // MARK: - Convenience Methods
 
     func simpleCompletion(prompt: String, model: String = "gpt-5") async throws -> String {
@@ -224,7 +432,8 @@ final class OpenAIClient {
 
     func generatePersonaStyleGuide(
         name: String,
-        description: String
+        description: String,
+        onStatusUpdate: ((String) async -> Void)? = nil
     ) async throws -> PersonaGenerationResult {
         B2BLog.ai.info("Generating style guide for persona: \(name)")
 
@@ -269,13 +478,60 @@ final class OpenAIClient {
         )
 
         do {
-            let response = try await responses(request: request)
-
-            // Extract sources from web search if available
             var sources: [String] = []
-            if let webSearchCalls = response.webSearchCall?.action?.sources {
+            var accumulatedStyleGuide = ""
+
+            // Use streaming API with real-time status updates
+            let response = try await streamingResponses(request: request) { event in
+                switch event.type {
+                case .webSearchInProgress:
+                    await onStatusUpdate?("🔎 Starting web search...")
+                    B2BLog.ai.debug("Web search initiated")
+
+                case .webSearchSearching:
+                    await onStatusUpdate?("🔎 Searching the web...")
+                    B2BLog.ai.debug("Web search in progress")
+
+                case .webSearchCompleted:
+                    if let eventSources = event.sources {
+                        sources = eventSources.compactMap { $0.url }
+                        let sourceCount = sources.count
+                        await onStatusUpdate?("✅ Found \(sourceCount) source\(sourceCount == 1 ? "" : "s") — generating style guide...")
+                        B2BLog.ai.debug("Web search completed with \(sourceCount) sources")
+                    } else {
+                        await onStatusUpdate?("✅ Web search completed — generating style guide...")
+                        B2BLog.ai.debug("Web search completed without explicit sources")
+                    }
+
+                case .outputTextDelta:
+                    if let delta = event.delta {
+                        accumulatedStyleGuide += delta
+                        // Show generation progress without flooding updates
+                        if accumulatedStyleGuide.count % 100 == 0 {
+                            let wordCount = accumulatedStyleGuide.split(separator: " ").count
+                            await onStatusUpdate?("✍️ Generating style guide... (\(wordCount) words)")
+                        }
+                    }
+
+                case .responseCompleted:
+                    await onStatusUpdate?("✅ Style guide generation complete!")
+                    B2BLog.ai.info("Streaming generation completed")
+
+                case .responseError:
+                    if let error = event.error {
+                        await onStatusUpdate?("❌ Error: \(error.message)")
+                        B2BLog.ai.error("Streaming error: \(error.message)")
+                    }
+
+                default:
+                    break
+                }
+            }
+
+            // Extract sources from the final response if not already captured
+            if sources.isEmpty, let webSearchCalls = response.webSearchCall?.action?.sources {
                 sources = webSearchCalls.compactMap { $0.url }
-                B2BLog.ai.debug("Web search returned \(sources.count) sources")
+                B2BLog.ai.debug("Extracted \(sources.count) sources from final response")
             }
 
             let result = PersonaGenerationResult(
@@ -292,6 +548,7 @@ final class OpenAIClient {
             return result
         } catch {
             B2BLog.ai.error("Failed to generate style guide: \(error)")
+            await onStatusUpdate?("❌ Failed to generate style guide")
             throw error
         }
     }

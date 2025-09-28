@@ -424,6 +424,110 @@ struct OutputTokensDetails: Codable {
 
 // Remove old ResponseMetadata since the actual API uses a generic dictionary
 
+// MARK: - Streaming Event Models
+
+enum StreamEventType: String, Decodable, CustomStringConvertible {
+    case responseCreated = "response.created"
+    case responseCompleted = "response.completed"
+    case responseError = "response.error"
+    case outputTextDelta = "response.output_text.delta"
+    case webSearchInProgress = "response.web_search_call.in_progress"
+    case webSearchSearching = "response.web_search_call.searching"
+    case webSearchCompleted = "response.web_search_call.completed"
+    case other
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+        self = StreamEventType(rawValue: value) ?? .other
+    }
+
+    var description: String {
+        switch self {
+        case .other:
+            return "other"
+        default:
+            return rawValue
+        }
+    }
+}
+
+struct StreamEvent: Decodable {
+    let type: StreamEventType
+    let delta: String?
+    let webSearchCallId: String?
+    let results: WebSearchStreamResults?
+    let error: StreamError?
+    let output: [ResponseOutputItem]?
+    let id: String?
+    let object: String?
+    let createdAt: Double?
+    let model: String?
+    let status: String?
+    let usage: ResponseUsage?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case delta
+        case webSearchCallId = "web_search_call_id"
+        case results
+        case error
+        case output
+        case id
+        case object
+        case createdAt = "created_at"
+        case model
+        case status
+        case usage
+    }
+
+    // Computed property to extract text delta from output items
+    var textDelta: String? {
+        if let delta = delta {
+            return delta
+        }
+
+        // For response.output_text.delta events, the text might be in the output array
+        if let output = output {
+            for item in output {
+                switch item {
+                case .message(let message):
+                    if let content = message.content {
+                        for contentItem in content {
+                            if contentItem.type == "output_text", let text = contentItem.text {
+                                return text
+                            }
+                        }
+                    }
+                default:
+                    continue
+                }
+            }
+        }
+
+        return nil
+    }
+}
+
+struct StreamError: Decodable {
+    let message: String
+    let type: String?
+    let code: String?
+}
+
+struct WebSearchStreamResults: Decodable {
+    let sources: [WebSearchSource]?
+}
+
+// Streaming-specific event for receiving partial responses
+struct StreamingEvent {
+    let type: StreamEventType
+    let delta: String?
+    let sources: [WebSearchSource]?
+    let error: StreamError?
+    let response: ResponsesResponse?
+}
+
 // MARK: - Web Search Models
 
 struct WebSearchCall: Codable {

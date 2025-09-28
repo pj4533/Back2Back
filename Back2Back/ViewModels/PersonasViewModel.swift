@@ -45,20 +45,16 @@ final class PersonasViewModel {
         lastGeneratedSources = []
 
         do {
-            // Update status to show we're searching
-            generationStatus = "Searching the web for information about \(name)..."
-
-            // Small delay to ensure UI updates
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-
-            generationStatus = "Analyzing persona characteristics..."
-
+            // Use streaming API with real-time status updates
             let result = try await openAIClient.generatePersonaStyleGuide(
                 name: name,
                 description: description
-            )
-
-            generationStatus = "Finalizing style guide..."
+            ) { [weak self] status in
+                await MainActor.run {
+                    self?.generationStatus = status
+                    B2BLog.ai.debug("Generation status: \(status)")
+                }
+            }
 
             // Update the persona with the generated style guide
             if let persona = personas.first(where: { $0.name == name }) {
@@ -66,19 +62,32 @@ final class PersonasViewModel {
                 updatedPersona.styleGuide = result.styleGuide
                 personaService.updatePersona(updatedPersona)
                 lastGeneratedSources = result.sources
-                generationStatus = "Style guide generated successfully!"
-                B2BLog.ai.info("✅ Style guide generated successfully")
+
+                // Update final status
+                let sourceCount = result.sources.count
+                if sourceCount > 0 {
+                    generationStatus = "✅ Style guide generated using \(sourceCount) source\(sourceCount == 1 ? "" : "s")"
+                } else {
+                    generationStatus = "✅ Style guide generated successfully!"
+                }
+                B2BLog.ai.info("✅ Style guide generated successfully with \(sourceCount) sources")
 
                 // Clear status after a moment
                 Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
                     generationStatus = ""
                 }
             }
         } catch {
             B2BLog.ai.error("❌ Failed to generate style guide: \(error)")
             generationError = error.localizedDescription
-            generationStatus = "Generation failed"
+            generationStatus = "❌ Generation failed: \(error.localizedDescription)"
+
+            // Clear error status after a moment
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                generationStatus = ""
+            }
         }
 
         isGeneratingStyleGuide = false
