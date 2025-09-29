@@ -18,6 +18,11 @@ struct SessionView: View {
 
     @State private var showSongPicker = false
 
+    // Check if user has already selected a song in the queue
+    private var hasUserSelectedSong: Bool {
+        sessionService.songQueue.contains { $0.selectedBy == .user }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -106,9 +111,9 @@ struct SessionView: View {
 
             // Bottom controls
             VStack(spacing: 12) {
-                // User song selection button - always enabled during user's turn
-                // The AI may be prefetching in the background, but that shouldn't block the user
-                if sessionService.currentTurn == .user {
+                // User song selection button - only show if user's turn and hasn't selected yet
+                // Once user adds a song, hide the button
+                if sessionService.currentTurn == .user && !hasUserSelectedSong {
                     Button(action: {
                         B2BLog.ui.debug("User tapped select song button")
                         showSongPicker = true

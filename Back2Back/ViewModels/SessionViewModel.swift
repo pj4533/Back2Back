@@ -252,7 +252,24 @@ final class SessionViewModel {
             B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
             B2BLog.ai.debug("Rationale: \(recommendation.rationale)")
 
+            // Check if user selected a song while AI was thinking
+            // If user has selected, we should abort this prefetch
+            let userHasSelected = sessionService.songQueue.contains { $0.selectedBy == .user }
+            if userHasSelected {
+                B2BLog.ai.info("⏭️ User selected a song while AI was prefetching - cancelling AI selection")
+                sessionService.setAIThinking(false)
+                return
+            }
+
             if let song = await searchAndMatchSong(recommendation) {
+                // Double-check again after search (in case user selected during search)
+                let userHasSelectedAfterSearch = sessionService.songQueue.contains { $0.selectedBy == .user }
+                if userHasSelectedAfterSearch {
+                    B2BLog.ai.info("⏭️ User selected a song during AI search - cancelling AI selection")
+                    sessionService.setAIThinking(false)
+                    return
+                }
+
                 queueAISong(song, rationale: recommendation.rationale, queueStatus: queueStatus)
                 B2BLog.ai.info("✅ Successfully queued AI song: \(song.title) as \(queueStatus)")
                 B2BLog.session.debug("Queue after AI selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
