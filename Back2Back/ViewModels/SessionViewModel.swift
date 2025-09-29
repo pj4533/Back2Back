@@ -53,17 +53,32 @@ final class SessionViewModel {
         sessionService.clearAIQueuedSongs()
         sessionService.clearNextAISong()
 
-        // Add to queue first with upNext status
-        B2BLog.session.info("Adding user song to queue with 'upNext' status")
-        _ = sessionService.queueSong(song, selectedBy: .user, queueStatus: .upNext)
+        // Check if something is currently playing
+        let isMusicPlaying = musicService.playbackState == .playing || musicService.currentlyPlaying != nil
 
-        // Play the song - this will trigger the playback monitor to update status
-        await playCurrentSong(song)
+        if isMusicPlaying {
+            // Music is playing - queue the song
+            B2BLog.session.info("Music currently playing - queueing user song with 'upNext' status")
+            _ = sessionService.queueSong(song, selectedBy: .user, queueStatus: .upNext)
 
-        // Start pre-fetching AI's next song while user's song plays
-        B2BLog.session.info("Starting AI prefetch for 'upNext' position")
-        prefetchTask = Task.detached { [weak self] in
-            await self?.prefetchAndQueueAISong(queueStatus: .upNext)
+            // Start pre-fetching AI's next song to play after the user's queued song
+            B2BLog.session.info("Starting AI prefetch for next position after user's queued song")
+            prefetchTask = Task.detached { [weak self] in
+                await self?.prefetchAndQueueAISong(queueStatus: .upNext)
+            }
+        } else {
+            // Nothing playing - play immediately
+            B2BLog.session.info("No music playing - starting playback immediately")
+            sessionService.addSongToHistory(song, selectedBy: .user, queueStatus: .playing)
+
+            // Play the song
+            await playCurrentSong(song)
+
+            // Start pre-fetching AI's next song while user's song plays
+            B2BLog.session.info("Starting AI prefetch for 'upNext' position")
+            prefetchTask = Task.detached { [weak self] in
+                await self?.prefetchAndQueueAISong(queueStatus: .upNext)
+            }
         }
 
         B2BLog.session.debug("Queue after user selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
@@ -78,7 +93,10 @@ final class SessionViewModel {
         if let nextSong = sessionService.getNextQueuedSong() {
             B2BLog.session.info("🎵 Found queued song: \(nextSong.song.title) by \(nextSong.song.artistName) (selected by \(nextSong.selectedBy.rawValue))")
 
-            // Play the song - the playback monitor will handle moving to history and updating status
+            // Move the song from queue to history before playing
+            sessionService.moveQueuedSongToHistory(nextSong.id)
+
+            // Play the song
             await playCurrentSong(nextSong.song)
 
             // If this was an AI song, queue another AI song to continue
@@ -281,10 +299,19 @@ final class SessionViewModel {
                 B2BLog.playback.trace("Playback - \(nowPlaying.song.title): \(Int(currentPlaybackTime))s/\(Int(nowPlaying.duration))s (\(Int(progress * 100))%)")
             }
 
+            // Detailed logging when approaching song end
+            if progress >= 0.90 && progress < 0.99 {
+                B2BLog.playback.debug("📊 Near song end: \(nowPlaying.song.title) - Progress: \(String(format: "%.1f%%", progress * 100)) (\(Int(currentPlaybackTime))s/\(Int(nowPlaying.duration))s)")
+                B2BLog.playback.debug("  - hasTriggeredEndOfSong: \(self.hasTriggeredEndOfSong)")
+                B2BLog.playback.debug("  - Playback state: \(String(describing: self.musicService.playbackState))")
+                B2BLog.playback.debug("  - Is playing: \(nowPlaying.isPlaying)")
+            }
+
             // Check if song has ended (100% complete or very close) and we haven't triggered yet
-            if progress >= 0.99 && !hasTriggeredEndOfSong && nowPlaying.duration > 0 {
+            // Lower threshold to 97% to catch songs that might not reach exactly 99%
+            if progress >= 0.97 && !hasTriggeredEndOfSong && nowPlaying.duration > 0 {
+                B2BLog.playback.info("🎵 Song ending detected at \(String(format: "%.1f%%", progress * 100)) - advancing to next song")
                 hasTriggeredEndOfSong = true
-                B2BLog.playback.info("🎵 Song ended, advancing to next song")
                 B2BLog.playback.debug("Queue state - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
 
                 // Mark current song as played before transitioning
@@ -297,9 +324,11 @@ final class SessionViewModel {
             lastPlaybackTime = currentPlaybackTime
 
         } else if lastSongId != nil {
-            // Was playing but now nothing - song ended
+            // Was playing but now nothing - song ended or playback stopped
+            B2BLog.playback.debug("🔍 No current playback detected (lastSongId: \(self.lastSongId ?? "nil"), hasTriggeredEndOfSong: \(self.hasTriggeredEndOfSong))")
+
             if !hasTriggeredEndOfSong {
-                B2BLog.playback.info("⏹️ Playback stopped, advancing queue")
+                B2BLog.playback.info("⏹️ Playback stopped or ended unexpectedly, advancing queue")
                 B2BLog.playback.debug("Queue state - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
 
                 hasTriggeredEndOfSong = true

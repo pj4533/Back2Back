@@ -58,6 +58,19 @@ class MusicService {
 
         if oldState != playbackState {
             B2BLog.playback.info("🔄 State: \(String(describing: oldState)) → \(String(describing: self.playbackState))")
+
+            // Log additional context when state changes
+            B2BLog.playback.debug("🔍 State change context:")
+            B2BLog.playback.debug("  - Queue entries: \(self.player.queue.entries.count)")
+            B2BLog.playback.debug("  - Current entry exists: \(self.player.queue.currentEntry != nil)")
+            B2BLog.playback.debug("  - Playback time: \(self.player.playbackTime)s")
+
+            // Check if this is an unexpected pause or stop
+            if playbackState == .paused && oldState == .playing {
+                B2BLog.playback.warning("⚠️ Unexpected pause detected - was playing, now paused")
+            } else if playbackState == .stopped && oldState == .playing {
+                B2BLog.playback.warning("⚠️ Unexpected stop detected - was playing, now stopped")
+            }
         }
 
         if let currentEntry = player.queue.currentEntry {
@@ -170,7 +183,14 @@ class MusicService {
         B2BLog.playback.info("👤 Play song: \(song.title)")
 
         do {
+            // Log current queue state before replacement
+            B2BLog.playback.debug("📝 Queue before replacement - entries: \(self.player.queue.entries.count)")
+
             player.queue = ApplicationMusicPlayer.Queue(for: [song])
+
+            // Log queue state after replacement
+            B2BLog.playback.debug("📝 Queue after replacement - entries: \(self.player.queue.entries.count)")
+
             try await player.play()
             B2BLog.playback.info("✅ Started playback: \(song.title) by \(song.artistName)")
         } catch {

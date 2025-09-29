@@ -50,6 +50,12 @@ final class SessionService {
         )
         sessionHistory.append(sessionSong)
 
+        // If this song is playing, track it
+        if queueStatus == .playing {
+            currentlyPlayingSongId = sessionSong.id
+            B2BLog.session.debug("Set currently playing song ID: \(sessionSong.id)")
+        }
+
         B2BLog.session.info("Added song to history: \(song.title) by \(selectedBy == .user ? "User" : "AI") - Status: \(queueStatus)")
         let newTurn = self.currentTurn == .user ? TurnType.ai : TurnType.user
         B2BLog.session.debug("Turn change: \(self.currentTurn.rawValue) -> \(newTurn.rawValue)")
@@ -103,8 +109,14 @@ final class SessionService {
         // First check history
         for (index, sessionSong) in sessionHistory.enumerated() {
             if sessionSong.song.id.rawValue == songId {
+                // If this song is already marked as playing and is the current one, nothing to do
+                if sessionSong.queueStatus == .playing && currentlyPlayingSongId == sessionSong.id {
+                    B2BLog.session.trace("Song already marked as currently playing: \(sessionSong.song.title)")
+                    return
+                }
+
                 // Mark any previously playing song as played
-                if let previousId = currentlyPlayingSongId {
+                if let previousId = currentlyPlayingSongId, previousId != sessionSong.id {
                     updateSongStatus(id: previousId, newStatus: .played)
                 }
 
@@ -140,7 +152,7 @@ final class SessionService {
             }
         }
 
-        B2BLog.session.warning("Could not find song with ID \(songId) in history or queue")
+        B2BLog.session.debug("Song with ID \(songId) not found in history or queue - may be initial playback")
     }
 
     func getNextQueuedSong() -> SessionSong? {
