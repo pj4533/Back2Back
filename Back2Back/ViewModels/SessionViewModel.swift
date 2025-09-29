@@ -53,12 +53,11 @@ final class SessionViewModel {
         sessionService.clearAIQueuedSongs()
         sessionService.clearNextAISong()
 
-        // Add to history and play immediately
-        B2BLog.session.info("Adding user song to queue with 'playing' status")
-        let sessionSong = sessionService.queueSong(song, selectedBy: .user, queueStatus: .playing)
-        sessionService.moveQueuedSongToHistory(sessionSong.id)
+        // Add to queue first with upNext status
+        B2BLog.session.info("Adding user song to queue with 'upNext' status")
+        _ = sessionService.queueSong(song, selectedBy: .user, queueStatus: .upNext)
 
-        // Play the song
+        // Play the song - this will trigger the playback monitor to update status
         await playCurrentSong(song)
 
         // Start pre-fetching AI's next song while user's song plays
@@ -79,8 +78,7 @@ final class SessionViewModel {
         if let nextSong = sessionService.getNextQueuedSong() {
             B2BLog.session.info("🎵 Found queued song: \(nextSong.song.title) by \(nextSong.song.artistName) (selected by \(nextSong.selectedBy.rawValue))")
 
-            // Move from queue to history and play
-            sessionService.moveQueuedSongToHistory(nextSong.id)
+            // Play the song - the playback monitor will handle moving to history and updating status
             await playCurrentSong(nextSong.song)
 
             // If this was an AI song, queue another AI song to continue
@@ -271,6 +269,10 @@ final class SessionViewModel {
                 lastSongId = currentSongId
                 hasTriggeredEndOfSong = false
                 lastPlaybackTime = currentPlaybackTime
+
+                // CRITICAL: Update the queue status to show this song is now playing
+                sessionService.updateCurrentlyPlayingSong(songId: currentSongId)
+
                 return
             }
 

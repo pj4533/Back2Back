@@ -16,6 +16,9 @@ class MusicService {
     var isSearching: Bool = false
     var playbackState: ApplicationMusicPlayer.PlaybackStatus = .stopped
 
+    // Add a publisher for song changes that other services can subscribe to
+    private(set) var currentSongId: String? = nil
+
     private let player = ApplicationMusicPlayer.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -59,35 +62,35 @@ class MusicService {
 
         if let currentEntry = player.queue.currentEntry {
             Task {
-                do {
-                    switch currentEntry.item {
-                    case .song(let song):
-                        let wasPlaying = currentlyPlaying?.song.id
-                        currentlyPlaying = NowPlayingItem(
-                            song: song,
-                            isPlaying: player.state.playbackStatus == .playing,
-                            playbackTime: player.playbackTime,
-                            duration: song.duration ?? 0
-                        )
-                        // Only log when the song actually changes, not on every state update
-                        if song.id.rawValue != lastLoggedSongId {
-                            B2BLog.playback.info("🎵 Now playing: \(song.title) by \(song.artistName)")
-                            lastLoggedSongId = song.id.rawValue
-                        }
-                    default:
-                        currentlyPlaying = nil
-                        if lastLoggedSongId != nil {
-                            B2BLog.playback.debug("Current queue entry is not a song")
-                            lastLoggedSongId = nil
-                        }
+                switch currentEntry.item {
+                case .song(let song):
+                    currentlyPlaying = NowPlayingItem(
+                        song: song,
+                        isPlaying: player.state.playbackStatus == .playing,
+                        playbackTime: player.playbackTime,
+                        duration: song.duration ?? 0
+                    )
+                    // Track the current song ID for external observers
+                    let newSongId = song.id.rawValue
+                    if newSongId != currentSongId {
+                        currentSongId = newSongId
                     }
-                } catch {
+                    // Only log when the song actually changes, not on every state update
+                    if song.id.rawValue != lastLoggedSongId {
+                        B2BLog.playback.info("🎵 Now playing: \(song.title) by \(song.artistName)")
+                        lastLoggedSongId = song.id.rawValue
+                    }
+                default:
                     currentlyPlaying = nil
-                    B2BLog.playback.error("❌ updatePlaybackState: \(error.localizedDescription)")
+                    if lastLoggedSongId != nil {
+                        B2BLog.playback.debug("Current queue entry is not a song")
+                        lastLoggedSongId = nil
+                    }
                 }
             }
         } else {
             currentlyPlaying = nil
+            currentSongId = nil
             lastLoggedSongId = nil
         }
     }

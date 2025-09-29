@@ -69,7 +69,8 @@ struct SessionView: View {
                             // Show history (played songs)
                             ForEach(sessionService.sessionHistory) { sessionSong in
                                 SessionSongRow(sessionSong: sessionSong)
-                                    .id(sessionSong.id)
+                                    // Use composite ID to force re-render on status change
+                                    .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .bottom).combined(with: .opacity),
                                         removal: .opacity
@@ -79,7 +80,8 @@ struct SessionView: View {
                             // Show queue (upcoming songs)
                             ForEach(sessionService.songQueue) { sessionSong in
                                 SessionSongRow(sessionSong: sessionSong)
-                                    .id(sessionSong.id)
+                                    // Use composite ID to force re-render on status change
+                                    .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .bottom).combined(with: .opacity),
                                         removal: .opacity
@@ -180,6 +182,10 @@ struct SessionView: View {
 
 struct SessionSongRow: View {
     let sessionSong: SessionSong
+    // Add computed property to force view updates when queue status changes
+    private var statusId: String {
+        "\(sessionSong.id)-\(sessionSong.queueStatus.description)"
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -201,38 +207,42 @@ struct SessionSongRow: View {
                         .lineLimit(1)
 
                     // Queue status badge
-                    if sessionSong.queueStatus == .upNext {
-                        Text("Up Next")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.green)
-                            .foregroundColor(.white)
-                            .cornerRadius(4)
-                    } else if sessionSong.queueStatus == .playing {
-                        HStack(spacing: 3) {
-                            Image(systemName: "speaker.wave.2.fill")
-                                .font(.caption2)
-                            Text("Now Playing")
+                    // Add animation to status changes
+                    Group {
+                        if sessionSong.queueStatus == .upNext {
+                            Text("Up Next")
                                 .font(.caption)
                                 .fontWeight(.semibold)
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(4)
-                    } else if sessionSong.queueStatus == .queuedIfUserSkips {
-                        Text("Queued (AI continues)")
-                            .font(.caption2)
-                            .fontWeight(.medium)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(4)
+                        } else if sessionSong.queueStatus == .playing {
+                            HStack(spacing: 3) {
+                                Image(systemName: "speaker.wave.2.fill")
+                                    .font(.caption2)
+                                Text("Now Playing")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.8))
+                            .background(Color.blue)
                             .foregroundColor(.white)
                             .cornerRadius(4)
+                        } else if sessionSong.queueStatus == .queuedIfUserSkips {
+                            Text("Queued (AI continues)")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.8))
+                                .foregroundColor(.white)
+                                .cornerRadius(4)
+                        }
                     }
+                    .animation(.easeInOut(duration: 0.3), value: sessionSong.queueStatus)
                 }
 
                 Text(sessionSong.song.artistName)

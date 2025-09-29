@@ -98,6 +98,51 @@ final class SessionService {
         }
     }
 
+    func updateCurrentlyPlayingSong(songId: String) {
+        // Find the song in history or queue that matches this MusicKit song ID
+        // First check history
+        for (index, sessionSong) in sessionHistory.enumerated() {
+            if sessionSong.song.id.rawValue == songId {
+                // Mark any previously playing song as played
+                if let previousId = currentlyPlayingSongId {
+                    updateSongStatus(id: previousId, newStatus: .played)
+                }
+
+                // Update this song to playing
+                sessionHistory[index].queueStatus = .playing
+                currentlyPlayingSongId = sessionSong.id
+                B2BLog.session.info("Updated currently playing: \(sessionSong.song.title)")
+                return
+            }
+        }
+
+        // Then check queue
+        for (index, sessionSong) in songQueue.enumerated() {
+            if sessionSong.song.id.rawValue == songId {
+                // This song started playing from the queue
+                // Move it to history with playing status
+                var song = songQueue.remove(at: index)
+
+                // Mark any previously playing song as played
+                if let previousId = currentlyPlayingSongId {
+                    updateSongStatus(id: previousId, newStatus: .played)
+                }
+
+                song.queueStatus = .playing
+                sessionHistory.append(song)
+                currentlyPlayingSongId = song.id
+
+                // Update turn based on who selected this song
+                currentTurn = song.selectedBy == .user ? .ai : .user
+
+                B2BLog.session.info("Moved to playing from queue: \(song.song.title)")
+                return
+            }
+        }
+
+        B2BLog.session.warning("Could not find song with ID \(songId) in history or queue")
+    }
+
     func getNextQueuedSong() -> SessionSong? {
         // First priority: songs marked as "upNext" (user → AI transition)
         if let upNext = songQueue.first(where: { $0.queueStatus == .upNext }) {
@@ -121,6 +166,20 @@ final class SessionService {
             currentlyPlayingSongId = nil
             B2BLog.session.debug("Marked current song as played")
         }
+    }
+
+    func getCurrentlyPlayingSessionSong() -> SessionSong? {
+        if let id = currentlyPlayingSongId {
+            // Check history first
+            if let song = sessionHistory.first(where: { $0.id == id }) {
+                return song
+            }
+            // Then check queue
+            if let song = songQueue.first(where: { $0.id == id }) {
+                return song
+            }
+        }
+        return nil
     }
 
     func setAIThinking(_ thinking: Bool) {
