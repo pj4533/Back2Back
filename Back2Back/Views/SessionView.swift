@@ -32,25 +32,12 @@ struct SessionView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
 
-                HStack {
-                    Label(
-                        "Turn: \(sessionService.currentTurn.rawValue)",
-                        systemImage: sessionService.currentTurn == .user ? "person.fill" : "cpu"
-                    )
-                    .font(.headline)
-                    .foregroundStyle(sessionService.currentTurn == .user ? .blue : .purple)
-
-                    if sessionService.isAIThinking {
-                        Spacer()
-                        HStack(spacing: 4) {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("AI selecting...")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                Label(
+                    "Turn: \(sessionService.currentTurn.rawValue)",
+                    systemImage: sessionService.currentTurn == .user ? "person.fill" : "cpu"
+                )
+                .font(.headline)
+                .foregroundStyle(sessionService.currentTurn == .user ? .blue : .purple)
 
                 Text("AI Persona: \(sessionService.currentPersonaName)")
                     .font(.subheadline)
@@ -72,7 +59,7 @@ struct SessionView: View {
             }
 
             // Session history and queue
-            if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty {
+            if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty && !sessionService.isAIThinking {
                 ContentUnavailableView(
                     "No Songs Yet",
                     systemImage: "music.note.list",
@@ -94,6 +81,15 @@ struct SessionView: View {
                                     ))
                             }
 
+                            // Show AI loading cell if AI is thinking
+                            if sessionService.isAIThinking {
+                                AILoadingCell()
+                                    .transition(.asymmetric(
+                                        insertion: .scale.combined(with: .opacity),
+                                        removal: .scale.combined(with: .opacity)
+                                    ))
+                            }
+
                             // Show queue (upcoming songs)
                             ForEach(sessionService.songQueue) { sessionSong in
                                 SessionSongRow(sessionSong: sessionSong)
@@ -106,7 +102,7 @@ struct SessionView: View {
                             }
                         }
                         .padding()
-                        .animation(.spring(response: 0.3), value: sessionService.sessionHistory.count + sessionService.songQueue.count)
+                        .animation(.spring(response: 0.3), value: sessionService.sessionHistory.count + sessionService.songQueue.count + (sessionService.isAIThinking ? 1 : 0))
                     }
                     .onChange(of: sessionService.sessionHistory.count + sessionService.songQueue.count) { _, _ in
                         withAnimation {
@@ -225,6 +221,120 @@ struct SessionView: View {
 
         // Let the SessionViewModel handle AI starting first
         await sessionViewModel.handleAIStartFirst()
+    }
+}
+
+struct AILoadingCell: View {
+    @State private var isAnimating = false
+    @State private var currentPhase = 0
+
+    private let loadingStates = [
+        ("brain.head.profile", "Analyzing the vibe..."),
+        ("music.note.list", "Searching the catalog..."),
+        ("sparkles", "Finding the perfect track...")
+    ]
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Turn indicator - animated CPU icon
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.purple, Color.pink, Color.orange],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 32, height: 32)
+                .overlay(
+                    Image(systemName: "cpu")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .symbolEffect(.pulse, options: .repeating)
+                )
+
+            // Loading content
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: loadingStates[currentPhase].0)
+                        .font(.title3)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink, .orange],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .symbolEffect(.bounce, options: .repeating)
+
+                    Text(loadingStates[currentPhase].1)
+                        .font(.headline)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .pink],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
+
+                // Animated dots
+                HStack(spacing: 4) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(Color.purple.opacity(0.6))
+                            .frame(width: 6, height: 6)
+                            .scaleEffect(isAnimating && index % 3 == currentPhase % 3 ? 1.2 : 0.8)
+                            .animation(
+                                .easeInOut(duration: 0.6)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(index) * 0.2),
+                                value: isAnimating
+                            )
+                    }
+                }
+                .padding(.top, 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.purple.opacity(0.1),
+                            Color.pink.opacity(0.1),
+                            Color.orange.opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.purple.opacity(0.4), .pink.opacity(0.4), .orange.opacity(0.4)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
+        )
+        .onAppear {
+            isAnimating = true
+            startPhaseRotation()
+        }
+    }
+
+    private func startPhaseRotation() {
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.5)) {
+                currentPhase = (currentPhase + 1) % loadingStates.count
+            }
+        }
     }
 }
 
