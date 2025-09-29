@@ -27,6 +27,15 @@ final class SessionViewModel {
     private var lastSongId: String? = nil
     private var hasTriggeredEndOfSong: Bool = false
 
+    // AI Model configuration
+    private var aiModelConfig: AIModelConfig {
+        guard let data = UserDefaults.standard.data(forKey: "aiModelConfig"),
+              let config = try? JSONDecoder().decode(AIModelConfig.self, from: data) else {
+            return .default
+        }
+        return config
+    }
+
     private init() {
         B2BLog.session.info("SessionViewModel initialized")
         startPlaybackMonitoring()
@@ -190,9 +199,11 @@ final class SessionViewModel {
             throw OpenAIError.apiKeyMissing
         }
 
+        let config = aiModelConfig
         let recommendation = try await openAIClient.selectNextSong(
             persona: sessionService.currentPersonaStyleGuide,
-            sessionHistory: sessionService.sessionHistory
+            sessionHistory: sessionService.sessionHistory,
+            config: config
         )
 
         // Check if song has already been played
@@ -202,7 +213,8 @@ final class SessionViewModel {
             let retryPersona = sessionService.currentPersonaStyleGuide + "\n\nIMPORTANT: Never select a song that has already been played in this session."
             return try await openAIClient.selectNextSong(
                 persona: retryPersona,
-                sessionHistory: sessionService.sessionHistory
+                sessionHistory: sessionService.sessionHistory,
+                config: config
             )
         }
 

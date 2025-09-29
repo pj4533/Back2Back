@@ -127,7 +127,8 @@ enum VerbosityLevel: String, Codable {
     case high
 }
 
-enum ReasoningEffort: String, Codable {
+enum ReasoningEffort: String, Codable, CaseIterable {
+    case minimal
     case low
     case medium
     case high

@@ -9,16 +9,16 @@ struct SongRecommendation: Codable {
 }
 
 extension OpenAIClient {
-    func selectNextSong(persona: String, sessionHistory: [SessionSong]) async throws -> SongRecommendation {
-        B2BLog.ai.info("Requesting AI song selection with persona")
+    func selectNextSong(persona: String, sessionHistory: [SessionSong], config: AIModelConfig = .default) async throws -> SongRecommendation {
+        B2BLog.ai.info("Requesting AI song selection with persona using model: \(config.songSelectionModel), reasoning: \(config.songSelectionReasoningLevel.rawValue)")
 
         let prompt = buildDJPrompt(persona: persona, history: sessionHistory)
 
         let request = ResponsesRequest(
-            model: "gpt-5",
+            model: config.songSelectionModel,
             input: prompt + "\n\nIMPORTANT: Respond ONLY with a valid JSON object in this exact format: {\"artist\": \"Artist Name\", \"song\": \"Song Title\", \"rationale\": \"Brief explanation (max 200 characters)\"}",
             verbosity: .high,
-            reasoningEffort: .low
+            reasoningEffort: config.songSelectionReasoningLevel
         )
 
         do {
