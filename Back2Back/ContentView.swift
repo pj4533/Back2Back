@@ -40,6 +40,14 @@ struct ContentView: View {
                 Label("Personas", systemImage: "person.3.fill")
             }
             .tag(1)
+
+            NavigationStack {
+                ConfigurationView()
+            }
+            .tabItem {
+                Label("Config", systemImage: "gear")
+            }
+            .tag(2)
         }
     }
 
