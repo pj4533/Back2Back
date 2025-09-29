@@ -106,25 +106,25 @@ struct SessionView: View {
 
             // Bottom controls
             VStack(spacing: 12) {
-                // User song selection button
-                Button(action: {
-                    B2BLog.ui.debug("User tapped select song button")
-                    showSongPicker = true
-                }) {
-                    Label(
-                        sessionService.currentTurn == .user ? "Select Your Track" : "Skip AI Turn",
-                        systemImage: "plus.circle.fill"
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(
-                        sessionService.currentTurn == .user ? Color.blue : Color.orange
-                    )
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+                // User song selection button - only show during user's turn
+                if sessionService.currentTurn == .user {
+                    Button(action: {
+                        B2BLog.ui.debug("User tapped select song button")
+                        showSongPicker = true
+                    }) {
+                        Label(
+                            "Select Your Track",
+                            systemImage: "plus.circle.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(sessionService.isAIThinking)
+                    .opacity(sessionService.isAIThinking ? 0.5 : 1.0)
                 }
-                .disabled(sessionService.isAIThinking)
-                .opacity(sessionService.isAIThinking ? 0.5 : 1.0)
 
                 // Clear session button (if there's history)
                 if !sessionService.sessionHistory.isEmpty {
