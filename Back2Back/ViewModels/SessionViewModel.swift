@@ -99,6 +99,13 @@ final class SessionViewModel {
             // Play the song
             await playCurrentSong(nextSong.song)
 
+            // If this was an AI song that just started playing, we're no longer "thinking"
+            // The turn is now the user's turn (they can select while this AI song plays)
+            if nextSong.selectedBy == .ai {
+                B2BLog.session.info("🤖 AI song now playing, clearing AI thinking state")
+                sessionService.setAIThinking(false)
+            }
+
             // If this was an AI song, queue another AI song to continue
             if nextSong.selectedBy == .ai {
                 B2BLog.session.info("🤖 AI song playing, queueing another AI selection to continue")
@@ -114,6 +121,8 @@ final class SessionViewModel {
         } else {
             B2BLog.session.warning("⚠️ No queued song available - waiting for user selection")
             // User needs to select manually
+            // Make sure AI thinking is cleared so user can select
+            sessionService.setAIThinking(false)
         }
     }
 

@@ -106,7 +106,8 @@ struct SessionView: View {
 
             // Bottom controls
             VStack(spacing: 12) {
-                // User song selection button - only show during user's turn
+                // User song selection button - always enabled during user's turn
+                // The AI may be prefetching in the background, but that shouldn't block the user
                 if sessionService.currentTurn == .user {
                     Button(action: {
                         B2BLog.ui.debug("User tapped select song button")
@@ -122,8 +123,6 @@ struct SessionView: View {
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
-                    .disabled(sessionService.isAIThinking)
-                    .opacity(sessionService.isAIThinking ? 0.5 : 1.0)
                 }
 
                 // Clear session button (if there's history)
