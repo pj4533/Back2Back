@@ -18,7 +18,7 @@ extension OpenAIClient {
             model: "gpt-5",
             input: prompt + "\n\nIMPORTANT: Respond ONLY with a valid JSON object in this exact format: {\"artist\": \"Artist Name\", \"song\": \"Song Title\", \"rationale\": \"Brief explanation (max 200 characters)\"}",
             verbosity: .high,
-            reasoningEffort: .high
+            reasoningEffort: .low
         )
 
         do {
