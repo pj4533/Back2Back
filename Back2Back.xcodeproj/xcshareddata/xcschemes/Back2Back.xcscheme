@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B0B77BAC2E85B1100006E510"
-               BuildableName = "Back2Back.app"
+               BuildableName = "Back2Back DJ.app"
                BlueprintName = "Back2Back"
                ReferencedContainer = "container:Back2Back.xcodeproj">
             </BuildableReference>
@@ -58,7 +58,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "B0B77BAC2E85B1100006E510"
-            BuildableName = "Back2Back.app"
+            BuildableName = "Back2Back DJ.app"
             BlueprintName = "Back2Back"
             ReferencedContainer = "container:Back2Back.xcodeproj">
          </BuildableReference>
@@ -75,7 +75,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "B0B77BAC2E85B1100006E510"
-            BuildableName = "Back2Back.app"
+            BuildableName = "Back2Back DJ.app"
             BlueprintName = "Back2Back"
             ReferencedContainer = "container:Back2Back.xcodeproj">
          </BuildableReference>
