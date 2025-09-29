@@ -10,24 +10,44 @@ final class EnvironmentService {
 
     private let processInfo = ProcessInfo.processInfo
     private var isInitialized = false
+    private var cachedOpenAIKey: String?
 
     private init() {
         // Prevent duplicate initialization logs
         guard !isInitialized else { return }
         isInitialized = true
         B2BLog.general.debug("EnvironmentService initialized")
+        loadEnvironmentVariables()
+    }
+
+    private func loadEnvironmentVariables() {
+        B2BLog.network.debug("Loading API keys from environment variables...")
+
+        // First try environment variables (useful for local development)
+        cachedOpenAIKey = processInfo.environment["OPENAI_API_KEY"]
+
+        // If not found in environment, try the generated Secrets file (for CI builds)
+        if cachedOpenAIKey == nil {
+            cachedOpenAIKey = Secrets.openAIAPIKey
+        }
+
+        // Log status (without exposing actual keys)
+        B2BLog.network.debug("OpenAI API key status: \(self.cachedOpenAIKey != nil ? "Available" : "Missing")")
+
+        // Validate that we have the required keys
+        if self.cachedOpenAIKey == nil {
+            B2BLog.network.error("MISSING OPENAI API KEY: Application will fail when attempting to use AI features")
+        }
     }
 
     func getOpenAIKey() -> String? {
-        let key = processInfo.environment["OPENAI_API_KEY"]
-
-        if key == nil || key?.isEmpty == true {
-            B2BLog.network.warning("OPENAI_API_KEY not found in environment variables")
+        if cachedOpenAIKey == nil || cachedOpenAIKey?.isEmpty == true {
+            B2BLog.network.warning("OPENAI_API_KEY not found in environment variables or Secrets file")
         } else {
-            B2BLog.network.trace("OpenAI API key retrieved from environment")
+            B2BLog.network.trace("OpenAI API key retrieved")
         }
 
-        return key
+        return cachedOpenAIKey
     }
 
     func getValue(for key: String) -> String? {
@@ -43,6 +63,11 @@ final class EnvironmentService {
     }
 
     var isConfiguredForOpenAI: Bool {
-        getOpenAIKey() != nil && !getOpenAIKey()!.isEmpty
+        cachedOpenAIKey != nil && !cachedOpenAIKey!.isEmpty
+    }
+
+    /// Reload environment variables (useful for testing)
+    func reload() {
+        loadEnvironmentVariables()
     }
 }

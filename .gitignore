@@ -127,6 +127,7 @@ Temporary Items
 *.cert
 *.p12
 *.mobileprovision
+Back2Back/Secrets.swift
 
 # IDE - VSCode
 .vscode/*
