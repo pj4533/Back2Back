@@ -258,7 +258,6 @@ struct SessionSongRow: View {
                     Text(rationale)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
                         .padding(.top, 2)
                 }
             }
