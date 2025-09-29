@@ -83,27 +83,4 @@ extension OpenAIClient {
         let response = try await responses(request: request)
         return response.outputText
     }
-
-    func personaBasedRecommendation(persona: String, context: String) async throws -> String {
-        let input = """
-        You are a DJ assistant helping to select the next song in a back-to-back DJ session.
-        Respond in the style of \(persona) and provide a song recommendation based on the following context:
-
-        \(context)
-        """
-
-        let request = ResponsesRequest(
-            model: "gpt-5",
-            input: input,
-            verbosity: .high,
-            reasoningEffort: .high
-        )
-
-        B2BLog.ai.info("Requesting song recommendation from persona: \(persona)")
-
-        let response = try await responses(request: request)
-
-        B2BLog.ai.info("Received recommendation from \(persona)")
-        return response.outputText
-    }
 }

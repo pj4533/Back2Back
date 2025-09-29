@@ -118,20 +118,6 @@ struct OpenAIClientTests {
         }
     }
 
-    @Test("personaBasedRecommendation requires API key")
-    func testPersonaBasedRecommendationRequiresApiKey() async throws {
-        let client = OpenAIClient.shared
-
-        if !client.isConfigured {
-            await #expect(throws: OpenAIError.apiKeyMissing) {
-                _ = try await client.personaBasedRecommendation(
-                    persona: "Mark Ronson",
-                    context: "Previous song was funk music"
-                )
-            }
-        }
-    }
-
     @Test("ResponseUsage model properties")
     func testResponseUsageModel() async throws {
         let outputDetails = OutputTokensDetails(reasoningTokens: 5)
@@ -256,22 +242,6 @@ struct OpenAIClientTests {
         if !client.isConfigured {
             await #expect(throws: OpenAIError.apiKeyMissing) {
                 _ = try await client.simpleCompletion(prompt: "Test")
-            }
-        }
-    }
-
-    @Test("personaBasedRecommendation formatting")
-    func testPersonaBasedRecommendationFormatting() async throws {
-        // This test verifies the implementation formats the input correctly
-        // We can't test the actual API call without a valid key
-        let client = OpenAIClient.shared
-
-        if !client.isConfigured {
-            await #expect(throws: OpenAIError.apiKeyMissing) {
-                _ = try await client.personaBasedRecommendation(
-                    persona: "Test Persona",
-                    context: "Test context"
-                )
             }
         }
     }
