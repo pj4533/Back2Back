@@ -10,9 +10,12 @@ import MusicKit
 import OSLog
 
 struct SessionView: View {
-    @State private var sessionService = SessionService.shared
-    @State private var musicService = MusicService.shared
-    @State private var sessionViewModel = SessionViewModel.shared
+    // For @Observable objects, access directly without property wrappers
+    // SwiftUI automatically tracks property access and updates the view
+    private let sessionService = SessionService.shared
+    private let sessionViewModel = SessionViewModel.shared
+    private let musicService = MusicService.shared
+
     @State private var showSongPicker = false
 
     var body: some View {

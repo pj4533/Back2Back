@@ -83,11 +83,11 @@ final class SessionViewModel {
             sessionService.moveQueuedSongToHistory(nextSong.id)
             await playCurrentSong(nextSong.song)
 
-            // If this was an AI song, queue another AI song as backup
+            // If this was an AI song, queue another AI song to continue
             if nextSong.selectedBy == .ai {
-                B2BLog.session.info("🤖 AI song playing, queueing another AI selection as fallback")
+                B2BLog.session.info("🤖 AI song playing, queueing another AI selection to continue")
                 prefetchTask = Task.detached { [weak self] in
-                    await self?.prefetchAndQueueAISong(queueStatus: .queuedIfUserSkips)
+                    await self?.prefetchAndQueueAISong(queueStatus: .upNext)
                 }
             } else {
                 B2BLog.session.info("👤 User song playing, queueing AI selection as 'upNext'")
@@ -259,8 +259,6 @@ final class SessionViewModel {
 
     private func checkPlaybackState() async {
         // Monitor the MusicService's currentlyPlaying state
-        let playbackStatus = musicService.playbackState
-
         if let nowPlaying = musicService.currentlyPlaying {
             let currentSongId = nowPlaying.song.id.rawValue
             // Get real-time playback position directly from the player
@@ -287,10 +285,10 @@ final class SessionViewModel {
                 B2BLog.playback.info("🎵 Song ended, advancing to next song")
                 B2BLog.playback.debug("Queue state - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
 
-                // Mark current song as played
+                // Mark current song as played before transitioning
                 sessionService.markCurrentSongAsPlayed()
 
-                // Advance to next queued song
+                // Advance to next queued song (this will set the new song as playing)
                 await triggerAISelection()
             }
 
@@ -304,10 +302,10 @@ final class SessionViewModel {
 
                 hasTriggeredEndOfSong = true
 
-                // Mark current song as played
+                // Mark current song as played before transitioning
                 sessionService.markCurrentSongAsPlayed()
 
-                // Try to advance queue
+                // Try to advance queue (this will set the new song as playing)
                 await triggerAISelection()
             }
 

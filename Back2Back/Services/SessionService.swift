@@ -99,7 +99,15 @@ final class SessionService {
     }
 
     func getNextQueuedSong() -> SessionSong? {
-        return songQueue.first { $0.queueStatus == .upNext }
+        // First priority: songs marked as "upNext" (user → AI transition)
+        if let upNext = songQueue.first(where: { $0.queueStatus == .upNext }) {
+            return upNext
+        }
+        // Second priority: AI continuation songs (AI → AI transition)
+        if let aiContinuation = songQueue.first(where: { $0.queueStatus == .queuedIfUserSkips }) {
+            return aiContinuation
+        }
+        return nil
     }
 
     func clearAIQueuedSongs() {

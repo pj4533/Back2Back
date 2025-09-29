@@ -1,15 +1,16 @@
 import Foundation
 import MusicKit
 import SwiftUI
-import Combine
+import Observation
 import OSLog
 
 @MainActor
-class MusicAuthViewModel: ObservableObject {
-    @Published var authorizationStatus: MusicAuthorization.Status = .notDetermined
-    @Published var isAuthorized: Bool = false
-    @Published var errorMessage: String?
-    @Published var isRequestingAuthorization: Bool = false
+@Observable
+class MusicAuthViewModel {
+    var authorizationStatus: MusicAuthorization.Status = .notDetermined
+    var isAuthorized: Bool = false
+    var errorMessage: String?
+    var isRequestingAuthorization: Bool = false
 
     private let musicService = MusicService.shared
 

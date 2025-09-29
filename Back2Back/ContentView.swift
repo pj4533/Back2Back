@@ -10,7 +10,7 @@ import MusicKit
 import OSLog
 
 struct ContentView: View {
-    @ObservedObject private var musicService = MusicService.shared
+    private let musicService = MusicService.shared
     @State private var showNowPlaying = false
     @State private var showOpenAITest = false
     @State private var selectedTab = 0

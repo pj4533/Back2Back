@@ -2,20 +2,20 @@ import Foundation
 import MusicKit
 import SwiftUI
 import Combine
+import Observation
 import OSLog
 
 /// High-performance search implementation with non-blocking UI updates
 /// Uses Combine for debouncing to avoid excessive Task creation
 @MainActor
-class MusicSearchViewModel: ObservableObject {
+@Observable
+class MusicSearchViewModel {
     // MARK: - Observable State
     // Remove didSet to prevent synchronous updates
-    @Published var searchText: String = ""
-    @Published var searchResults: [MusicSearchResult] = []
-    @Published var isSearching: Bool = false
-    @Published var errorMessage: String?
-    @Published var currentlyPlaying: NowPlayingItem?
-    @Published var playbackState: ApplicationMusicPlayer.PlaybackStatus = .stopped
+    var searchText: String = ""
+    var searchResults: [MusicSearchResult] = []
+    var isSearching: Bool = false
+    var errorMessage: String?
 
     // MARK: - Private Properties
     private let musicService = MusicService.shared
@@ -36,22 +36,18 @@ class MusicSearchViewModel: ObservableObject {
         setupSearchPipeline()
     }
 
+    // MARK: - Computed Properties from MusicService
+    var currentlyPlaying: NowPlayingItem? {
+        musicService.currentlyPlaying
+    }
+
+    var playbackState: ApplicationMusicPlayer.PlaybackStatus {
+        musicService.playbackState
+    }
+
     // MARK: - Setup
     private func setupBindings() {
-        // Use Combine for simple observation of published properties
-        musicService.$currentlyPlaying
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] value in
-                self?.currentlyPlaying = value
-            }
-            .store(in: &cancellables)
-
-        musicService.$playbackState
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] value in
-                self?.playbackState = value
-            }
-            .store(in: &cancellables)
+        // No longer needed for MusicService observation since we use computed properties
     }
 
     /// Setup efficient search pipeline using Combine

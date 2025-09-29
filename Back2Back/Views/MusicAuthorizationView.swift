@@ -2,7 +2,7 @@ import SwiftUI
 import MusicKit
 
 struct MusicAuthorizationView: View {
-    @StateObject private var viewModel = MusicAuthViewModel()
+    @State private var viewModel = MusicAuthViewModel()
 
     var body: some View {
         VStack(spacing: 20) {

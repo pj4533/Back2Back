@@ -2,7 +2,7 @@ import SwiftUI
 import MusicKit
 
 struct MusicSearchView: View {
-    @StateObject private var viewModel = MusicSearchViewModel()
+    @State private var viewModel = MusicSearchViewModel()
     @State private var localSearchText: String = ""  // Local state for immediate UI updates
     @FocusState private var isSearchFieldFocused: Bool
 

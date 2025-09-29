@@ -1,18 +1,20 @@
 import Foundation
 import MusicKit
 import Combine
+import Observation
 import OSLog
 
 @MainActor
-class MusicService: ObservableObject {
+@Observable
+class MusicService {
     static let shared = MusicService()
 
-    @Published var authorizationStatus: MusicAuthorization.Status = .notDetermined
-    @Published var isAuthorized: Bool = false
-    @Published var searchResults: [MusicSearchResult] = []
-    @Published var currentlyPlaying: NowPlayingItem?
-    @Published var isSearching: Bool = false
-    @Published var playbackState: ApplicationMusicPlayer.PlaybackStatus = .stopped
+    var authorizationStatus: MusicAuthorization.Status = .notDetermined
+    var isAuthorized: Bool = false
+    var searchResults: [MusicSearchResult] = []
+    var currentlyPlaying: NowPlayingItem?
+    var isSearching: Bool = false
+    var playbackState: ApplicationMusicPlayer.PlaybackStatus = .stopped
 
     private let player = ApplicationMusicPlayer.shared
     private var cancellables = Set<AnyCancellable>()
