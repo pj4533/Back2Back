@@ -3,59 +3,21 @@ import MusicKit
 
 struct NowPlayingView: View {
     @State private var viewModel = NowPlayingViewModel()
-    @State private var isExpanded: Bool = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
             if let nowPlaying = viewModel.currentlyPlaying {
-                if isExpanded {
-                    expandedView(nowPlaying: nowPlaying)
-                } else {
-                    miniPlayerView(nowPlaying: nowPlaying)
-                }
+                expandedView(nowPlaying: nowPlaying)
             }
         }
-        .animation(.spring(), value: isExpanded)
         .background(Color(.secondarySystemBackground))
-    }
-
-    private func miniPlayerView(nowPlaying: NowPlayingItem) -> some View {
-        HStack(spacing: 12) {
-            artworkView(for: nowPlaying.song, size: 50)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(nowPlaying.song.title)
-                    .font(.headline)
-                    .lineLimit(1)
-
-                Text(nowPlaying.song.artistName)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            playbackControls
-
-            Button(action: { isExpanded.toggle() }) {
-                Image(systemName: "chevron.up")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
-            }
-        }
-        .padding()
-        .contentShape(Rectangle())
-        .onTapGesture {
-            isExpanded.toggle()
-        }
     }
 
     private func expandedView(nowPlaying: NowPlayingItem) -> some View {
         VStack(spacing: 20) {
             HStack {
-                Button(action: { isExpanded = false }) {
+                Button(action: { dismiss() }) {
                     Image(systemName: "chevron.down")
                         .font(.title2)
                         .foregroundColor(.secondary)
@@ -111,28 +73,6 @@ struct NowPlayingView: View {
             Spacer()
         }
         .padding(.vertical)
-    }
-
-    private var playbackControls: some View {
-        HStack(spacing: 20) {
-            Button(action: viewModel.skipToPrevious) {
-                Image(systemName: "backward.fill")
-                    .font(.body)
-            }
-            .disabled(!viewModel.canSkipToPrevious)
-
-            Button(action: viewModel.togglePlayPause) {
-                Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.title3)
-            }
-
-            Button(action: viewModel.skipToNext) {
-                Image(systemName: "forward.fill")
-                    .font(.body)
-            }
-            .disabled(!viewModel.canSkipToNext)
-        }
-        .foregroundColor(.primary)
     }
 
     private func artworkView(for song: Song, size: CGFloat) -> some View {

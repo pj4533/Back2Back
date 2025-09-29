@@ -17,6 +17,7 @@ struct SessionView: View {
     private let musicService = MusicService.shared
 
     @State private var showSongPicker = false
+    @State private var showNowPlaying = false
 
     // Check if user has already selected a song in the queue
     private var hasUserSelectedSong: Bool {
@@ -58,6 +59,17 @@ struct SessionView: View {
             }
             .padding()
             .background(Color(UIColor.systemGroupedBackground))
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if musicService.currentlyPlaying != nil {
+                        Button(action: { showNowPlaying = true }) {
+                            Image(systemName: "music.note")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                }
+            }
 
             // Session history and queue
             if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty {
@@ -129,21 +141,6 @@ struct SessionView: View {
                         .cornerRadius(12)
                     }
                 }
-
-                // Clear session button (if there's history)
-                if !sessionService.sessionHistory.isEmpty {
-                    Button(action: {
-                        B2BLog.ui.debug("User tapped reset session")
-                        withAnimation {
-                            sessionService.resetSession()
-                        }
-                    }) {
-                        Label("Reset Session", systemImage: "arrow.clockwise")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
             .padding()
             .background(Color(UIColor.systemBackground))
@@ -168,6 +165,9 @@ struct SessionView: View {
                     }
                 }
             }
+        }
+        .fullScreenCover(isPresented: $showNowPlaying) {
+            NowPlayingView()
         }
     }
 
