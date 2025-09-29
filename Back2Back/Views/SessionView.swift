@@ -123,9 +123,45 @@ struct SessionView: View {
 
             // Bottom controls
             VStack(spacing: 12) {
-                // User song selection button - only show if user's turn and hasn't selected yet
-                // Once user adds a song, hide the button
-                if sessionService.currentTurn == .user && !hasUserSelectedSong {
+                // Show both buttons only at the very start (no history and no queue)
+                if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty {
+                    HStack(spacing: 12) {
+                        // User goes first button
+                        Button(action: {
+                            B2BLog.ui.debug("User tapped select song button")
+                            showSongPicker = true
+                        }) {
+                            Label(
+                                "I'll Start",
+                                systemImage: "person.fill"
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                        }
+
+                        // AI goes first button
+                        Button(action: {
+                            B2BLog.ui.debug("User tapped AI start button")
+                            Task {
+                                await handleAIStartFirst()
+                            }
+                        }) {
+                            Label(
+                                "AI Starts",
+                                systemImage: "cpu"
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                        }
+                    }
+                } else if sessionService.currentTurn == .user && !hasUserSelectedSong {
+                    // After session has started, only show user selection button on their turn
                     Button(action: {
                         B2BLog.ui.debug("User tapped select song button")
                         showSongPicker = true
@@ -181,6 +217,14 @@ struct SessionView: View {
 
         // No need to manually trigger AI selection anymore -
         // it will happen automatically when the user's song ends
+    }
+
+    @MainActor
+    private func handleAIStartFirst() async {
+        B2BLog.session.info("User requested AI to start first")
+
+        // Let the SessionViewModel handle AI starting first
+        await sessionViewModel.handleAIStartFirst()
     }
 }
 

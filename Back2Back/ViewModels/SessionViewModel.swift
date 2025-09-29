@@ -84,6 +84,43 @@ final class SessionViewModel {
         B2BLog.session.debug("Queue after user selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
     }
 
+    func handleAIStartFirst() async {
+        B2BLog.session.info("🤖 AI starting session first")
+
+        // AI selects and plays immediately (nothing else is in queue/history)
+        sessionService.setAIThinking(true)
+
+        do {
+            let recommendation = try await selectAISong()
+            B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
+
+            if let song = await searchAndMatchSong(recommendation) {
+                // Add to history with "playing" status since we'll play it immediately
+                sessionService.addSongToHistory(song, selectedBy: .ai, rationale: recommendation.rationale, queueStatus: .playing)
+
+                // Play the song
+                await playCurrentSong(song)
+
+                // Clear AI thinking state - now it's the user's turn to select
+                sessionService.setAIThinking(false)
+
+                // Queue another AI song as backup in case user doesn't select
+                // This ensures music never stops playing
+                // Use queuedIfUserSkips so it only plays if user doesn't make a selection
+                B2BLog.session.info("AI's first song playing - prefetching backup AI track")
+                prefetchTask = Task.detached { [weak self] in
+                    await self?.prefetchAndQueueAISong(queueStatus: .queuedIfUserSkips)
+                }
+            } else {
+                B2BLog.ai.warning("⚠️ Could not find matching song for AI recommendation")
+                sessionService.setAIThinking(false)
+            }
+        } catch {
+            B2BLog.ai.error("❌ Failed to start AI first: \(error)")
+            sessionService.setAIThinking(false)
+        }
+    }
+
     func triggerAISelection() async {
         // This is now called when songs end automatically
         B2BLog.session.info("🔄 Auto-advancing to next queued song")

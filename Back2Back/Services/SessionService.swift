@@ -57,10 +57,12 @@ final class SessionService {
         }
 
         B2BLog.session.info("Added song to history: \(song.title) by \(selectedBy == .user ? "User" : "AI") - Status: \(queueStatus)")
-        let newTurn = self.currentTurn == .user ? TurnType.ai : TurnType.user
+
+        // Update turn based on who selected this song (same logic as moveQueuedSongToHistory)
+        let newTurn = selectedBy == .user ? TurnType.ai : TurnType.user
         B2BLog.session.debug("Turn change: \(self.currentTurn.rawValue) -> \(newTurn.rawValue)")
 
-        currentTurn = currentTurn == .user ? .ai : .user
+        currentTurn = selectedBy == .user ? .ai : .user
     }
 
     func queueSong(_ song: Song, selectedBy: TurnType, rationale: String? = nil, queueStatus: QueueStatus) -> SessionSong {
