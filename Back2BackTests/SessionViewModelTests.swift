@@ -222,18 +222,30 @@ struct SessionViewModelTests {
     }
 
     @MainActor
-    @Test("Threshold allows single exact match")
-    func testThresholdLogic() {
-        // With threshold of 100, exact match on either artist OR title passes
-        // This is appropriate because normalization handles variations
+    @Test("Requires both artist and title match")
+    func testRequiresBothFields() {
+        // Must have BOTH artist AND title match (at least partial)
+        // This prevents "I Love You" by "Trippie Redd" matching "I Love You" by "The Darling Dears"
 
-        let artistOnlyScore = 100  // Just artist exact match
-        let titleOnlyScore = 100   // Just title exact match
-        let bothFieldsScore = 200  // Both exact matches
+        let artistOnlyScore = (artistScore: 100, titleScore: 0, total: 100)  // Title mismatch - REJECT
+        let titleOnlyScore = (artistScore: 0, titleScore: 100, total: 100)   // Artist mismatch - REJECT
+        let bothPartialScore = (artistScore: 25, titleScore: 50, total: 75)  // Both match but low - REJECT
+        let bothGoodScore = (artistScore: 50, titleScore: 100, total: 150)   // Both match - ACCEPT
+        let bothExactScore = (artistScore: 100, titleScore: 100, total: 200) // Both exact - ACCEPT
 
-        #expect(artistOnlyScore >= 100, "Artist exact match should pass threshold")
-        #expect(titleOnlyScore >= 100, "Title exact match should pass threshold")
-        #expect(bothFieldsScore >= 100, "Both exact matches should pass threshold")
+        // Artist-only or title-only should NOT pass (even if total >= 100)
+        #expect(!(artistOnlyScore.artistScore >= 25 && artistOnlyScore.titleScore >= 25 && artistOnlyScore.total >= 100),
+                "Artist-only match should be rejected")
+        #expect(!(titleOnlyScore.artistScore >= 25 && titleOnlyScore.titleScore >= 25 && titleOnlyScore.total >= 100),
+                "Title-only match should be rejected")
+
+        // Both need at least 25, and total needs 100+
+        #expect(!(bothPartialScore.artistScore >= 25 && bothPartialScore.titleScore >= 25 && bothPartialScore.total >= 100),
+                "Both partial but low total should be rejected")
+        #expect(bothGoodScore.artistScore >= 25 && bothGoodScore.titleScore >= 25 && bothGoodScore.total >= 100,
+                "Both match with good total should be accepted")
+        #expect(bothExactScore.artistScore >= 25 && bothExactScore.titleScore >= 25 && bothExactScore.total >= 100,
+                "Both exact match should be accepted")
     }
 
     @MainActor

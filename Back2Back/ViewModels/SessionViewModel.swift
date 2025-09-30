@@ -368,34 +368,56 @@ final class SessionViewModel {
         let normalizedArtist = normalizeString(artist)
         let normalizedTitle = normalizeString(stripParentheticals(title))
 
+        B2BLog.musicKit.debug("Looking for match - Artist: '\(normalizedArtist)', Title: '\(normalizedTitle)'")
+
         // Score each result
-        let scoredResults = results.compactMap { result -> (result: MusicSearchResult, score: Int)? in
+        let scoredResults = results.compactMap { result -> (result: MusicSearchResult, artistScore: Int, titleScore: Int, totalScore: Int)? in
             let song = result.song
 
-            var score = 0
+            var artistScore = 0
+            var titleScore = 0
 
             // Normalize result strings
             let resultArtist = normalizeString(song.artistName)
             let resultTitle = normalizeString(stripParentheticals(song.title))
 
-            // Exact matches get highest scores
-            if resultArtist == normalizedArtist { score += 100 }
-            else if resultArtist.contains(normalizedArtist) { score += 50 }
-            else if normalizedArtist.contains(resultArtist) { score += 25 }
+            // Score artist match
+            if resultArtist == normalizedArtist { artistScore = 100 }
+            else if resultArtist.contains(normalizedArtist) { artistScore = 50 }
+            else if normalizedArtist.contains(resultArtist) { artistScore = 25 }
 
-            if resultTitle == normalizedTitle { score += 100 }
-            else if resultTitle.contains(normalizedTitle) { score += 50 }
-            else if normalizedTitle.contains(resultTitle) { score += 25 }
+            // Score title match
+            if resultTitle == normalizedTitle { titleScore = 100 }
+            else if resultTitle.contains(normalizedTitle) { titleScore = 50 }
+            else if normalizedTitle.contains(resultTitle) { titleScore = 25 }
 
-            return (result, score)
+            let totalScore = artistScore + titleScore
+
+            // Log details for debugging
+            if totalScore >= 25 {
+                B2BLog.musicKit.debug("  Candidate: '\(resultTitle)' by '\(resultArtist)' - Artist:\(artistScore) Title:\(titleScore) Total:\(totalScore)")
+            }
+
+            return (result, artistScore, titleScore, totalScore)
         }
 
-        // Return best match if score is high enough
-        // Threshold of 100 = exact match on either artist OR title (after normalization)
-        // Higher scores indicate matches in both fields
-        if let best = scoredResults.max(by: { $0.score < $1.score }), best.score >= 100 {
-            B2BLog.musicKit.info("Found match with score \(best.score): '\(best.result.song.title)' by \(best.result.song.artistName)")
+        // CRITICAL: Require BOTH artist AND title to have some match
+        // This prevents matching "I Love You" by "Trippie Redd" when looking for "I Love You" by "The Darling Dears"
+        // We need at least a partial match (25+) in BOTH fields, plus a good total score
+        if let best = scoredResults.max(by: { $0.totalScore < $1.totalScore }),
+           best.artistScore >= 25,  // Artist must have at least partial match
+           best.titleScore >= 25,   // Title must have at least partial match
+           best.totalScore >= 100 { // Total score must be decent
+
+            B2BLog.musicKit.info("✅ Found match with Artist:\(best.artistScore) Title:\(best.titleScore) Total:\(best.totalScore)")
+            B2BLog.musicKit.info("   '\(best.result.song.title)' by \(best.result.song.artistName)")
             return best.result
+        }
+
+        B2BLog.musicKit.warning("❌ No match found meeting criteria (need Artist≥25, Title≥25, Total≥100)")
+        if let best = scoredResults.max(by: { $0.totalScore < $1.totalScore }) {
+            B2BLog.musicKit.debug("   Best candidate was: Artist:\(best.artistScore) Title:\(best.titleScore) Total:\(best.totalScore)")
+            B2BLog.musicKit.debug("   '\(best.result.song.title)' by \(best.result.song.artistName)")
         }
 
         return nil
