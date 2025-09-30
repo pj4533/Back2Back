@@ -3,7 +3,6 @@ import MusicKit
 
 struct MusicSearchView: View {
     @State private var viewModel = MusicSearchViewModel()
-    @State private var localSearchText: String = ""  // Local state for immediate UI updates
     @FocusState private var isSearchFieldFocused: Bool
 
     // Optional callback for when a song is selected (for modal usage)
@@ -40,14 +39,11 @@ struct MusicSearchView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
 
-            // Use local state for instant UI updates
+            // Bind directly to ViewModel for single source of truth
             TextField("Search for songs, artists, or albums",
-                     text: $localSearchText)
-                .onChange(of: localSearchText) { _, newValue in
-                    // Update ViewModel asynchronously without blocking
-                    Task {
-                        await viewModel.updateSearchTextAsync(newValue)
-                    }
+                     text: $viewModel.searchText)
+                .onChange(of: viewModel.searchText) { _, newValue in
+                    viewModel.updateSearchText(newValue)
                 }
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .focused($isSearchFieldFocused)
@@ -56,15 +52,10 @@ struct MusicSearchView: View {
                 .textInputAutocapitalization(.never)
                 // Disable smart punctuation for better search experience
                 .disableAutocorrection(true)
-                // Add explicit animation to smooth updates
-                .animation(.easeInOut(duration: 0.1), value: localSearchText)
 
-            if !localSearchText.isEmpty {
+            if !viewModel.searchText.isEmpty {
                 Button(action: {
-                    localSearchText = ""
-                    Task {
-                        await viewModel.clearSearchAsync()
-                    }
+                    viewModel.clearSearch()
                 }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.secondary)

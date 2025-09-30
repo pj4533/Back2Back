@@ -1,11 +1,16 @@
 import Foundation
 import OSLog
 
-extension OpenAIClient {
+@MainActor
+class PersonaGenerationService {
+    static let shared = PersonaGenerationService()
+    private init() {}
+
     func generatePersonaStyleGuide(
         name: String,
         description: String,
-        onStatusUpdate: ((String) async -> Void)? = nil
+        onStatusUpdate: ((String) async -> Void)? = nil,
+        client: OpenAIClient
     ) async throws -> PersonaGenerationResult {
         B2BLog.ai.info("Generating style guide for persona: \(name)")
 
@@ -65,7 +70,7 @@ extension OpenAIClient {
             var reasoningStartTime = Date()
             var totalSourcesFound = 0
 
-            let response = try await streamingResponses(request: request) { event in
+            let response = try await OpenAIStreaming.shared.streamingResponses(request: request, client: client) { event in
                 await self.handlePersonaGenerationEvent(
                     event: event,
                     sources: &sources,
@@ -107,6 +112,8 @@ extension OpenAIClient {
             throw error
         }
     }
+
+    // MARK: - Event Handling
 
     private func handlePersonaGenerationEvent(
         event: StreamingEvent,
@@ -283,7 +290,9 @@ extension OpenAIClient {
         }
     }
 
-    func stripCitations(from text: String) -> String {
+    // MARK: - Citation Stripping
+
+    private func stripCitations(from text: String) -> String {
         var cleanedText = text
 
         cleanedText = cleanedText.replacingOccurrences(

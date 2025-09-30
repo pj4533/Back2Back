@@ -17,19 +17,25 @@ import OSLog
 final class SessionViewModel {
     static let shared = SessionViewModel()
 
-    private let musicService = MusicService.shared
-    private let sessionService = SessionService.shared
+    // Use concrete @Observable types for SwiftUI observation to work
+    // Protocols break observation chain since they can't be @Observable
+    private let musicService: MusicService
+    private let sessionService: SessionService
 
     // Coordinators handle specific responsibilities
     private let playbackCoordinator: PlaybackCoordinator
     private let aiSongCoordinator: AISongCoordinator
     private let turnManager: TurnManager
 
-    private init(
+    init(
+        musicService: MusicService = MusicService.shared,
+        sessionService: SessionService = SessionService.shared,
         playbackCoordinator: PlaybackCoordinator? = nil,
         aiSongCoordinator: AISongCoordinator? = nil,
         turnManager: TurnManager? = nil
     ) {
+        self.musicService = musicService
+        self.sessionService = sessionService
         self.playbackCoordinator = playbackCoordinator ?? PlaybackCoordinator()
         self.aiSongCoordinator = aiSongCoordinator ?? AISongCoordinator()
         self.turnManager = turnManager ?? TurnManager()
@@ -66,7 +72,7 @@ final class SessionViewModel {
         if isMusicPlaying {
             // Music is playing - queue the song
             B2BLog.session.info("Music currently playing - queueing user song with 'upNext' status")
-            _ = sessionService.queueSong(song, selectedBy: .user, queueStatus: .upNext)
+            _ = sessionService.queueSong(song, selectedBy: .user, rationale: nil, queueStatus: .upNext)
 
             // Start pre-fetching AI's next song to play after the user's queued song
             B2BLog.session.info("Starting AI prefetch for next position after user's queued song")
@@ -74,7 +80,7 @@ final class SessionViewModel {
         } else {
             // Nothing playing - play immediately
             B2BLog.session.info("No music playing - starting playback immediately")
-            sessionService.addSongToHistory(song, selectedBy: .user, queueStatus: .playing)
+            sessionService.addSongToHistory(song, selectedBy: .user, rationale: nil, queueStatus: .playing)
 
             // Play the song
             await playCurrentSong(song)

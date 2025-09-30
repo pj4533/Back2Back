@@ -26,7 +26,8 @@ struct SessionHistoryListView: View {
                         // Show history (played songs)
                         ForEach(sessionService.sessionHistory) { sessionSong in
                             SessionSongRow(sessionSong: sessionSong)
-                                // Use composite ID to force re-render on status change
+                                // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
+                                // SwiftUI needs to know when status changes on same song
                                 .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -46,7 +47,8 @@ struct SessionHistoryListView: View {
                         // Show queue (upcoming songs)
                         ForEach(sessionService.songQueue) { sessionSong in
                             SessionSongRow(sessionSong: sessionSong)
-                                // Use composite ID to force re-render on status change
+                                // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
+                                // SwiftUI needs to know when status changes on same song
                                 .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .bottom).combined(with: .opacity),

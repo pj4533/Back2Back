@@ -1,9 +1,13 @@
 import Foundation
 import OSLog
 
-extension OpenAIClient {
-    func responses(request: ResponsesRequest) async throws -> ResponsesResponse {
-        guard let apiKey = apiKey, !apiKey.isEmpty else {
+@MainActor
+class OpenAINetworking {
+    static let shared = OpenAINetworking()
+    private init() {}
+
+    func responses(request: ResponsesRequest, client: OpenAIClient) async throws -> ResponsesResponse {
+        guard let apiKey = client.apiKey, !apiKey.isEmpty else {
             B2BLog.ai.error("API key missing when attempting responses API call")
             throw OpenAIError.apiKeyMissing
         }
@@ -32,7 +36,7 @@ extension OpenAIClient {
 
         do {
             let startTime = Date()
-            let (data, response) = try await session.data(for: urlRequest)
+            let (data, response) = try await client.session.data(for: urlRequest)
             let elapsedTime = Date().timeIntervalSince(startTime)
 
             B2BLog.network.debug("⏱️ OpenAI API Response Time: \(elapsedTime)")

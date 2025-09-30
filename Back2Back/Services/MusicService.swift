@@ -6,7 +6,7 @@ import OSLog
 
 @MainActor
 @Observable
-class MusicService {
+class MusicService: MusicServiceProtocol {
     static let shared = MusicService()
 
     var authorizationStatus: MusicAuthorization.Status = .notDetermined
