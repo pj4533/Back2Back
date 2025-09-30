@@ -1,0 +1,73 @@
+//
+//  SessionHistoryListView.swift
+//  Back2Back
+//
+//  Created on 2025-09-30.
+//  Extracted from SessionView as part of Phase 1 refactoring (#20)
+//
+
+import SwiftUI
+
+struct SessionHistoryListView: View {
+    private let sessionService = SessionService.shared
+
+    var body: some View {
+        if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty && !sessionService.isAIThinking {
+            ContentUnavailableView(
+                "No Songs Yet",
+                systemImage: "music.note.list",
+                description: Text("Start your DJ session by selecting the first track")
+            )
+            .frame(maxHeight: .infinity)
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        // Show history (played songs)
+                        ForEach(sessionService.sessionHistory) { sessionSong in
+                            SessionSongRow(sessionSong: sessionSong)
+                                // Use composite ID to force re-render on status change
+                                .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
+
+                        // Show AI loading cell if AI is thinking
+                        if sessionService.isAIThinking {
+                            AILoadingCell()
+                                .transition(.asymmetric(
+                                    insertion: .scale.combined(with: .opacity),
+                                    removal: .scale.combined(with: .opacity)
+                                ))
+                        }
+
+                        // Show queue (upcoming songs)
+                        ForEach(sessionService.songQueue) { sessionSong in
+                            SessionSongRow(sessionSong: sessionSong)
+                                // Use composite ID to force re-render on status change
+                                .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
+                    }
+                    .padding()
+                    .animation(.spring(response: 0.3), value: sessionService.sessionHistory.count + sessionService.songQueue.count + (sessionService.isAIThinking ? 1 : 0))
+                }
+                .onChange(of: sessionService.sessionHistory.count + sessionService.songQueue.count) { _, _ in
+                    withAnimation {
+                        // Scroll to last item (whether in history or queue)
+                        if let lastQueued = sessionService.songQueue.last {
+                            proxy.scrollTo(lastQueued.id, anchor: .bottom)
+                        } else if let lastHistory = sessionService.sessionHistory.last {
+                            proxy.scrollTo(lastHistory.id, anchor: .bottom)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -3,6 +3,7 @@
 //  Back2Back
 //
 //  Created on 2025-09-27.
+//  Refactored as part of Phase 1 architecture improvements (#20)
 //
 
 import Foundation
@@ -17,34 +18,32 @@ final class SessionViewModel {
     static let shared = SessionViewModel()
 
     private let musicService = MusicService.shared
-    private let openAIClient = OpenAIClient.shared
     private let sessionService = SessionService.shared
-    private let environmentService = EnvironmentService.shared
-    private let musicMatcher: MusicMatchingProtocol
 
-    private var playbackObserverTask: Task<Void, Never>?
-    private var prefetchTask: Task<Void, Never>?
-    private var lastPlaybackTime: TimeInterval = 0
-    private var lastSongId: String? = nil
-    private var hasTriggeredEndOfSong: Bool = false
+    // Coordinators handle specific responsibilities
+    private let playbackCoordinator: PlaybackCoordinator
+    private let aiSongCoordinator: AISongCoordinator
+    private let turnManager: TurnManager
 
-    // AI Model configuration
-    private var aiModelConfig: AIModelConfig {
-        guard let data = UserDefaults.standard.data(forKey: "aiModelConfig"),
-              let config = try? JSONDecoder().decode(AIModelConfig.self, from: data) else {
-            return .default
-        }
-        return config
-    }
+    private init(
+        playbackCoordinator: PlaybackCoordinator? = nil,
+        aiSongCoordinator: AISongCoordinator? = nil,
+        turnManager: TurnManager? = nil
+    ) {
+        self.playbackCoordinator = playbackCoordinator ?? PlaybackCoordinator()
+        self.aiSongCoordinator = aiSongCoordinator ?? AISongCoordinator()
+        self.turnManager = turnManager ?? TurnManager()
 
-    private init(musicMatcher: MusicMatchingProtocol? = nil) {
-        self.musicMatcher = musicMatcher ?? StringBasedMusicMatcher()
         B2BLog.session.info("SessionViewModel initialized")
-        startPlaybackMonitoring()
+
+        // Setup playback callback
+        self.playbackCoordinator.onSongEnded = { [weak self] in
+            await self?.handleSongEnded()
+        }
     }
 
     nonisolated deinit {
-        // Tasks will be cancelled automatically
+        // Coordinators will clean up automatically
     }
 
     // MARK: - Public Methods
@@ -54,10 +53,7 @@ final class SessionViewModel {
         B2BLog.session.debug("Current queue before selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
 
         // Cancel any existing prefetch
-        if prefetchTask != nil {
-            B2BLog.session.debug("Cancelling existing AI prefetch task")
-            prefetchTask?.cancel()
-        }
+        aiSongCoordinator.cancelPrefetch()
 
         // Clear any AI queued songs (user takes control)
         B2BLog.session.info("Clearing AI queue - User taking control")
@@ -74,9 +70,7 @@ final class SessionViewModel {
 
             // Start pre-fetching AI's next song to play after the user's queued song
             B2BLog.session.info("Starting AI prefetch for next position after user's queued song")
-            prefetchTask = Task.detached { [weak self] in
-                await self?.prefetchAndQueueAISong(queueStatus: .upNext)
-            }
+            aiSongCoordinator.startPrefetch(queueStatus: .upNext)
         } else {
             // Nothing playing - play immediately
             B2BLog.session.info("No music playing - starting playback immediately")
@@ -87,163 +81,43 @@ final class SessionViewModel {
 
             // Start pre-fetching AI's next song while user's song plays
             B2BLog.session.info("Starting AI prefetch for 'upNext' position")
-            prefetchTask = Task.detached { [weak self] in
-                await self?.prefetchAndQueueAISong(queueStatus: .upNext)
-            }
+            aiSongCoordinator.startPrefetch(queueStatus: .upNext)
         }
 
         B2BLog.session.debug("Queue after user selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
     }
 
     func handleAIStartFirst() async {
-        B2BLog.session.info("🤖 AI starting session first")
-
-        // AI selects and plays immediately (nothing else is in queue/history)
-        sessionService.setAIThinking(true)
-
         do {
-            let recommendation = try await selectAISong()
-            B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
-
-            if let song = await searchAndMatchSong(recommendation) {
+            if let song = try await aiSongCoordinator.handleAIStartFirst() {
                 // Add to history with "playing" status since we'll play it immediately
-                sessionService.addSongToHistory(song, selectedBy: .ai, rationale: recommendation.rationale, queueStatus: .playing)
+                sessionService.addSongToHistory(song, selectedBy: .ai, rationale: nil, queueStatus: .playing)
 
                 // Play the song
                 await playCurrentSong(song)
 
-                // Clear AI thinking state - now it's the user's turn to select
-                sessionService.setAIThinking(false)
-
                 // Queue another AI song as backup in case user doesn't select
-                // This ensures music never stops playing
-                // Use queuedIfUserSkips so it only plays if user doesn't make a selection
                 B2BLog.session.info("AI's first song playing - prefetching backup AI track")
-                prefetchTask = Task.detached { [weak self] in
-                    await self?.prefetchAndQueueAISong(queueStatus: .queuedIfUserSkips)
-                }
-            } else {
-                // No good match found - retry with a new AI recommendation
-                B2BLog.ai.warning("⚠️ No good match found for AI start, retrying with new selection")
-
-                do {
-                    let retryRecommendation = try await selectAISong()
-                    B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
-
-                    if let retrySong = await searchAndMatchSong(retryRecommendation) {
-                        // Add to history with "playing" status
-                        sessionService.addSongToHistory(retrySong, selectedBy: .ai, rationale: retryRecommendation.rationale, queueStatus: .playing)
-
-                        // Play the song
-                        await playCurrentSong(retrySong)
-
-                        // Clear AI thinking state
-                        sessionService.setAIThinking(false)
-
-                        // Queue backup AI track
-                        B2BLog.session.info("AI retry song playing - prefetching backup AI track")
-                        prefetchTask = Task.detached { [weak self] in
-                            await self?.prefetchAndQueueAISong(queueStatus: .queuedIfUserSkips)
-                        }
-                    } else {
-                        B2BLog.ai.error("❌ AI retry also failed to find matching song for start - giving up")
-                        sessionService.setAIThinking(false)
-                    }
-                } catch {
-                    B2BLog.ai.error("❌ Failed to get AI retry recommendation for start: \(error)")
-                    sessionService.setAIThinking(false)
-                }
+                aiSongCoordinator.startPrefetch(queueStatus: .queuedIfUserSkips)
             }
         } catch {
             B2BLog.ai.error("❌ Failed to start AI first: \(error)")
-            sessionService.setAIThinking(false)
-        }
-    }
-
-    func triggerAISelection() async {
-        // This is now called when songs end automatically
-        B2BLog.session.info("🔄 Auto-advancing to next queued song")
-        B2BLog.session.debug("Queue state - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-
-        // Check if we have a queued song ready
-        if let nextSong = sessionService.getNextQueuedSong() {
-            B2BLog.session.info("🎵 Found queued song: \(nextSong.song.title) by \(nextSong.song.artistName) (selected by \(nextSong.selectedBy.rawValue))")
-
-            // Move the song from queue to history before playing
-            sessionService.moveQueuedSongToHistory(nextSong.id)
-
-            // Play the song
-            await playCurrentSong(nextSong.song)
-
-            // If this was an AI song that just started playing, we're no longer "thinking"
-            // The turn is now the user's turn (they can select while this AI song plays)
-            if nextSong.selectedBy == .ai {
-                B2BLog.session.info("🤖 AI song now playing, clearing AI thinking state")
-                sessionService.setAIThinking(false)
-            }
-
-            // If this was an AI song, queue another AI song to continue
-            if nextSong.selectedBy == .ai {
-                B2BLog.session.info("🤖 AI song playing, queueing another AI selection to continue")
-                prefetchTask = Task.detached { [weak self] in
-                    await self?.prefetchAndQueueAISong(queueStatus: .upNext)
-                }
-            } else {
-                B2BLog.session.info("👤 User song playing, queueing AI selection as 'upNext'")
-                prefetchTask = Task.detached { [weak self] in
-                    await self?.prefetchAndQueueAISong(queueStatus: .upNext)
-                }
-            }
-        } else {
-            B2BLog.session.warning("⚠️ No queued song available - waiting for user selection")
-            // User needs to select manually
-            // Make sure AI thinking is cleared so user can select
-            sessionService.setAIThinking(false)
         }
     }
 
     func skipToQueuedSong(_ sessionSong: SessionSong) async {
-        B2BLog.session.info("⏩ User tapped to skip to queued song: \(sessionSong.song.title)")
-        B2BLog.session.debug("Queue state before skip - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-
         // Cancel any existing prefetch
-        if prefetchTask != nil {
-            B2BLog.session.debug("Cancelling existing AI prefetch task")
-            prefetchTask?.cancel()
-        }
+        aiSongCoordinator.cancelPrefetch()
 
-        // Mark the currently playing song as played (if there is one)
-        sessionService.markCurrentSongAsPlayed()
-
-        // Remove all songs before this one from the queue (they're being skipped)
-        sessionService.removeQueuedSongsBeforeSong(sessionSong.id)
-
-        // Move the tapped song from queue to history
-        sessionService.moveQueuedSongToHistory(sessionSong.id)
+        // Use turn manager to handle skip
+        let song = await turnManager.skipToSong(sessionSong)
 
         // Play the tapped song
-        await playCurrentSong(sessionSong.song)
-
-        // If this was an AI song, clear AI thinking state
-        if sessionSong.selectedBy == .ai {
-            B2BLog.session.info("🤖 Skipped to AI song, clearing AI thinking state")
-            sessionService.setAIThinking(false)
-        }
+        await playCurrentSong(song)
 
         // Queue the next song based on who selected the current song
-        if sessionSong.selectedBy == .ai {
-            B2BLog.session.info("🤖 AI song now playing, queueing another AI selection to continue")
-            prefetchTask = Task.detached { [weak self] in
-                await self?.prefetchAndQueueAISong(queueStatus: .upNext)
-            }
-        } else {
-            B2BLog.session.info("👤 User song now playing, queueing AI selection as 'upNext'")
-            prefetchTask = Task.detached { [weak self] in
-                await self?.prefetchAndQueueAISong(queueStatus: .upNext)
-            }
-        }
-
-        B2BLog.session.debug("Queue state after skip - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
+        let queueStatus = turnManager.determineNextQueueStatus(after: sessionSong.selectedBy)
+        aiSongCoordinator.startPrefetch(queueStatus: queueStatus)
     }
 
     // MARK: - Private Methods
@@ -257,240 +131,18 @@ final class SessionViewModel {
         }
     }
 
-    private func queueAISong(_ song: Song, rationale: String?, queueStatus: QueueStatus) {
-        B2BLog.ai.info("Queueing AI song: \(song.title) with status: \(queueStatus)")
-
-        // Add to queue (not history yet)
-        _ = sessionService.queueSong(song, selectedBy: .ai, rationale: rationale, queueStatus: queueStatus)
-
-        sessionService.setAIThinking(false)
-    }
-
-    private func selectAISong() async throws -> SongRecommendation {
-        B2BLog.ai.info("Selecting next AI song")
-
-        guard environmentService.getOpenAIKey() != nil else {
-            throw OpenAIError.apiKeyMissing
+    private func handleSongEnded() async {
+        // Use turn manager to advance to next song
+        guard let (song, selectedBy) = await turnManager.advanceToNextSong() else {
+            return
         }
 
-        // Get current persona ID
-        guard let currentPersona = PersonaService.shared.selectedPersona else {
-            throw OpenAIError.decodingError(NSError(domain: "Back2Back", code: -1, userInfo: [NSLocalizedDescriptionKey: "No persona selected"]))
-        }
+        // Play the song
+        await playCurrentSong(song)
 
-        let config = aiModelConfig
-        let recommendation = try await openAIClient.selectNextSong(
-            persona: sessionService.currentPersonaStyleGuide,
-            personaId: currentPersona.id,
-            sessionHistory: sessionService.sessionHistory,
-            config: config
-        )
-
-        // Check if song has already been played
-        if sessionService.hasSongBeenPlayed(artist: recommendation.artist, title: recommendation.song) {
-            B2BLog.ai.warning("AI tried to select already-played song, retrying")
-            // Try once more with emphasis on no repeats
-            let retryPersona = sessionService.currentPersonaStyleGuide + "\n\nIMPORTANT: Never select a song that has already been played in this session."
-            let retryRecommendation = try await openAIClient.selectNextSong(
-                persona: retryPersona,
-                personaId: currentPersona.id,
-                sessionHistory: sessionService.sessionHistory,
-                config: config
-            )
-
-            // Record the retry recommendation in cache
-            PersonaSongCacheService.shared.recordSong(
-                personaId: currentPersona.id,
-                artist: retryRecommendation.artist,
-                songTitle: retryRecommendation.song
-            )
-
-            return retryRecommendation
-        }
-
-        // Record the recommendation in cache
-        PersonaSongCacheService.shared.recordSong(
-            personaId: currentPersona.id,
-            artist: recommendation.artist,
-            songTitle: recommendation.song
-        )
-
-        return recommendation
-    }
-
-    private func searchAndMatchSong(_ recommendation: SongRecommendation) async -> Song? {
-        do {
-            return try await musicMatcher.searchAndMatch(recommendation: recommendation)
-        } catch {
-            B2BLog.musicKit.error("Search and match failed: \(error)")
-            return nil
-        }
-    }
-
-    // MARK: - AI Song Prefetching
-
-    private func prefetchAndQueueAISong(queueStatus: QueueStatus) async {
-        B2BLog.ai.info("🤖 Starting AI song selection for queue position: \(queueStatus)")
-        B2BLog.ai.debug("Current session has \(self.sessionService.sessionHistory.count) songs played")
-        sessionService.setAIThinking(true)
-
-        do {
-            let recommendation = try await selectAISong()
-            B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
-            B2BLog.ai.debug("Rationale: \(recommendation.rationale)")
-
-            // Check if user selected a song while AI was thinking
-            // If user has selected, we should abort this prefetch
-            let userHasSelected = sessionService.songQueue.contains { $0.selectedBy == .user }
-            if userHasSelected {
-                B2BLog.ai.info("⏭️ User selected a song while AI was prefetching - cancelling AI selection")
-                sessionService.setAIThinking(false)
-                return
-            }
-
-            if let song = await searchAndMatchSong(recommendation) {
-                // Double-check again after search (in case user selected during search)
-                let userHasSelectedAfterSearch = sessionService.songQueue.contains { $0.selectedBy == .user }
-                if userHasSelectedAfterSearch {
-                    B2BLog.ai.info("⏭️ User selected a song during AI search - cancelling AI selection")
-                    sessionService.setAIThinking(false)
-                    return
-                }
-
-                queueAISong(song, rationale: recommendation.rationale, queueStatus: queueStatus)
-                B2BLog.ai.info("✅ Successfully queued AI song: \(song.title) as \(queueStatus)")
-                B2BLog.session.debug("Queue after AI selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-            } else {
-                // No good match found - retry with a new AI recommendation
-                B2BLog.ai.warning("⚠️ No good match found for AI recommendation, retrying with new selection")
-
-                // Check if user selected during the failed attempt
-                let userHasSelected = sessionService.songQueue.contains { $0.selectedBy == .user }
-                if userHasSelected {
-                    B2BLog.ai.info("⏭️ User selected a song during failed search - cancelling AI retry")
-                    sessionService.setAIThinking(false)
-                    return
-                }
-
-                // Retry once with a new recommendation
-                do {
-                    let retryRecommendation = try await selectAISong()
-                    B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
-                    B2BLog.ai.debug("Retry rationale: \(retryRecommendation.rationale)")
-
-                    if let retrySong = await searchAndMatchSong(retryRecommendation) {
-                        // Final check if user selected during retry
-                        let userHasSelectedAfterRetry = sessionService.songQueue.contains { $0.selectedBy == .user }
-                        if userHasSelectedAfterRetry {
-                            B2BLog.ai.info("⏭️ User selected a song during AI retry - cancelling AI selection")
-                            sessionService.setAIThinking(false)
-                            return
-                        }
-
-                        queueAISong(retrySong, rationale: retryRecommendation.rationale, queueStatus: queueStatus)
-                        B2BLog.ai.info("✅ Successfully queued AI retry song: \(retrySong.title) as \(queueStatus)")
-                        B2BLog.session.debug("Queue after AI retry - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-                    } else {
-                        B2BLog.ai.error("❌ AI retry also failed to find matching song - giving up")
-                        sessionService.setAIThinking(false)
-                    }
-                } catch {
-                    B2BLog.ai.error("❌ Failed to get AI retry recommendation: \(error)")
-                    sessionService.setAIThinking(false)
-                }
-            }
-        } catch {
-            B2BLog.ai.error("❌ Failed to fetch and queue AI song: \(error)")
-            sessionService.setAIThinking(false)
-        }
-    }
-
-    // MARK: - Playback Monitoring
-
-    private func startPlaybackMonitoring() {
-        playbackObserverTask = Task { [weak self] in
-            guard let self = self else { return }
-
-            B2BLog.playback.debug("Starting playback monitoring")
-
-            // Create a timer that checks playback state periodically
-            while !Task.isCancelled {
-                await self.checkPlaybackState()
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // Check every second
-            }
-        }
-    }
-
-    private func checkPlaybackState() async {
-        // Monitor the MusicService's currentlyPlaying state
-        if let nowPlaying = musicService.currentlyPlaying {
-            let currentSongId = nowPlaying.song.id.rawValue
-            // Get real-time playback position directly from the player
-            let currentPlaybackTime = musicService.getCurrentPlaybackTime()
-            let progress = nowPlaying.duration > 0 ? (currentPlaybackTime / nowPlaying.duration) : 0
-
-            // Check if this is a new song
-            if currentSongId != lastSongId {
-                B2BLog.playback.info("🎵 New song detected: \(nowPlaying.song.title)")
-                lastSongId = currentSongId
-                hasTriggeredEndOfSong = false
-                lastPlaybackTime = currentPlaybackTime
-
-                // CRITICAL: Update the queue status to show this song is now playing
-                sessionService.updateCurrentlyPlayingSong(songId: currentSongId)
-
-                return
-            }
-
-            // Log current state for debugging (less frequently)
-            if Int(currentPlaybackTime) % 10 == 0 && Int(currentPlaybackTime) != Int(lastPlaybackTime) {
-                B2BLog.playback.trace("Playback - \(nowPlaying.song.title): \(Int(currentPlaybackTime))s/\(Int(nowPlaying.duration))s (\(Int(progress * 100))%)")
-            }
-
-            // Detailed logging when approaching song end
-            if progress >= 0.90 && progress < 0.99 {
-                B2BLog.playback.debug("📊 Near song end: \(nowPlaying.song.title) - Progress: \(String(format: "%.1f%%", progress * 100)) (\(Int(currentPlaybackTime))s/\(Int(nowPlaying.duration))s)")
-                B2BLog.playback.debug("  - hasTriggeredEndOfSong: \(self.hasTriggeredEndOfSong)")
-                B2BLog.playback.debug("  - Playback state: \(String(describing: self.musicService.playbackState))")
-                B2BLog.playback.debug("  - Is playing: \(nowPlaying.isPlaying)")
-            }
-
-            // Check if song has ended (100% complete or very close) and we haven't triggered yet
-            // Lower threshold to 97% to catch songs that might not reach exactly 99%
-            if progress >= 0.97 && !hasTriggeredEndOfSong && nowPlaying.duration > 0 {
-                B2BLog.playback.info("🎵 Song ending detected at \(String(format: "%.1f%%", progress * 100)) - advancing to next song")
-                hasTriggeredEndOfSong = true
-                B2BLog.playback.debug("Queue state - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-
-                // Mark current song as played before transitioning
-                sessionService.markCurrentSongAsPlayed()
-
-                // Advance to next queued song (this will set the new song as playing)
-                await triggerAISelection()
-            }
-
-            lastPlaybackTime = currentPlaybackTime
-
-        } else if lastSongId != nil {
-            // Was playing but now nothing - song ended or playback stopped
-            B2BLog.playback.debug("🔍 No current playback detected (lastSongId: \(self.lastSongId ?? "nil"), hasTriggeredEndOfSong: \(self.hasTriggeredEndOfSong))")
-
-            if !hasTriggeredEndOfSong {
-                B2BLog.playback.info("⏹️ Playback stopped or ended unexpectedly, advancing queue")
-                B2BLog.playback.debug("Queue state - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-
-                hasTriggeredEndOfSong = true
-
-                // Mark current song as played before transitioning
-                sessionService.markCurrentSongAsPlayed()
-
-                // Try to advance queue (this will set the new song as playing)
-                await triggerAISelection()
-            }
-
-            lastSongId = nil
-            lastPlaybackTime = 0
-        }
+        // Queue the next song based on who selected the current song
+        let queueStatus = turnManager.determineNextQueueStatus(after: selectedBy)
+        aiSongCoordinator.startPrefetch(queueStatus: queueStatus)
     }
 }
 
