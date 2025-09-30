@@ -7,9 +7,10 @@ import OSLog
 @Observable
 final class PersonasViewModel {
     private let personaService = PersonaService.shared
-    private let aiService: AIRecommendationServiceProtocol
+    // Use concrete @Observable type for SwiftUI observation to work
+    private let aiService: OpenAIClient
 
-    init(aiService: AIRecommendationServiceProtocol = OpenAIClient.shared) {
+    init(aiService: OpenAIClient = OpenAIClient.shared) {
         self.aiService = aiService
     }
 

@@ -18,7 +18,8 @@ class MusicSearchViewModel {
     var errorMessage: String?
 
     // MARK: - Private Properties
-    private let musicService: MusicServiceProtocol
+    // Use concrete @Observable type for SwiftUI observation to work
+    private let musicService: MusicService
     private var searchTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
@@ -29,7 +30,7 @@ class MusicSearchViewModel {
     private let debounceDuration: TimeInterval = 0.75
 
     // MARK: - Initialization
-    init(musicService: MusicServiceProtocol = MusicService.shared) {
+    init(musicService: MusicService = MusicService.shared) {
         self.musicService = musicService
         // Use debug level for initialization logs to reduce noise
         B2BLog.search.debug("Initializing MusicSearchViewModel")

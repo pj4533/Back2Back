@@ -17,8 +17,10 @@ import OSLog
 final class SessionViewModel {
     static let shared = SessionViewModel()
 
-    private let musicService: MusicServiceProtocol
-    private let sessionService: SessionStateManagerProtocol
+    // Use concrete @Observable types for SwiftUI observation to work
+    // Protocols break observation chain since they can't be @Observable
+    private let musicService: MusicService
+    private let sessionService: SessionService
 
     // Coordinators handle specific responsibilities
     private let playbackCoordinator: PlaybackCoordinator
@@ -26,8 +28,8 @@ final class SessionViewModel {
     private let turnManager: TurnManager
 
     init(
-        musicService: MusicServiceProtocol = MusicService.shared,
-        sessionService: SessionStateManagerProtocol = SessionService.shared,
+        musicService: MusicService = MusicService.shared,
+        sessionService: SessionService = SessionService.shared,
         playbackCoordinator: PlaybackCoordinator? = nil,
         aiSongCoordinator: AISongCoordinator? = nil,
         turnManager: TurnManager? = nil

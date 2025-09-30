@@ -10,10 +10,11 @@ import OSLog
 @Observable
 class NowPlayingViewModel {
     // MARK: - Private Properties
-    private let musicService: MusicServiceProtocol
+    // Use concrete @Observable type for SwiftUI observation to work
+    private let musicService: MusicService
 
     // MARK: - Initialization
-    init(musicService: MusicServiceProtocol = MusicService.shared) {
+    init(musicService: MusicService = MusicService.shared) {
         self.musicService = musicService
         // Log initialization only once
         B2BLog.ui.debug("Initializing NowPlayingViewModel")
