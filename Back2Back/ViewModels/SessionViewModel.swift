@@ -234,22 +234,37 @@ final class SessionViewModel {
 
             if searchResults.isEmpty {
                 // Try with just song title
-                B2BLog.musicKit.debug("No exact match, trying broader search")
+                B2BLog.musicKit.debug("No results from combined search, trying title-only search")
                 try await musicService.searchCatalog(for: recommendation.song)
                 searchResults = musicService.searchResults
             }
 
-            // Find best match
-            if let bestMatch = findBestMatch(searchResults, artist: recommendation.artist, title: recommendation.song) {
+            if searchResults.isEmpty {
+                B2BLog.musicKit.warning("No search results found for: \(recommendation.song) by \(recommendation.artist)")
+                return nil
+            }
+
+            // Prioritize Apple's TopResults (first 3 results are typically the most relevant)
+            // Apple's search algorithm has already ranked these as best matches
+            let topResults = Array(searchResults.prefix(3))
+            B2BLog.musicKit.debug("Checking top \(topResults.count) results first")
+
+            if let bestMatch = findBestMatch(topResults, artist: recommendation.artist, title: recommendation.song) {
+                B2BLog.musicKit.info("✅ Found match in top results: '\(bestMatch.song.title)' by \(bestMatch.song.artistName)")
                 return bestMatch.song
             }
 
-            // Fallback to first result if no good match
-            if let firstResult = searchResults.first {
-                B2BLog.musicKit.warning("Using first search result as fallback")
-                return firstResult.song
+            // Fall back to full results if top results didn't have a good match
+            B2BLog.musicKit.debug("No match in top results, checking all \(searchResults.count) results")
+            if let bestMatch = findBestMatch(searchResults, artist: recommendation.artist, title: recommendation.song) {
+                B2BLog.musicKit.info("✅ Found match in full results: '\(bestMatch.song.title)' by \(bestMatch.song.artistName)")
+                return bestMatch.song
             }
 
+            // Return nil instead of blindly accepting first result
+            // This allows the AI to retry with a different recommendation
+            B2BLog.musicKit.warning("❌ No good match found for: '\(recommendation.song)' by '\(recommendation.artist)'")
+            B2BLog.musicKit.debug("First result was: '\(searchResults.first?.song.title ?? "none")' by '\(searchResults.first?.song.artistName ?? "none")'")
             return nil
         } catch {
             B2BLog.musicKit.error("Search failed: \(error)")
@@ -257,9 +272,40 @@ final class SessionViewModel {
         }
     }
 
+    // MARK: - String Normalization Helpers
+
+    /// Normalizes a string for matching by handling diacritics, featuring artists, and parentheticals
+    private func normalizeString(_ string: String) -> String {
+        var normalized = string.lowercased()
+
+        // Handle featuring artists - remove common variations
+        normalized = normalized.replacingOccurrences(of: " feat. ", with: " ")
+        normalized = normalized.replacingOccurrences(of: " ft. ", with: " ")
+        normalized = normalized.replacingOccurrences(of: " featuring ", with: " ")
+        normalized = normalized.replacingOccurrences(of: " with ", with: " ")
+
+        // Normalize unicode characters (é → e, ñ → n, etc.)
+        normalized = normalized.folding(options: .diacriticInsensitive, locale: .current)
+
+        // Trim whitespace
+        normalized = normalized.trimmingCharacters(in: .whitespaces)
+
+        return normalized
+    }
+
+    /// Strips parentheticals like "(Remastered)", "(Live)", "(Radio Edit)" from titles
+    private func stripParentheticals(_ string: String) -> String {
+        return string.replacingOccurrences(
+            of: #"\s*\([^)]*\)"#,
+            with: "",
+            options: .regularExpression
+        ).trimmingCharacters(in: .whitespaces)
+    }
+
     private func findBestMatch(_ results: [MusicSearchResult], artist: String, title: String) -> MusicSearchResult? {
-        let lowercasedArtist = artist.lowercased()
-        let lowercasedTitle = title.lowercased()
+        // Normalize search terms
+        let normalizedArtist = normalizeString(artist)
+        let normalizedTitle = normalizeString(stripParentheticals(title))
 
         // Score each result
         let scoredResults = results.compactMap { result -> (result: MusicSearchResult, score: Int)? in
@@ -267,24 +313,26 @@ final class SessionViewModel {
 
             var score = 0
 
-            let resultArtist = song.artistName.lowercased()
-            let resultTitle = song.title.lowercased()
+            // Normalize result strings
+            let resultArtist = normalizeString(song.artistName)
+            let resultTitle = normalizeString(stripParentheticals(song.title))
 
             // Exact matches get highest scores
-            if resultArtist == lowercasedArtist { score += 100 }
-            else if resultArtist.contains(lowercasedArtist) { score += 50 }
-            else if lowercasedArtist.contains(resultArtist) { score += 25 }
+            if resultArtist == normalizedArtist { score += 100 }
+            else if resultArtist.contains(normalizedArtist) { score += 50 }
+            else if normalizedArtist.contains(resultArtist) { score += 25 }
 
-            if resultTitle == lowercasedTitle { score += 100 }
-            else if resultTitle.contains(lowercasedTitle) { score += 50 }
-            else if lowercasedTitle.contains(resultTitle) { score += 25 }
+            if resultTitle == normalizedTitle { score += 100 }
+            else if resultTitle.contains(normalizedTitle) { score += 50 }
+            else if normalizedTitle.contains(resultTitle) { score += 25 }
 
             return (result, score)
         }
 
-        // Return best match if score is high enough
-        if let best = scoredResults.max(by: { $0.score < $1.score }), best.score >= 100 {
-            B2BLog.musicKit.info("Found match with score \(best.score)")
+        // Return best match if score is high enough (raised threshold from 100 to 150)
+        // This requires partial matches in both artist AND title, not just one
+        if let best = scoredResults.max(by: { $0.score < $1.score }), best.score >= 150 {
+            B2BLog.musicKit.info("Found match with score \(best.score): '\(best.result.song.title)' by \(best.result.song.artistName)")
             return best.result
         }
 

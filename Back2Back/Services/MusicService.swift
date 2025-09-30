@@ -156,6 +156,7 @@ class MusicService {
         do {
             var request = MusicCatalogSearchRequest(term: searchTerm, types: [Song.self])
             request.limit = limit
+            request.includeTopResults = true
 
             B2BLog.network.debug("🌐 API: MusicCatalogSearchRequest")
             let response = try await request.response()
