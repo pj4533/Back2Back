@@ -121,8 +121,36 @@ final class SessionViewModel {
                     await self?.prefetchAndQueueAISong(queueStatus: .queuedIfUserSkips)
                 }
             } else {
-                B2BLog.ai.warning("⚠️ Could not find matching song for AI recommendation")
-                sessionService.setAIThinking(false)
+                // No good match found - retry with a new AI recommendation
+                B2BLog.ai.warning("⚠️ No good match found for AI start, retrying with new selection")
+
+                do {
+                    let retryRecommendation = try await selectAISong()
+                    B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
+
+                    if let retrySong = await searchAndMatchSong(retryRecommendation) {
+                        // Add to history with "playing" status
+                        sessionService.addSongToHistory(retrySong, selectedBy: .ai, rationale: retryRecommendation.rationale, queueStatus: .playing)
+
+                        // Play the song
+                        await playCurrentSong(retrySong)
+
+                        // Clear AI thinking state
+                        sessionService.setAIThinking(false)
+
+                        // Queue backup AI track
+                        B2BLog.session.info("AI retry song playing - prefetching backup AI track")
+                        prefetchTask = Task.detached { [weak self] in
+                            await self?.prefetchAndQueueAISong(queueStatus: .queuedIfUserSkips)
+                        }
+                    } else {
+                        B2BLog.ai.error("❌ AI retry also failed to find matching song for start - giving up")
+                        sessionService.setAIThinking(false)
+                    }
+                } catch {
+                    B2BLog.ai.error("❌ Failed to get AI retry recommendation for start: \(error)")
+                    sessionService.setAIThinking(false)
+                }
             }
         } catch {
             B2BLog.ai.error("❌ Failed to start AI first: \(error)")
@@ -371,8 +399,43 @@ final class SessionViewModel {
                 B2BLog.ai.info("✅ Successfully queued AI song: \(song.title) as \(queueStatus)")
                 B2BLog.session.debug("Queue after AI selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
             } else {
-                B2BLog.ai.warning("⚠️ Could not find matching song for AI recommendation")
-                sessionService.setAIThinking(false)
+                // No good match found - retry with a new AI recommendation
+                B2BLog.ai.warning("⚠️ No good match found for AI recommendation, retrying with new selection")
+
+                // Check if user selected during the failed attempt
+                let userHasSelected = sessionService.songQueue.contains { $0.selectedBy == .user }
+                if userHasSelected {
+                    B2BLog.ai.info("⏭️ User selected a song during failed search - cancelling AI retry")
+                    sessionService.setAIThinking(false)
+                    return
+                }
+
+                // Retry once with a new recommendation
+                do {
+                    let retryRecommendation = try await selectAISong()
+                    B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
+                    B2BLog.ai.debug("Retry rationale: \(retryRecommendation.rationale)")
+
+                    if let retrySong = await searchAndMatchSong(retryRecommendation) {
+                        // Final check if user selected during retry
+                        let userHasSelectedAfterRetry = sessionService.songQueue.contains { $0.selectedBy == .user }
+                        if userHasSelectedAfterRetry {
+                            B2BLog.ai.info("⏭️ User selected a song during AI retry - cancelling AI selection")
+                            sessionService.setAIThinking(false)
+                            return
+                        }
+
+                        queueAISong(retrySong, rationale: retryRecommendation.rationale, queueStatus: queueStatus)
+                        B2BLog.ai.info("✅ Successfully queued AI retry song: \(retrySong.title) as \(queueStatus)")
+                        B2BLog.session.debug("Queue after AI retry - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
+                    } else {
+                        B2BLog.ai.error("❌ AI retry also failed to find matching song - giving up")
+                        sessionService.setAIThinking(false)
+                    }
+                } catch {
+                    B2BLog.ai.error("❌ Failed to get AI retry recommendation: \(error)")
+                    sessionService.setAIThinking(false)
+                }
             }
         } catch {
             B2BLog.ai.error("❌ Failed to fetch and queue AI song: \(error)")
