@@ -9,10 +9,10 @@ struct SongRecommendation: Codable {
 }
 
 extension OpenAIClient {
-    func selectNextSong(persona: String, sessionHistory: [SessionSong], config: AIModelConfig = .default) async throws -> SongRecommendation {
+    func selectNextSong(persona: String, personaId: UUID, sessionHistory: [SessionSong], config: AIModelConfig = .default) async throws -> SongRecommendation {
         B2BLog.ai.info("Requesting AI song selection with persona using model: \(config.songSelectionModel), reasoning: \(config.songSelectionReasoningLevel.rawValue)")
 
-        let prompt = buildDJPrompt(persona: persona, history: sessionHistory)
+        let prompt = buildDJPrompt(persona: persona, personaId: personaId, history: sessionHistory)
 
         let request = ResponsesRequest(
             model: config.songSelectionModel,
@@ -40,7 +40,7 @@ extension OpenAIClient {
         }
     }
 
-    private func buildDJPrompt(persona: String, history: [SessionSong]) -> String {
+    private func buildDJPrompt(persona: String, personaId: UUID, history: [SessionSong]) -> String {
         var historyText = ""
         if !history.isEmpty {
             historyText = """
@@ -51,13 +51,28 @@ extension OpenAIClient {
             """
         }
 
+        // Get recent songs from cache (24-hour exclusion list)
+        let recentSongs = PersonaSongCacheService.shared.getRecentSongs(for: personaId)
+        var recentSongsText = ""
+        if !recentSongs.isEmpty {
+            recentSongsText = """
+
+            Songs you've recently selected (within last 24 hours) - do NOT choose these:
+            \(formatRecentSongs(recentSongs))
+
+            """
+
+            B2BLog.ai.info("Added \(recentSongs.count) recent songs to exclusion list for persona")
+        }
+
         return """
         \(persona)
-        \(historyText)
+        \(historyText)\(recentSongsText)
         Select the next song that:
         1. Complements the musical journey so far
         2. Reflects your DJ persona's taste
         3. Doesn't repeat any previous songs
+        4. Avoids recently selected songs from your past sessions
 
         You MUST respond with ONLY a valid JSON object (no markdown, no extra text) in this exact format:
         {"artist": "Artist Name", "song": "Song Title", "rationale": "Brief explanation of your choice"}
@@ -69,6 +84,12 @@ extension OpenAIClient {
     private func formatSessionHistory(_ history: [SessionSong]) -> String {
         history.enumerated().map { index, sessionSong in
             "\(index + 1). '\(sessionSong.song.title)' by \(sessionSong.song.artistName) [\(sessionSong.selectedBy.rawValue)]"
+        }.joined(separator: "\n")
+    }
+
+    private func formatRecentSongs(_ recentSongs: [CachedSong]) -> String {
+        recentSongs.enumerated().map { index, cachedSong in
+            "\(index + 1). '\(cachedSong.songTitle)' by \(cachedSong.artist)"
         }.joined(separator: "\n")
     }
 

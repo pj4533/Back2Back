@@ -271,9 +271,15 @@ final class SessionViewModel {
             throw OpenAIError.apiKeyMissing
         }
 
+        // Get current persona ID
+        guard let currentPersona = PersonaService.shared.selectedPersona else {
+            throw OpenAIError.decodingError(NSError(domain: "Back2Back", code: -1, userInfo: [NSLocalizedDescriptionKey: "No persona selected"]))
+        }
+
         let config = aiModelConfig
         let recommendation = try await openAIClient.selectNextSong(
             persona: sessionService.currentPersonaStyleGuide,
+            personaId: currentPersona.id,
             sessionHistory: sessionService.sessionHistory,
             config: config
         )
@@ -283,12 +289,29 @@ final class SessionViewModel {
             B2BLog.ai.warning("AI tried to select already-played song, retrying")
             // Try once more with emphasis on no repeats
             let retryPersona = sessionService.currentPersonaStyleGuide + "\n\nIMPORTANT: Never select a song that has already been played in this session."
-            return try await openAIClient.selectNextSong(
+            let retryRecommendation = try await openAIClient.selectNextSong(
                 persona: retryPersona,
+                personaId: currentPersona.id,
                 sessionHistory: sessionService.sessionHistory,
                 config: config
             )
+
+            // Record the retry recommendation in cache
+            PersonaSongCacheService.shared.recordSong(
+                personaId: currentPersona.id,
+                artist: retryRecommendation.artist,
+                songTitle: retryRecommendation.song
+            )
+
+            return retryRecommendation
         }
+
+        // Record the recommendation in cache
+        PersonaSongCacheService.shared.recordSong(
+            personaId: currentPersona.id,
+            artist: recommendation.artist,
+            songTitle: recommendation.song
+        )
 
         return recommendation
     }
