@@ -222,17 +222,66 @@ struct SessionViewModelTests {
     }
 
     @MainActor
-    @Test("Improved threshold prevents false positives")
-    func testImprovedThresholdLogic() {
-        // With threshold of 150, we need matches in both fields
-        // Artist exact match (100) + Title partial match (50) = 150 (passes)
-        // Artist exact match (100) only = 100 (fails)
+    @Test("Threshold allows single exact match")
+    func testThresholdLogic() {
+        // With threshold of 100, exact match on either artist OR title passes
+        // This is appropriate because normalization handles variations
 
         let artistOnlyScore = 100  // Just artist exact match
-        let artistAndTitleScore = 150  // Artist exact + title partial
+        let titleOnlyScore = 100   // Just title exact match
+        let bothFieldsScore = 200  // Both exact matches
 
-        #expect(artistOnlyScore < 150, "Artist-only match should not pass threshold")
-        #expect(artistAndTitleScore >= 150, "Artist + title match should pass threshold")
+        #expect(artistOnlyScore >= 100, "Artist exact match should pass threshold")
+        #expect(titleOnlyScore >= 100, "Title exact match should pass threshold")
+        #expect(bothFieldsScore >= 100, "Both exact matches should pass threshold")
+    }
+
+    @MainActor
+    @Test("Normalization handles The prefix")
+    func testNormalizationThePrefix() {
+        let testCases = [
+            ("The Beatles", "beatles"),
+            ("The Rolling Stones", "rolling stones"),
+            ("The T.S.U. Toronadoes", "tsu toronadoes"),
+        ]
+
+        for (input, expected) in testCases {
+            let normalized = normalizeTestString(input)
+            #expect(normalized == expected, "Failed for input: '\(input)'")
+        }
+    }
+
+    @MainActor
+    @Test("Normalization handles ampersand and punctuation")
+    func testNormalizationAmpersandPunctuation() {
+        let testCases = [
+            ("Apple & The Three Oranges", "apple and three oranges"),
+            ("Apple&Three Oranges", "apple and three oranges"),
+            ("T.S.U. Toronadoes", "tsu toronadoes"),
+            ("A.B.C. Band", "abc band"),
+        ]
+
+        for (input, expected) in testCases {
+            let normalized = normalizeTestString(input)
+            #expect(normalized == expected, "Failed for input: '\(input)'")
+        }
+    }
+
+    @MainActor
+    @Test("Strip part numbers from titles")
+    func testStripPartNumbers() {
+        let testCases = [
+            ("Free and Easy Pt. 1", "Free and Easy"),
+            ("Free and Easy Pt. 2", "Free and Easy"),
+            ("Song Title Part 1", "Song Title"),
+            ("Song Title Part 2", "Song Title"),
+            ("Getting the Corners Pt 1", "Getting the Corners"),
+        ]
+
+        for (input, expected) in testCases {
+            let stripped = stripParentheticalsTest(input)
+            #expect(stripped == expected, "Failed for input: '\(input)'")
+        }
     }
 
     // MARK: - Helper Functions for Testing
@@ -247,8 +296,23 @@ struct SessionViewModelTests {
         normalized = normalized.replacingOccurrences(of: " featuring ", with: " ")
         normalized = normalized.replacingOccurrences(of: " with ", with: " ")
 
+        // Normalize "The" prefix
+        if normalized.hasPrefix("the ") {
+            normalized = String(normalized.dropFirst(4))
+        }
+
+        // Remove common punctuation
+        normalized = normalized.replacingOccurrences(of: " & ", with: " and ")
+        normalized = normalized.replacingOccurrences(of: "&", with: " and ")
+
+        // Remove periods from abbreviations
+        normalized = normalized.replacingOccurrences(of: ".", with: "")
+
         // Normalize unicode
         normalized = normalized.folding(options: .diacriticInsensitive, locale: .current)
+
+        // Normalize multiple spaces
+        normalized = normalized.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
 
         // Trim whitespace
         normalized = normalized.trimmingCharacters(in: .whitespaces)
@@ -258,11 +322,28 @@ struct SessionViewModelTests {
 
     /// Test helper that mimics the stripParentheticals function
     private func stripParentheticalsTest(_ string: String) -> String {
-        return string.replacingOccurrences(
+        var cleaned = string
+
+        // Remove parentheticals
+        cleaned = cleaned.replacingOccurrences(
             of: #"\s*\([^)]*\)"#,
             with: "",
             options: .regularExpression
-        ).trimmingCharacters(in: .whitespaces)
+        )
+
+        // Remove "Pt. 1", "Pt. 2", "Part 1", "Part 2", etc.
+        cleaned = cleaned.replacingOccurrences(
+            of: #"\s+Pt\.?\s*\d+"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        cleaned = cleaned.replacingOccurrences(
+            of: #"\s+Part\s+\d+"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+
+        return cleaned.trimmingCharacters(in: .whitespaces)
     }
 
 }

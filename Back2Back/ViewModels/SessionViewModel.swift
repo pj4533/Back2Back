@@ -312,8 +312,23 @@ final class SessionViewModel {
         normalized = normalized.replacingOccurrences(of: " featuring ", with: " ")
         normalized = normalized.replacingOccurrences(of: " with ", with: " ")
 
+        // Normalize "The" prefix (common in artist names)
+        if normalized.hasPrefix("the ") {
+            normalized = String(normalized.dropFirst(4))
+        }
+
+        // Remove common punctuation that varies (& vs and, periods, hyphens in abbreviations)
+        normalized = normalized.replacingOccurrences(of: " & ", with: " and ")
+        normalized = normalized.replacingOccurrences(of: "&", with: " and ")
+
+        // Remove periods from abbreviations (T.S.U. → TSU)
+        normalized = normalized.replacingOccurrences(of: ".", with: "")
+
         // Normalize unicode characters (é → e, ñ → n, etc.)
         normalized = normalized.folding(options: .diacriticInsensitive, locale: .current)
+
+        // Normalize multiple spaces to single space
+        normalized = normalized.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
 
         // Trim whitespace
         normalized = normalized.trimmingCharacters(in: .whitespaces)
@@ -321,13 +336,31 @@ final class SessionViewModel {
         return normalized
     }
 
-    /// Strips parentheticals like "(Remastered)", "(Live)", "(Radio Edit)" from titles
+    /// Strips parentheticals and part numbers from titles
+    /// Removes: "(Remastered)", "(Live)", "(Radio Edit)", "Pt. 1", "Part 1", etc.
     private func stripParentheticals(_ string: String) -> String {
-        return string.replacingOccurrences(
+        var cleaned = string
+
+        // Remove parentheticals: (Remastered), (Live), etc.
+        cleaned = cleaned.replacingOccurrences(
             of: #"\s*\([^)]*\)"#,
             with: "",
             options: .regularExpression
-        ).trimmingCharacters(in: .whitespaces)
+        )
+
+        // Remove "Pt. 1", "Pt. 2", "Part 1", "Part 2", etc.
+        cleaned = cleaned.replacingOccurrences(
+            of: #"\s+Pt\.?\s*\d+"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        cleaned = cleaned.replacingOccurrences(
+            of: #"\s+Part\s+\d+"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+
+        return cleaned.trimmingCharacters(in: .whitespaces)
     }
 
     private func findBestMatch(_ results: [MusicSearchResult], artist: String, title: String) -> MusicSearchResult? {
@@ -357,9 +390,10 @@ final class SessionViewModel {
             return (result, score)
         }
 
-        // Return best match if score is high enough (raised threshold from 100 to 150)
-        // This requires partial matches in both artist AND title, not just one
-        if let best = scoredResults.max(by: { $0.score < $1.score }), best.score >= 150 {
+        // Return best match if score is high enough
+        // Threshold of 100 = exact match on either artist OR title (after normalization)
+        // Higher scores indicate matches in both fields
+        if let best = scoredResults.max(by: { $0.score < $1.score }), best.score >= 100 {
             B2BLog.musicKit.info("Found match with score \(best.score): '\(best.result.song.title)' by \(best.result.song.artistName)")
             return best.result
         }
