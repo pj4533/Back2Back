@@ -20,6 +20,7 @@ final class SessionViewModel {
     private let openAIClient = OpenAIClient.shared
     private let sessionService = SessionService.shared
     private let environmentService = EnvironmentService.shared
+    private let musicMatcher: MusicMatchingProtocol
 
     private var playbackObserverTask: Task<Void, Never>?
     private var prefetchTask: Task<Void, Never>?
@@ -36,7 +37,8 @@ final class SessionViewModel {
         return config
     }
 
-    private init() {
+    private init(musicMatcher: MusicMatchingProtocol? = nil) {
+        self.musicMatcher = musicMatcher ?? StringBasedMusicMatcher()
         B2BLog.session.info("SessionViewModel initialized")
         startPlaybackMonitoring()
     }
@@ -271,9 +273,15 @@ final class SessionViewModel {
             throw OpenAIError.apiKeyMissing
         }
 
+        // Get current persona ID
+        guard let currentPersona = PersonaService.shared.selectedPersona else {
+            throw OpenAIError.decodingError(NSError(domain: "Back2Back", code: -1, userInfo: [NSLocalizedDescriptionKey: "No persona selected"]))
+        }
+
         let config = aiModelConfig
         let recommendation = try await openAIClient.selectNextSong(
             persona: sessionService.currentPersonaStyleGuide,
+            personaId: currentPersona.id,
             sessionHistory: sessionService.sessionHistory,
             config: config
         )
@@ -283,189 +291,43 @@ final class SessionViewModel {
             B2BLog.ai.warning("AI tried to select already-played song, retrying")
             // Try once more with emphasis on no repeats
             let retryPersona = sessionService.currentPersonaStyleGuide + "\n\nIMPORTANT: Never select a song that has already been played in this session."
-            return try await openAIClient.selectNextSong(
+            let retryRecommendation = try await openAIClient.selectNextSong(
                 persona: retryPersona,
+                personaId: currentPersona.id,
                 sessionHistory: sessionService.sessionHistory,
                 config: config
             )
+
+            // Record the retry recommendation in cache
+            PersonaSongCacheService.shared.recordSong(
+                personaId: currentPersona.id,
+                artist: retryRecommendation.artist,
+                songTitle: retryRecommendation.song
+            )
+
+            return retryRecommendation
         }
+
+        // Record the recommendation in cache
+        PersonaSongCacheService.shared.recordSong(
+            personaId: currentPersona.id,
+            artist: recommendation.artist,
+            songTitle: recommendation.song
+        )
 
         return recommendation
     }
 
     private func searchAndMatchSong(_ recommendation: SongRecommendation) async -> Song? {
-        B2BLog.musicKit.info("Searching for: \(recommendation.song) by \(recommendation.artist)")
-
         do {
-            // Try exact search first
-            try await musicService.searchCatalog(
-                for: "\(recommendation.artist) \(recommendation.song)"
-            )
-
-            var searchResults = musicService.searchResults
-
-            if searchResults.isEmpty {
-                // Try with just song title
-                B2BLog.musicKit.debug("No results from combined search, trying title-only search")
-                try await musicService.searchCatalog(for: recommendation.song)
-                searchResults = musicService.searchResults
-            }
-
-            if searchResults.isEmpty {
-                B2BLog.musicKit.warning("No search results found for: \(recommendation.song) by \(recommendation.artist)")
-                return nil
-            }
-
-            // Prioritize Apple's TopResults (first 3 results are typically the most relevant)
-            // Apple's search algorithm has already ranked these as best matches
-            let topResults = Array(searchResults.prefix(3))
-            B2BLog.musicKit.debug("Checking top \(topResults.count) results first")
-
-            if let bestMatch = findBestMatch(topResults, artist: recommendation.artist, title: recommendation.song) {
-                B2BLog.musicKit.info("✅ Found match in top results: '\(bestMatch.song.title)' by \(bestMatch.song.artistName)")
-                return bestMatch.song
-            }
-
-            // Fall back to full results if top results didn't have a good match
-            B2BLog.musicKit.debug("No match in top results, checking all \(searchResults.count) results")
-            if let bestMatch = findBestMatch(searchResults, artist: recommendation.artist, title: recommendation.song) {
-                B2BLog.musicKit.info("✅ Found match in full results: '\(bestMatch.song.title)' by \(bestMatch.song.artistName)")
-                return bestMatch.song
-            }
-
-            // Return nil instead of blindly accepting first result
-            // This allows the AI to retry with a different recommendation
-            B2BLog.musicKit.warning("❌ No good match found for: '\(recommendation.song)' by '\(recommendation.artist)'")
-            B2BLog.musicKit.debug("First result was: '\(searchResults.first?.song.title ?? "none")' by '\(searchResults.first?.song.artistName ?? "none")'")
-            return nil
+            return try await musicMatcher.searchAndMatch(recommendation: recommendation)
         } catch {
-            B2BLog.musicKit.error("Search failed: \(error)")
+            B2BLog.musicKit.error("Search and match failed: \(error)")
             return nil
         }
     }
 
-    // MARK: - String Normalization Helpers
-
-    /// Normalizes a string for matching by handling diacritics, featuring artists, and parentheticals
-    private func normalizeString(_ string: String) -> String {
-        var normalized = string.lowercased()
-
-        // Handle featuring artists - remove common variations
-        normalized = normalized.replacingOccurrences(of: " feat. ", with: " ")
-        normalized = normalized.replacingOccurrences(of: " ft. ", with: " ")
-        normalized = normalized.replacingOccurrences(of: " featuring ", with: " ")
-        normalized = normalized.replacingOccurrences(of: " with ", with: " ")
-
-        // Normalize "The" prefix (common in artist names)
-        if normalized.hasPrefix("the ") {
-            normalized = String(normalized.dropFirst(4))
-        }
-
-        // Remove common punctuation that varies (& vs and, periods, hyphens in abbreviations)
-        normalized = normalized.replacingOccurrences(of: " & ", with: " and ")
-        normalized = normalized.replacingOccurrences(of: "&", with: " and ")
-
-        // Remove periods from abbreviations (T.S.U. → TSU)
-        normalized = normalized.replacingOccurrences(of: ".", with: "")
-
-        // Normalize unicode characters (é → e, ñ → n, etc.)
-        normalized = normalized.folding(options: .diacriticInsensitive, locale: .current)
-
-        // Normalize multiple spaces to single space
-        normalized = normalized.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-
-        // Trim whitespace
-        normalized = normalized.trimmingCharacters(in: .whitespaces)
-
-        return normalized
-    }
-
-    /// Strips parentheticals and part numbers from titles
-    /// Removes: "(Remastered)", "(Live)", "(Radio Edit)", "Pt. 1", "Part 1", etc.
-    private func stripParentheticals(_ string: String) -> String {
-        var cleaned = string
-
-        // Remove parentheticals: (Remastered), (Live), etc.
-        cleaned = cleaned.replacingOccurrences(
-            of: #"\s*\([^)]*\)"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        // Remove "Pt. 1", "Pt. 2", "Part 1", "Part 2", etc.
-        cleaned = cleaned.replacingOccurrences(
-            of: #"\s+Pt\.?\s*\d+"#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        cleaned = cleaned.replacingOccurrences(
-            of: #"\s+Part\s+\d+"#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-
-        return cleaned.trimmingCharacters(in: .whitespaces)
-    }
-
-    private func findBestMatch(_ results: [MusicSearchResult], artist: String, title: String) -> MusicSearchResult? {
-        // Normalize search terms
-        let normalizedArtist = normalizeString(artist)
-        let normalizedTitle = normalizeString(stripParentheticals(title))
-
-        B2BLog.musicKit.debug("Looking for match - Artist: '\(normalizedArtist)', Title: '\(normalizedTitle)'")
-
-        // Score each result
-        let scoredResults = results.compactMap { result -> (result: MusicSearchResult, artistScore: Int, titleScore: Int, totalScore: Int)? in
-            let song = result.song
-
-            var artistScore = 0
-            var titleScore = 0
-
-            // Normalize result strings
-            let resultArtist = normalizeString(song.artistName)
-            let resultTitle = normalizeString(stripParentheticals(song.title))
-
-            // Score artist match
-            if resultArtist == normalizedArtist { artistScore = 100 }
-            else if resultArtist.contains(normalizedArtist) { artistScore = 50 }
-            else if normalizedArtist.contains(resultArtist) { artistScore = 25 }
-
-            // Score title match
-            if resultTitle == normalizedTitle { titleScore = 100 }
-            else if resultTitle.contains(normalizedTitle) { titleScore = 50 }
-            else if normalizedTitle.contains(resultTitle) { titleScore = 25 }
-
-            let totalScore = artistScore + titleScore
-
-            // Log details for debugging
-            if totalScore >= 25 {
-                B2BLog.musicKit.debug("  Candidate: '\(resultTitle)' by '\(resultArtist)' - Artist:\(artistScore) Title:\(titleScore) Total:\(totalScore)")
-            }
-
-            return (result, artistScore, titleScore, totalScore)
-        }
-
-        // CRITICAL: Require BOTH artist AND title to have some match
-        // This prevents matching "I Love You" by "Trippie Redd" when looking for "I Love You" by "The Darling Dears"
-        // We need at least a partial match (25+) in BOTH fields, plus a good total score
-        if let best = scoredResults.max(by: { $0.totalScore < $1.totalScore }),
-           best.artistScore >= 25,  // Artist must have at least partial match
-           best.titleScore >= 25,   // Title must have at least partial match
-           best.totalScore >= 100 { // Total score must be decent
-
-            B2BLog.musicKit.info("✅ Found match with Artist:\(best.artistScore) Title:\(best.titleScore) Total:\(best.totalScore)")
-            B2BLog.musicKit.info("   '\(best.result.song.title)' by \(best.result.song.artistName)")
-            return best.result
-        }
-
-        B2BLog.musicKit.warning("❌ No match found meeting criteria (need Artist≥25, Title≥25, Total≥100)")
-        if let best = scoredResults.max(by: { $0.totalScore < $1.totalScore }) {
-            B2BLog.musicKit.debug("   Best candidate was: Artist:\(best.artistScore) Title:\(best.titleScore) Total:\(best.totalScore)")
-            B2BLog.musicKit.debug("   '\(best.result.song.title)' by \(best.result.song.artistName)")
-        }
-
-        return nil
-    }
+    // MARK: - AI Song Prefetching
 
     private func prefetchAndQueueAISong(queueStatus: QueueStatus) async {
         B2BLog.ai.info("🤖 Starting AI song selection for queue position: \(queueStatus)")
