@@ -51,43 +51,137 @@ Key MusicKit resources:
 2. **Music Search and Playback** ✅
    - Real-time catalog search with 0.75s debouncing
    - ApplicationMusicPlayer integration
-   - Queue management
+   - Queue management with prepareToPlay() for readiness
    - Now Playing UI (mini and expanded views)
+   - Tap-to-skip functionality for queued songs
+
+3. **Turn-based song selection (user → AI → user)** ✅
+   - Automatic turn management in SessionService
+   - User can select songs via search
+   - AI automatically queues next song using current persona
+   - Visual feedback showing current turn (User/AI)
+   - Prefetching system for smooth playback transitions
+
+4. **Persona library with preset and custom options** ✅
+   - PersonaService with UserDefaults persistence
+   - Default personas: "Rare Groove Collector", "Modern Electronic DJ"
+   - Create, edit, delete, and select personas
+   - Style guide configuration for AI behavior
+   - PersonasListView and PersonaDetailView UIs
+
+5. **Session history tracking** ✅
+   - SessionService maintains full session history
+   - Tracks songs with metadata (selected by, timestamp, rationale)
+   - Queue status tracking (playing, played, upNext, queuedIfUserSkips)
+   - SessionView displays history and queue
+
+6. **OpenAI API integration** ✅
+   - OpenAI Responses API (GPT-5) for song selection
+   - Streaming responses for persona generation
+   - Configurable AI models and reasoning levels
+   - EnvironmentService for secure API key management
+   - Configuration UI for model selection (GPT-5, GPT-5 Mini, GPT-5 Nano)
+
+### Advanced Features Implemented
+7. **Time-based song repetition prevention** ✅
+   - PersonaSongCacheService with 24-hour cache
+   - Prevents personas from repeating songs across sessions
+   - Per-persona song tracking with automatic expiration
+   - UserDefaults persistence with cache cleanup
+   - Debug UI to clear cache in ConfigurationView
+
+8. **Intelligent track matching** ✅
+   - StringBasedMusicMatcher with fuzzy matching
+   - Unicode normalization (handles curly quotes, diacritics)
+   - Artist/title normalization (featuring artists, "The" prefix, ampersands)
+   - Parenthetical stripping (Remastered, Live, Part numbers)
+   - Confidence scoring requiring BOTH artist and title matches
+   - AI retry logic when no good match found
+   - MusicMatchingProtocol for future LLM-based matching
+
+9. **AI Model Configuration** ✅
+   - ConfigurationView for model and reasoning level settings
+   - AIModelConfig with UserDefaults persistence
+   - Separate configs for song selection vs style guide generation
+   - Model options: GPT-5, GPT-5 Mini, GPT-5 Nano
+   - Reasoning levels: low, medium, high
 
 ### Not Yet Implemented
-3. **Turn-based song selection (user → AI → user)** ⏳
-4. **Persona library with preset and custom options** ⏳
-5. **Visual feedback for current turn** ⏳
-6. **Session history tracking** ⏳
-7. **OpenAI API integration** ⏳
+- Playlist export to Apple Music
+- Crossfade/BPM-aware transitions
+- Spotify integration
+- Multi-user support
+- Voice interaction
 
 ## Project Structure
 ```
 Back2Back/
 ├── Back2Back/                    # Main app target
 │   ├── Back2BackApp.swift       # App entry point with B2BLog initialization
-│   ├── ContentView.swift        # Main navigation and auth flow controller
+│   ├── ContentView.swift        # Main tab navigation (Session, Personas, Config)
+│   ├── SecretsTemplate.swift    # Template for API keys configuration
 │   ├── Models/
-│   │   └── MusicModels.swift   # MusicSearchResult, NowPlayingItem, error types
+│   │   ├── MusicModels.swift           # MusicSearchResult, NowPlayingItem, error types
+│   │   ├── PersonaModels.swift         # Persona and PersonaGenerationResult
+│   │   ├── PersonaSongCache.swift      # CachedSong, PersonaSongCache (24hr expiration)
+│   │   ├── AIModelConfig.swift         # AI model configuration and persistence
+│   │   ├── OpenAIModels.swift          # Core OpenAI API types
+│   │   ├── OpenAIModels+Core.swift     # Base request/response types
+│   │   ├── OpenAIModels+Components.swift  # Message, ToolCall, etc.
+│   │   └── OpenAIModels+Streaming.swift   # Streaming response types
 │   ├── Views/
 │   │   ├── MusicAuthorizationView.swift  # Apple Music permission UI
 │   │   ├── MusicSearchView.swift         # Search UI with debounced input
-│   │   └── NowPlayingView.swift          # Mini/expanded player views
+│   │   ├── NowPlayingView.swift          # Mini/expanded player views
+│   │   ├── SessionView.swift             # DJ session UI with history/queue
+│   │   ├── PersonasListView.swift        # Persona management list
+│   │   ├── PersonaDetailView.swift       # Edit/create persona
+│   │   └── ConfigurationView.swift       # AI model settings and debug tools
 │   ├── Services/
-│   │   └── MusicService.swift  # Singleton MusicKit wrapper (@MainActor)
+│   │   ├── MusicService.swift            # Singleton MusicKit wrapper (@MainActor)
+│   │   ├── SessionService.swift          # Session state management
+│   │   ├── PersonaService.swift          # Persona CRUD operations
+│   │   ├── PersonaSongCacheService.swift # 24hr song repetition prevention
+│   │   ├── EnvironmentService.swift      # Secure API key management
+│   │   ├── OpenAIClient.swift            # Core OpenAI HTTP client
+│   │   ├── OpenAIClient+Responses.swift  # Responses API implementation
+│   │   ├── OpenAIClient+Streaming.swift  # Streaming response handling
+│   │   ├── OpenAIClient+StreamHelpers.swift # Stream parsing utilities
+│   │   ├── OpenAIClient+SongSelection.swift # Song recommendation logic
+│   │   ├── OpenAIClient+Persona.swift    # Persona generation logic
+│   │   └── MusicMatching/
+│   │       ├── MusicMatchingProtocol.swift      # Matcher interface
+│   │       ├── StringBasedMusicMatcher.swift    # Fuzzy string matching
+│   │       └── LLMBasedMusicMatcher.swift       # Future LLM matcher (stub)
 │   ├── ViewModels/
 │   │   ├── MusicAuthViewModel.swift      # Auth state management
-│   │   └── MusicSearchViewModel.swift    # Search with 0.75s debouncing
+│   │   ├── MusicSearchViewModel.swift    # Search with 0.75s debouncing
+│   │   ├── SessionViewModel.swift        # DJ session logic and AI coordination
+│   │   ├── NowPlayingViewModel.swift     # Playback state management
+│   │   ├── PersonasViewModel.swift       # Persona list management
+│   │   └── PersonaDetailViewModel.swift  # Persona editing/creation
 │   ├── Utils/
 │   │   └── Logger.swift         # B2BLog unified logging system
 │   └── Info.plist              # Background audio configuration
 ├── docs/
-│   └── back2back_requirements.md # Original spec (DO NOT MODIFY)
+│   ├── back2back_requirements.md          # Original spec (DO NOT MODIFY)
+│   └── openai-responses-api-web-search-swift.md  # OpenAI API documentation
 └── Back2BackTests/              # Swift Testing framework tests
+    ├── Back2BackTests.swift
     ├── MusicAuthViewModelTests.swift
     ├── MusicSearchViewModelTests.swift
     ├── MusicServiceTests.swift
-    └── MusicModelsTests.swift
+    ├── MusicModelsTests.swift
+    ├── SessionViewModelTests.swift         # Session logic, track matching tests
+    ├── SessionServiceTests.swift
+    ├── PersonaServiceTests.swift
+    ├── PersonasViewModelTests.swift
+    ├── PersonaSongCacheServiceTests.swift  # 24hr cache tests
+    ├── OpenAIClientTests.swift
+    ├── OpenAIModelsTests.swift
+    ├── OpenAISongSelectionTests.swift
+    ├── EnvironmentServiceTests.swift
+    └── AIModelConfigTests.swift
 ```
 
 ## Development Guidelines
@@ -166,6 +260,38 @@ xcodebuild test -project Back2Back.xcodeproj -scheme Back2Back -destination 'pla
 xcodebuild clean -project Back2Back.xcodeproj -scheme Back2Back
 ```
 
+## Recent Improvements (September 2025)
+
+### Time-Based Song Repetition Prevention (PR #19)
+Implemented a 24-hour cache system to prevent personas from selecting the same songs across different sessions:
+- **PersonaSongCache models**: CachedSong and PersonaSongCache with automatic expiration
+- **PersonaSongCacheService**: Singleton with UserDefaults persistence
+- **Integration**: AI prompts now include exclusion list of recent songs
+- **Debug tools**: Clear cache button in ConfigurationView
+
+### Tap-to-Skip Functionality
+Allow users to tap any queued song to skip ahead:
+- **SessionSongRow**: Tap gesture on queued items
+- **SessionViewModel.skipToQueuedSong()**: Handles skip logic
+- **SessionService.removeQueuedSongsBeforeSong()**: Queue management helper
+
+### Improved Track Matching (PR #17)
+Enhanced verification between AI recommendations and Apple Music search:
+- **Unicode normalization**: Handles curly quotes (U+2019), diacritics
+- **Artist/title normalization**: Featuring artists, "The" prefix, ampersands, abbreviations
+- **Parenthetical stripping**: Removes "(Remastered)", "(Live)", "Pt. 1", etc.
+- **Stricter matching**: Requires BOTH artist AND title partial matches (prevents wrong song selection)
+- **AI retry logic**: When no good match found, AI selects alternative song
+- **Music matching architecture**: Extracted to MusicMatching/ module with protocol-based design
+
+### Queue Readiness Improvements
+- **prepareToPlay()**: Ensures queue is ready before playback starts
+- Prevents playback errors from uninitialized queue state
+
+### Product Naming
+- App renamed to "Back2Back DJ" in App Store/Home Screen
+- Internal module name remains "Back2Back" for consistency
+
 ## Implementation Details
 
 ### Logging System (B2BLog)
@@ -195,8 +321,21 @@ The app uses a comprehensive logging system with OSLog:
 ### Current Test Coverage
 - Authorization flow (MusicAuthViewModelTests)
 - Search functionality (MusicSearchViewModelTests)
-- Service layer (MusicServiceTests)
-- Model validation (MusicModelsTests)
+- Service layer (MusicServiceTests, SessionServiceTests, PersonaServiceTests)
+- Model validation (MusicModelsTests, OpenAIModelsTests)
+- OpenAI integration (OpenAIClientTests, OpenAISongSelectionTests)
+- Session logic and track matching (SessionViewModelTests)
+  - String normalization (Unicode, diacritics, "The" prefix, ampersands)
+  - Parenthetical stripping (Remastered, Live, Part numbers)
+  - Confidence scoring and threshold logic
+  - Featuring artist variations
+- Persona management (PersonasViewModelTests)
+- Song cache system (PersonaSongCacheServiceTests)
+  - 24-hour expiration logic
+  - Multi-persona isolation
+  - Cache persistence and cleanup
+- Environment configuration (EnvironmentServiceTests)
+- AI model configuration (AIModelConfigTests)
 
 ## Important Notes
 - Always test with real Apple Music subscription
