@@ -8,8 +8,18 @@ struct SongRecommendation: Codable {
     let rationale: String
 }
 
-extension OpenAIClient {
-    func selectNextSong(persona: String, personaId: UUID, sessionHistory: [SessionSong], config: AIModelConfig = .default) async throws -> SongRecommendation {
+@MainActor
+class SongSelectionService {
+    static let shared = SongSelectionService()
+    private init() {}
+
+    func selectNextSong(
+        persona: String,
+        personaId: UUID,
+        sessionHistory: [SessionSong],
+        config: AIModelConfig = .default,
+        client: OpenAIClient
+    ) async throws -> SongRecommendation {
         B2BLog.ai.info("Requesting AI song selection with persona using model: \(config.songSelectionModel), reasoning: \(config.songSelectionReasoningLevel.rawValue)")
 
         let prompt = buildDJPrompt(persona: persona, personaId: personaId, history: sessionHistory)
@@ -22,7 +32,7 @@ extension OpenAIClient {
         )
 
         do {
-            let response = try await responses(request: request)
+            let response = try await OpenAINetworking.shared.responses(request: request, client: client)
 
             guard let jsonData = response.outputText.data(using: .utf8) else {
                 throw OpenAIError.decodingError(NSError(domain: "OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not convert output to data"]))
@@ -39,6 +49,20 @@ extension OpenAIClient {
             throw error
         }
     }
+
+    func simpleCompletion(prompt: String, model: String = "gpt-5", client: OpenAIClient) async throws -> String {
+        let request = ResponsesRequest(
+            model: model,
+            input: prompt,
+            verbosity: .medium,
+            reasoningEffort: .medium
+        )
+
+        let response = try await OpenAINetworking.shared.responses(request: request, client: client)
+        return response.outputText
+    }
+
+    // MARK: - Private Helpers
 
     private func buildDJPrompt(persona: String, personaId: UUID, history: [SessionSong]) -> String {
         var historyText = ""
@@ -91,17 +115,5 @@ extension OpenAIClient {
         recentSongs.enumerated().map { index, cachedSong in
             "\(index + 1). '\(cachedSong.songTitle)' by \(cachedSong.artist)"
         }.joined(separator: "\n")
-    }
-
-    func simpleCompletion(prompt: String, model: String = "gpt-5") async throws -> String {
-        let request = ResponsesRequest(
-            model: model,
-            input: prompt,
-            verbosity: .medium,
-            reasoningEffort: .medium
-        )
-
-        let response = try await responses(request: request)
-        return response.outputText
     }
 }

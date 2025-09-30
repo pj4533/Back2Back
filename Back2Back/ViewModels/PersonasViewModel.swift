@@ -7,7 +7,11 @@ import OSLog
 @Observable
 final class PersonasViewModel {
     private let personaService = PersonaService.shared
-    private let openAIClient = OpenAIClient.shared
+    private let aiService: AIRecommendationServiceProtocol
+
+    init(aiService: AIRecommendationServiceProtocol = OpenAIClient.shared) {
+        self.aiService = aiService
+    }
 
     var personas: [Persona] {
         personaService.personas
@@ -46,7 +50,7 @@ final class PersonasViewModel {
 
         do {
             // Use streaming API with real-time status updates
-            let result = try await openAIClient.generatePersonaStyleGuide(
+            let result = try await aiService.generatePersonaStyleGuide(
                 name: name,
                 description: description
             ) { [weak self] status in

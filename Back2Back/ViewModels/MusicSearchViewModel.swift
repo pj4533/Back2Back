@@ -18,7 +18,7 @@ class MusicSearchViewModel {
     var errorMessage: String?
 
     // MARK: - Private Properties
-    private let musicService = MusicService.shared
+    private let musicService: MusicServiceProtocol
     private var searchTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
@@ -29,7 +29,8 @@ class MusicSearchViewModel {
     private let debounceDuration: TimeInterval = 0.75
 
     // MARK: - Initialization
-    init() {
+    init(musicService: MusicServiceProtocol = MusicService.shared) {
+        self.musicService = musicService
         // Use debug level for initialization logs to reduce noise
         B2BLog.search.debug("Initializing MusicSearchViewModel")
         setupBindings()
@@ -65,17 +66,12 @@ class MusicSearchViewModel {
             .store(in: &cancellables)
     }
 
-    // MARK: - Search Logic with Non-Blocking Updates
+    // MARK: - Search Logic
 
-    /// Truly non-blocking async method to update search text
-    func updateSearchTextAsync(_ newText: String) async {
-        // Store the text without triggering immediate UI updates
+    /// Update search text and trigger debounced search
+    func updateSearchText(_ newText: String) {
         searchText = newText
-
-        // Send to search pipeline on background queue
-        Task.detached { [weak self, newText] in
-            await self?.searchSubject.send(newText)
-        }
+        searchSubject.send(newText)
     }
 
     /// Performs the actual search with proper task management
@@ -85,14 +81,9 @@ class MusicSearchViewModel {
 
         // Clear results if search term is empty
         guard !searchTerm.isEmpty else {
-            Task.detached(priority: .utility) {
-                await B2BLog.search.debug("Search term is empty, clearing results")
-            }
-            // Update UI properties asynchronously to avoid blocking
-            Task { @MainActor in
-                self.searchResults = []
-                self.errorMessage = nil
-            }
+            B2BLog.search.debug("Search term is empty, clearing results")
+            searchResults = []
+            errorMessage = nil
             return
         }
 
@@ -104,10 +95,7 @@ class MusicSearchViewModel {
             self.isSearching = true
             self.errorMessage = nil
 
-            // Defer logging to avoid blocking
-            Task.detached(priority: .utility) {
-                await B2BLog.search.info("🔍 Performing search for: \(searchTerm)")
-            }
+            B2BLog.search.info("🔍 Performing search for: \(searchTerm)")
             let startTime = Date()
 
             do {
@@ -236,22 +224,12 @@ class MusicSearchViewModel {
 
     // MARK: - UI Actions
 
-    func clearSearchAsync() async {
-        Task.detached(priority: .utility) {
-            await B2BLog.ui.info("👤 Clear search")
-        }
-
-        // Cancel any pending search operations
+    func clearSearch() {
+        B2BLog.ui.info("👤 Clear search")
         searchTask?.cancel()
-
-        // Clear state asynchronously
-        await MainActor.run {
-            searchText = ""
-            searchResults = []
-            errorMessage = nil
-        }
-
-        // Clear the search pipeline
+        searchText = ""
+        searchResults = []
+        errorMessage = nil
         searchSubject.send("")
     }
 
@@ -260,9 +238,7 @@ class MusicSearchViewModel {
     /// Force cancels all pending operations (useful for view dismissal)
     func cancelAllOperations() {
         searchTask?.cancel()
-        Task.detached(priority: .utility) {
-            await B2BLog.search.info("Cancelled all pending search operations")
-        }
+        B2BLog.search.info("Cancelled all pending search operations")
     }
 
     /// Preloads search results for better perceived performance

@@ -66,11 +66,7 @@ enum OpenAIError: LocalizedError, CustomStringConvertible, Equatable {
 }
 
 // MARK: - Constants
-
-struct OpenAIConstants {
-    static let baseURL = "https://api.openai.com"
-    static let responsesEndpoint = "/v1/responses"
-}
+// OpenAIConstants moved to Services/OpenAI/Core/OpenAIConfig.swift
 
 // MARK: - Core Request/Response Models
 

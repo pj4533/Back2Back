@@ -12,7 +12,7 @@ import OSLog
 
 @MainActor
 @Observable
-final class SessionService {
+final class SessionService: SessionStateManagerProtocol {
     static let shared = SessionService()
 
     private(set) var sessionHistory: [SessionSong] = []

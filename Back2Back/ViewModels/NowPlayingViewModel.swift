@@ -10,10 +10,11 @@ import OSLog
 @Observable
 class NowPlayingViewModel {
     // MARK: - Private Properties
-    private let musicService = MusicService.shared
+    private let musicService: MusicServiceProtocol
 
     // MARK: - Initialization
-    init() {
+    init(musicService: MusicServiceProtocol = MusicService.shared) {
+        self.musicService = musicService
         // Log initialization only once
         B2BLog.ui.debug("Initializing NowPlayingViewModel")
     }

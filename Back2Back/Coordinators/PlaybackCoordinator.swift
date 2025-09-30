@@ -9,6 +9,7 @@
 import Foundation
 import MusicKit
 import Observation
+import Combine
 import OSLog
 
 /// Coordinates playback monitoring and song transition detection
@@ -19,6 +20,7 @@ final class PlaybackCoordinator {
     private let sessionService = SessionService.shared
 
     private var playbackObserverTask: Task<Void, Never>?
+    private var stateSubscription: AnyCancellable?
     private var lastPlaybackTime: TimeInterval = 0
     private var lastSongId: String? = nil
     private var hasTriggeredEndOfSong: Bool = false
@@ -29,10 +31,11 @@ final class PlaybackCoordinator {
     init() {
         B2BLog.session.debug("PlaybackCoordinator initialized")
         startPlaybackMonitoring()
+        setupStateObserver()
     }
 
     nonisolated deinit {
-        // Tasks will be cancelled automatically
+        // Tasks and subscriptions will be cancelled automatically
     }
 
     // MARK: - Public Methods
@@ -41,9 +44,37 @@ final class PlaybackCoordinator {
     func stopMonitoring() {
         playbackObserverTask?.cancel()
         playbackObserverTask = nil
+        stateSubscription?.cancel()
+        stateSubscription = nil
     }
 
     // MARK: - Playback Monitoring
+
+    /// Subscribe to ApplicationMusicPlayer state changes for reactive updates
+    private func setupStateObserver() {
+        // Observe player state changes to detect song transitions more efficiently
+        stateSubscription = ApplicationMusicPlayer.shared.state.objectWillChange
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.handleStateChange()
+                }
+            }
+        B2BLog.playback.debug("Subscribed to ApplicationMusicPlayer state changes")
+    }
+
+    /// Handle player state changes from Combine publisher
+    private func handleStateChange() async {
+        // Quick check for song transitions when state changes
+        if let nowPlaying = musicService.currentlyPlaying {
+            let currentSongId = nowPlaying.song.id.rawValue
+            if currentSongId != lastSongId {
+                B2BLog.playback.info("🎵 Song transition detected via state observer: \(nowPlaying.song.title)")
+                lastSongId = currentSongId
+                hasTriggeredEndOfSong = false
+                sessionService.updateCurrentlyPlayingSong(songId: currentSongId)
+            }
+        }
+    }
 
     private func startPlaybackMonitoring() {
         playbackObserverTask = Task { [weak self] in
@@ -51,10 +82,10 @@ final class PlaybackCoordinator {
 
             B2BLog.playback.debug("Starting playback monitoring")
 
-            // Create a timer that checks playback state periodically
+            // Reduced timer frequency: check every 0.5s instead of 1s for better responsiveness
             while !Task.isCancelled {
                 await self.checkPlaybackState()
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // Check every second
+                try? await Task.sleep(nanoseconds: 500_000_000) // Check every 0.5 seconds
             }
         }
     }
