@@ -340,12 +340,32 @@ struct AILoadingCell: View {
 
 struct SessionSongRow: View {
     let sessionSong: SessionSong
+    private let sessionViewModel = SessionViewModel.shared
+
     // Add computed property to force view updates when queue status changes
     private var statusId: String {
         "\(sessionSong.id)-\(sessionSong.queueStatus.description)"
     }
 
+    // Determine if this cell is tappable
+    private var isTappable: Bool {
+        sessionSong.queueStatus == .upNext || sessionSong.queueStatus == .queuedIfUserSkips
+    }
+
     var body: some View {
+        rowContent
+            .contentShape(Rectangle()) // Make entire cell tappable
+            .onTapGesture {
+                if isTappable {
+                    B2BLog.ui.info("User tapped queued song to skip ahead: \(sessionSong.song.title)")
+                    Task {
+                        await sessionViewModel.skipToQueuedSong(sessionSong)
+                    }
+                }
+            }
+    }
+
+    private var rowContent: some View {
         HStack(spacing: 12) {
             // Turn indicator
             Circle()

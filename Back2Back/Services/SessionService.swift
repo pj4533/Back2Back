@@ -229,6 +229,19 @@ final class SessionService {
             sessionSong.song.title.lowercased() == title.lowercased()
         }
     }
+
+    func removeQueuedSongsBeforeSong(_ songId: UUID) {
+        // Find the index of the target song
+        if let targetIndex = songQueue.firstIndex(where: { $0.id == songId }) {
+            // Remove all songs before this index
+            let removedSongs = songQueue.prefix(targetIndex)
+            songQueue.removeFirst(targetIndex)
+            B2BLog.session.info("Removed \(removedSongs.count) songs from queue (skipped ahead)")
+            for song in removedSongs {
+                B2BLog.session.debug("  Skipped: \(song.song.title) by \(song.song.artistName)")
+            }
+        }
+    }
 }
 
 struct SessionSong: Identifiable {

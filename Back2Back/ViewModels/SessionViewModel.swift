@@ -200,6 +200,50 @@ final class SessionViewModel {
         }
     }
 
+    func skipToQueuedSong(_ sessionSong: SessionSong) async {
+        B2BLog.session.info("⏩ User tapped to skip to queued song: \(sessionSong.song.title)")
+        B2BLog.session.debug("Queue state before skip - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
+
+        // Cancel any existing prefetch
+        if prefetchTask != nil {
+            B2BLog.session.debug("Cancelling existing AI prefetch task")
+            prefetchTask?.cancel()
+        }
+
+        // Mark the currently playing song as played (if there is one)
+        sessionService.markCurrentSongAsPlayed()
+
+        // Remove all songs before this one from the queue (they're being skipped)
+        sessionService.removeQueuedSongsBeforeSong(sessionSong.id)
+
+        // Move the tapped song from queue to history
+        sessionService.moveQueuedSongToHistory(sessionSong.id)
+
+        // Play the tapped song
+        await playCurrentSong(sessionSong.song)
+
+        // If this was an AI song, clear AI thinking state
+        if sessionSong.selectedBy == .ai {
+            B2BLog.session.info("🤖 Skipped to AI song, clearing AI thinking state")
+            sessionService.setAIThinking(false)
+        }
+
+        // Queue the next song based on who selected the current song
+        if sessionSong.selectedBy == .ai {
+            B2BLog.session.info("🤖 AI song now playing, queueing another AI selection to continue")
+            prefetchTask = Task.detached { [weak self] in
+                await self?.prefetchAndQueueAISong(queueStatus: .upNext)
+            }
+        } else {
+            B2BLog.session.info("👤 User song now playing, queueing AI selection as 'upNext'")
+            prefetchTask = Task.detached { [weak self] in
+                await self?.prefetchAndQueueAISong(queueStatus: .upNext)
+            }
+        }
+
+        B2BLog.session.debug("Queue state after skip - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
+    }
+
     // MARK: - Private Methods
 
     private func playCurrentSong(_ song: Song) async {
