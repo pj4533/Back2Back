@@ -181,21 +181,72 @@ class MusicService {
 
     func playSong(_ song: Song) async throws {
         B2BLog.playback.info("👤 Play song: \(song.title)")
+        B2BLog.playback.debug("   Song ID: \(song.id.rawValue)")
+        B2BLog.playback.debug("   Song contentRating: \(String(describing: song.contentRating))")
 
         do {
-            // Log current queue state before replacement
-            B2BLog.playback.debug("📝 Queue before replacement - entries: \(self.player.queue.entries.count)")
+            // Log current state before any changes
+            let beforeState = player.state.playbackStatus
+            let beforeQueueCount = player.queue.entries.count
+            B2BLog.playback.debug("📝 BEFORE setQueue:")
+            B2BLog.playback.debug("   - Player state: \(String(describing: beforeState))")
+            B2BLog.playback.debug("   - Queue entries: \(beforeQueueCount)")
 
+            // Create queue and set it
+            let setQueueStartTime = Date()
             player.queue = ApplicationMusicPlayer.Queue(for: [song])
+            let setQueueDuration = Date().timeIntervalSince(setQueueStartTime)
+            B2BLog.playback.debug("⏱️ setQueue completed in \(setQueueDuration)s")
 
-            // Log queue state after replacement
-            B2BLog.playback.debug("📝 Queue after replacement - entries: \(self.player.queue.entries.count)")
+            // Check queue state immediately after setQueue
+            let afterSetQueueCount = player.queue.entries.count
+            let afterSetQueueHasEntry = player.queue.currentEntry != nil
+            B2BLog.playback.debug("📝 IMMEDIATELY after setQueue:")
+            B2BLog.playback.debug("   - Queue entries: \(afterSetQueueCount)")
+            B2BLog.playback.debug("   - Has current entry: \(afterSetQueueHasEntry)")
 
+            // CRITICAL: Use prepareToPlay() to ensure the queue is ready before calling play()
+            // This is an async operation that loads and prepares the media
+            B2BLog.playback.debug("⏱️ Calling prepareToPlay()...")
+            let prepareStartTime = Date()
+            try await player.prepareToPlay()
+            let prepareDuration = Date().timeIntervalSince(prepareStartTime)
+            B2BLog.playback.debug("⏱️ prepareToPlay() completed in \(prepareDuration)s")
+
+            // Check queue state after prepareToPlay
+            let afterPrepareCount = player.queue.entries.count
+            let afterPrepareHasEntry = player.queue.currentEntry != nil
+            let afterPrepareState = player.state.playbackStatus
+            B2BLog.playback.debug("📝 AFTER prepareToPlay():")
+            B2BLog.playback.debug("   - Player state: \(String(describing: afterPrepareState))")
+            B2BLog.playback.debug("   - Queue entries: \(afterPrepareCount)")
+            B2BLog.playback.debug("   - Has current entry: \(afterPrepareHasEntry)")
+
+            // Verify queue is actually ready
+            guard player.queue.entries.count > 0 else {
+                B2BLog.playback.error("❌ Queue still empty after prepareToPlay() - song may not be available")
+                B2BLog.playback.error("   Song details: \(song.title) by \(song.artistName)")
+                B2BLog.playback.error("   Song ID: \(song.id.rawValue)")
+                throw MusicPlaybackError.queueFailed
+            }
+
+            // Now call play()
+            B2BLog.playback.debug("⏱️ Calling play()...")
+            let playStartTime = Date()
             try await player.play()
+            let playDuration = Date().timeIntervalSince(playStartTime)
+            B2BLog.playback.debug("⏱️ play() completed in \(playDuration)s")
+
+            // Log final state
+            let finalState = player.state.playbackStatus
+            B2BLog.playback.debug("📝 AFTER play():")
+            B2BLog.playback.debug("   - Player state: \(String(describing: finalState))")
+
             B2BLog.playback.info("✅ Started playback: \(song.title) by \(song.artistName)")
         } catch {
             let playbackError = MusicPlaybackError.playbackFailed(error)
             B2BLog.playback.error("❌ playSong: \(playbackError.localizedDescription)")
+            B2BLog.playback.error("   Error details: \(error)")
             throw playbackError
         }
     }
