@@ -124,9 +124,9 @@ final class SessionViewModel {
                     B2BLog.session.error("Failed to start playback: \(error)")
                 }
 
-                // Queue another AI song as backup in case user doesn't select
-                B2BLog.session.info("AI's first song playing - prefetching backup AI track")
-                aiSongCoordinator.startPrefetch(queueStatus: .queuedIfUserSkips)
+                // Note: We don't need to call startPrefetch here because
+                // handleSongAdvanced() will be called automatically when playback starts
+                // and it will queue the next AI song with the correct status
             }
         } catch {
             B2BLog.ai.error("❌ Failed to start AI first: \(error)")
