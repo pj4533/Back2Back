@@ -97,6 +97,8 @@ class SongSelectionService {
         2. Reflects your DJ persona's taste
         3. Doesn't repeat any previous songs
         4. Avoids recently selected songs from your past sessions
+        5. AVOID playing the same artist back-to-back whenever possible
+        6. IMPORTANT: Avoid selecting songs that are explicitly mentioned in your style guide. Those songs should only be played occasionally, after many other selections. The goal is to SURPRISE with songs that fit the persona but aren't directly mentioned - songs that are similar in spirit but not the obvious choices the user already knows about.
 
         You MUST respond with ONLY a valid JSON object (no markdown, no extra text) in this exact format:
         {"artist": "Artist Name", "song": "Song Title", "rationale": "Brief explanation of your choice"}
