@@ -33,7 +33,16 @@ final class MusicPlaybackService {
     // MARK: - Playback Observers
 
     private func setupPlaybackObservers() {
+        // Observe playback state changes (play/pause/stop)
         player.state.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updatePlaybackState()
+            }
+            .store(in: &cancellables)
+
+        // Observe queue changes (song advancement)
+        player.queue.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 self?.updatePlaybackState()
