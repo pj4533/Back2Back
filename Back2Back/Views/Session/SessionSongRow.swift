@@ -100,6 +100,12 @@ struct SessionSongRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
+                if !songMetadata.isEmpty {
+                    Text(songMetadata)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
                 if let rationale = sessionSong.rationale {
                     Text(rationale)
                         .font(.caption)
@@ -109,18 +115,12 @@ struct SessionSongRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Timestamp or queue indicator
-            VStack(alignment: .trailing, spacing: 2) {
-                if sessionSong.queueStatus == .played {
-                    Text(formatTime(sessionSong.timestamp))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                } else if sessionSong.queueStatus == .queuedIfUserSkips {
-                    // Additional visual hint for conditional queue
-                    Image(systemName: "questionmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
+            // Queue indicator
+            if sessionSong.queueStatus == .queuedIfUserSkips {
+                // Additional visual hint for conditional queue
+                Image(systemName: "questionmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
         }
         .padding()
@@ -146,9 +146,31 @@ struct SessionSongRow: View {
         .opacity(sessionSong.queueStatus == .queuedIfUserSkips ? 0.85 : 1.0)
     }
 
-    private func formatTime(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+    private func formatReleaseYear() -> String? {
+        guard let releaseDate = sessionSong.song.releaseDate else { return nil }
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: releaseDate)
+        return String(year)
+    }
+
+    private func formatDuration() -> String? {
+        guard let duration = sessionSong.song.duration else { return nil }
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    private var songMetadata: String {
+        var components: [String] = []
+
+        if let year = formatReleaseYear() {
+            components.append(year)
+        }
+
+        if let duration = formatDuration() {
+            components.append(duration)
+        }
+
+        return components.joined(separator: " • ")
     }
 }
