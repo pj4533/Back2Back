@@ -109,4 +109,16 @@ class MusicService: MusicServiceProtocol {
     func getCurrentPlaybackTime() -> TimeInterval {
         playbackService.getCurrentPlaybackTime()
     }
+
+    func seek(to time: TimeInterval) async throws {
+        try await playbackService.seek(to: time)
+    }
+
+    func skipForward(_ seconds: TimeInterval = 15) async throws {
+        try await playbackService.skipForward(seconds)
+    }
+
+    func skipBackward(_ seconds: TimeInterval = 15) async throws {
+        try await playbackService.skipBackward(seconds)
+    }
 }

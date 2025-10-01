@@ -53,4 +53,51 @@ struct MusicServiceTests {
         let expectedAuthorized = service.authorizationStatus == .authorized
         #expect(service.isAuthorized == expectedAuthorized)
     }
+
+    // MARK: - Seek and Skip Tests
+
+    @Test func getCurrentPlaybackTimeReturnsNonNegativeValue() async throws {
+        let service = MusicService.shared
+        let time = service.getCurrentPlaybackTime()
+        #expect(time >= 0)
+    }
+
+    @Test func seekToZeroDoesNotThrowWhenNoCurrentEntry() async throws {
+        let service = MusicService.shared
+        service.clearQueue()
+
+        do {
+            try await service.seek(to: 0)
+            Issue.record("Expected seek to throw when no current entry")
+        } catch {
+            // Expected to throw MusicPlaybackError.queueFailed
+            #expect(error is MusicPlaybackError)
+        }
+    }
+
+    @Test func skipForwardDoesNotThrowWhenNoCurrentEntry() async throws {
+        let service = MusicService.shared
+        service.clearQueue()
+
+        do {
+            try await service.skipForward(15)
+            Issue.record("Expected skipForward to throw when no current entry")
+        } catch {
+            // Expected to throw MusicPlaybackError.queueFailed
+            #expect(error is MusicPlaybackError)
+        }
+    }
+
+    @Test func skipBackwardDoesNotThrowWhenNoCurrentEntry() async throws {
+        let service = MusicService.shared
+        service.clearQueue()
+
+        do {
+            try await service.skipBackward(15)
+            Issue.record("Expected skipBackward to throw when no current entry")
+        } catch {
+            // Expected to throw MusicPlaybackError.queueFailed
+            #expect(error is MusicPlaybackError)
+        }
+    }
 }

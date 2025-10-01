@@ -35,6 +35,10 @@ class MockMusicService: MusicServiceProtocol {
         return searchResults
     }
 
+    func searchCatalogWithPagination(for searchTerm: String, pageSize: Int = 25, maxResults: Int = 200) async throws -> [MusicSearchResult] {
+        return try await searchCatalog(for: searchTerm, limit: pageSize)
+    }
+
     func playSong(_ song: Song) async throws {
         playSongCalled = true
         lastPlayedSong = song
@@ -64,5 +68,17 @@ class MockMusicService: MusicServiceProtocol {
 
     func getCurrentPlaybackTime() -> TimeInterval {
         return 0
+    }
+
+    func seek(to time: TimeInterval) async throws {
+        // Mock implementation
+    }
+
+    func skipForward(_ seconds: TimeInterval = 15) async throws {
+        // Mock implementation
+    }
+
+    func skipBackward(_ seconds: TimeInterval = 15) async throws {
+        // Mock implementation
     }
 }

@@ -219,4 +219,64 @@ final class MusicPlaybackService {
         // Return the current real-time playback position
         return player.playbackTime
     }
+
+    // MARK: - Seek Controls
+
+    /// Seek to a specific time position in the current track
+    func seek(to time: TimeInterval) async throws {
+        B2BLog.playback.info("⏩ Seeking to \(time)s")
+
+        guard let _ = player.queue.currentEntry else {
+            B2BLog.playback.warning("Cannot seek - no current entry")
+            throw MusicPlaybackError.queueFailed
+        }
+
+        // Clamp time to valid range
+        let clampedTime = max(0, min(time, currentDuration))
+        player.playbackTime = clampedTime
+
+        B2BLog.playback.debug("✅ Seeked to \(clampedTime)s")
+    }
+
+    /// Skip forward by a specified number of seconds (default: 15s)
+    func skipForward(_ seconds: TimeInterval = 15) async throws {
+        B2BLog.playback.info("⏭️ Skip forward \(seconds)s")
+
+        guard let _ = player.queue.currentEntry else {
+            B2BLog.playback.warning("Cannot skip forward - no current entry")
+            throw MusicPlaybackError.queueFailed
+        }
+
+        let newTime = min(player.playbackTime + seconds, currentDuration)
+        player.playbackTime = newTime
+
+        B2BLog.playback.debug("✅ Skipped forward to \(newTime)s")
+    }
+
+    /// Skip backward by a specified number of seconds (default: 15s)
+    func skipBackward(_ seconds: TimeInterval = 15) async throws {
+        B2BLog.playback.info("⏮️ Skip backward \(seconds)s")
+
+        guard let _ = player.queue.currentEntry else {
+            B2BLog.playback.warning("Cannot skip backward - no current entry")
+            throw MusicPlaybackError.queueFailed
+        }
+
+        let newTime = max(player.playbackTime - seconds, 0)
+        player.playbackTime = newTime
+
+        B2BLog.playback.debug("✅ Skipped backward to \(newTime)s")
+    }
+
+    // MARK: - Private Helpers
+
+    /// Get the duration of the current track
+    private var currentDuration: TimeInterval {
+        guard let currentEntry = player.queue.currentEntry,
+              case .song(let song) = currentEntry.item,
+              let duration = song.duration else {
+            return 0
+        }
+        return duration
+    }
 }
