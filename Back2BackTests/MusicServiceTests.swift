@@ -31,7 +31,6 @@ struct MusicServiceTests {
 
     @Test func searchWithEmptyTermDoesNotTriggerSearching() async throws {
         let service = MusicService.shared
-        service.isSearching = false
         try await service.searchCatalog(for: "")
         #expect(!service.isSearching)
     }
