@@ -68,6 +68,18 @@ class MusicService: MusicServiceProtocol {
         try await searchService.searchCatalog(for: searchTerm, limit: limit)
     }
 
+    func searchCatalogWithPagination(
+        for searchTerm: String,
+        pageSize: Int = 25,
+        maxResults: Int = 200
+    ) async throws -> [MusicSearchResult] {
+        try await searchService.searchCatalogWithPagination(
+            for: searchTerm,
+            pageSize: pageSize,
+            maxResults: maxResults
+        )
+    }
+
     // MARK: - Playback (delegated to MusicPlaybackService)
 
     func playSong(_ song: Song) async throws {

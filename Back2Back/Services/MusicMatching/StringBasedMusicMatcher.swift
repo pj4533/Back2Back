@@ -23,15 +23,22 @@ final class StringBasedMusicMatcher: MusicMatchingProtocol {
     func searchAndMatch(recommendation: SongRecommendation) async throws -> Song? {
         B2BLog.musicKit.info("Searching for: \(recommendation.song) by \(recommendation.artist)")
 
-        // Try exact search first
-        var searchResults = try await musicService.searchCatalog(
-            for: "\(recommendation.artist) \(recommendation.song)"
+        // Use paginated search to get up to 200 results before giving up
+        // This ensures we don't miss obscure tracks that might be listed after the first 25 results
+        var searchResults = try await musicService.searchCatalogWithPagination(
+            for: "\(recommendation.artist) \(recommendation.song)",
+            pageSize: 25,
+            maxResults: 200
         )
 
         if searchResults.isEmpty {
             // Try with just song title
             B2BLog.musicKit.debug("No results from combined search, trying title-only search")
-            searchResults = try await musicService.searchCatalog(for: recommendation.song)
+            searchResults = try await musicService.searchCatalogWithPagination(
+                for: recommendation.song,
+                pageSize: 25,
+                maxResults: 200
+            )
         }
 
         if searchResults.isEmpty {
@@ -60,7 +67,7 @@ final class StringBasedMusicMatcher: MusicMatchingProtocol {
 
         // Return nil instead of blindly accepting first result
         // This allows the AI to retry with a different recommendation
-        B2BLog.musicKit.warning("❌ No good match found for: '\(recommendation.song)' by '\(recommendation.artist)'")
+        B2BLog.musicKit.warning("❌ No good match found for: '\(recommendation.song)' by '\(recommendation.artist)' after searching \(searchResults.count) results")
         B2BLog.musicKit.debug("First result was: '\(searchResults.first?.song.title ?? "none")' by '\(searchResults.first?.song.artistName ?? "none")'")
         return nil
     }
