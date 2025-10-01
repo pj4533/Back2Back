@@ -9,7 +9,7 @@ import OSLog
 /// Uses Combine for debouncing to avoid excessive Task creation
 @MainActor
 @Observable
-class MusicSearchViewModel {
+class MusicSearchViewModel: ViewModelError {
     // MARK: - Observable State
     // Remove didSet to prevent synchronous updates
     var searchText: String = ""
@@ -84,7 +84,7 @@ class MusicSearchViewModel {
         guard !searchTerm.isEmpty else {
             B2BLog.search.debug("Search term is empty, clearing results")
             searchResults = []
-            errorMessage = nil
+            clearError()
             return
         }
 
@@ -94,7 +94,7 @@ class MusicSearchViewModel {
 
             // Update UI state
             self.isSearching = true
-            self.errorMessage = nil
+            self.clearError()
 
             B2BLog.search.info("🔍 Performing search for: \(searchTerm)")
             let startTime = Date()
@@ -127,10 +127,7 @@ class MusicSearchViewModel {
                 }
                 self.isSearching = false
             } catch {
-                Task.detached(priority: .utility) {
-                    await B2BLog.search.error("❌ MusicSearchViewModel.performSearch: \(error.localizedDescription)")
-                }
-                self.errorMessage = "Search failed: \(error.localizedDescription)"
+                self.handleError(error, userMessage: "Search failed", context: "MusicSearchViewModel.performSearch")
                 self.searchResults = []
                 self.isSearching = false
             }
@@ -160,12 +157,9 @@ class MusicSearchViewModel {
             }
             do {
                 try await musicService.playSong(song)
-                errorMessage = nil
+                clearError()
             } catch {
-                errorMessage = "Failed to play song: \(error.localizedDescription)"
-                Task.detached(priority: .utility) {
-                    await B2BLog.playback.error("❌ MusicSearchViewModel.selectSong: \(error.localizedDescription)")
-                }
+                handleError(error, userMessage: "Failed to play song", context: "MusicSearchViewModel.selectSong")
             }
         }
     }
@@ -175,10 +169,7 @@ class MusicSearchViewModel {
             do {
                 try await musicService.togglePlayPause()
             } catch {
-                errorMessage = "Playback control failed: \(error.localizedDescription)"
-                Task.detached(priority: .utility) {
-                    await B2BLog.playback.error("❌ MusicSearchViewModel.togglePlayPause: \(error.localizedDescription)")
-                }
+                handleError(error, userMessage: "Playback control failed", context: "MusicSearchViewModel.togglePlayPause")
             }
         }
     }
@@ -188,10 +179,7 @@ class MusicSearchViewModel {
             do {
                 try await musicService.skipToNext()
             } catch {
-                errorMessage = "Failed to skip to next song"
-                Task.detached(priority: .utility) {
-                    await B2BLog.playback.warning("Failed to skip to next song")
-                }
+                handleError(error, userMessage: "Failed to skip to next song", context: "MusicSearchViewModel.skipToNext")
             }
         }
     }
@@ -201,10 +189,7 @@ class MusicSearchViewModel {
             do {
                 try await musicService.skipToPrevious()
             } catch {
-                errorMessage = "Failed to skip to previous song"
-                Task.detached(priority: .utility) {
-                    await B2BLog.playback.warning("Failed to skip to previous song")
-                }
+                handleError(error, userMessage: "Failed to skip to previous song", context: "MusicSearchViewModel.skipToPrevious")
             }
         }
     }
@@ -230,7 +215,7 @@ class MusicSearchViewModel {
         searchTask?.cancel()
         searchText = ""
         searchResults = []
-        errorMessage = nil
+        clearError()
         searchSubject.send("")
     }
 

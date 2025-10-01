@@ -45,25 +45,18 @@ final class AISongCoordinator {
         sessionService.setAIThinking(true)
         defer { sessionService.setAIThinking(false) }
 
-        let recommendation = try await selectAISong()
-        B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
-
-        if let song = await searchAndMatchSong(recommendation) {
-            return song
-        } else {
-            // No good match found - retry once
-            B2BLog.ai.warning("⚠️ No good match found for AI start, retrying with new selection")
-
-            let retryRecommendation = try await selectAISong()
-            B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
-
-            if let retrySong = await searchAndMatchSong(retryRecommendation) {
-                return retrySong
-            } else {
-                B2BLog.ai.error("❌ AI retry also failed to find matching song for start")
-                return nil
+        return try await AIRetryStrategy.executeWithRetry(
+            operation: {
+                let recommendation = try await self.selectAISong()
+                B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
+                return await self.searchAndMatchSong(recommendation)
+            },
+            retryOperation: {
+                let retryRecommendation = try await self.selectAISong()
+                B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
+                return await self.searchAndMatchSong(retryRecommendation)
             }
-        }
+        )
     }
 
     /// Prefetch and queue AI song for specified queue position
@@ -73,32 +66,60 @@ final class AISongCoordinator {
         sessionService.setAIThinking(true)
 
         do {
-            let recommendation = try await selectAISong()
-            B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
-            B2BLog.ai.debug("Rationale: \(recommendation.rationale)")
+            // Use retry strategy to handle song selection and matching
+            let result: (Song, String)? = try await AIRetryStrategy.executeWithRetry(
+                operation: {
+                    let recommendation = try await self.selectAISong()
+                    B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
+                    B2BLog.ai.debug("Rationale: \(recommendation.rationale)")
 
-            // Check if user selected a song while AI was thinking
-            if userHasSelectedSong() {
-                B2BLog.ai.info("⏭️ User selected a song while AI was prefetching - cancelling AI selection")
-                sessionService.setAIThinking(false)
-                return
-            }
+                    // Check if user selected a song while AI was thinking
+                    if self.userHasSelectedSong() {
+                        B2BLog.ai.info("⏭️ User selected a song while AI was prefetching - cancelling AI selection")
+                        return nil
+                    }
 
-            if let song = await searchAndMatchSong(recommendation) {
-                // Double-check again after search
-                if userHasSelectedSong() {
-                    B2BLog.ai.info("⏭️ User selected a song during AI search - cancelling AI selection")
-                    sessionService.setAIThinking(false)
-                    return
+                    if let song = await self.searchAndMatchSong(recommendation) {
+                        // Double-check again after search
+                        if self.userHasSelectedSong() {
+                            B2BLog.ai.info("⏭️ User selected a song during AI search - cancelling AI selection")
+                            return nil
+                        }
+                        return (song, recommendation.rationale)
+                    }
+                    return nil
+                },
+                retryOperation: {
+                    // Check if user selected during the failed attempt
+                    if self.userHasSelectedSong() {
+                        B2BLog.ai.info("⏭️ User selected a song during failed search - cancelling AI retry")
+                        return nil
+                    }
+
+                    let retryRecommendation = try await self.selectAISong()
+                    B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
+                    B2BLog.ai.debug("Retry rationale: \(retryRecommendation.rationale)")
+
+                    if let retrySong = await self.searchAndMatchSong(retryRecommendation) {
+                        // Final check if user selected during retry
+                        if self.userHasSelectedSong() {
+                            B2BLog.ai.info("⏭️ User selected a song during AI retry - cancelling AI selection")
+                            return nil
+                        }
+                        return (retrySong, retryRecommendation.rationale)
+                    }
+                    return nil
                 }
+            )
 
-                queueAISong(song, rationale: recommendation.rationale, queueStatus: queueStatus)
+            // If we got a result, queue the song
+            if let (song, rationale) = result {
+                queueAISong(song, rationale: rationale, queueStatus: queueStatus)
                 B2BLog.ai.info("✅ Successfully queued AI song: \(song.title) as \(queueStatus)")
                 B2BLog.session.debug("Queue after AI selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-            } else {
-                // No good match found - retry with a new AI recommendation
-                try await handleRetry(queueStatus: queueStatus)
             }
+
+            sessionService.setAIThinking(false)
         } catch {
             B2BLog.ai.error("❌ Failed to fetch and queue AI song: \(error)")
             sessionService.setAIThinking(false)
@@ -123,38 +144,6 @@ final class AISongCoordinator {
     }
 
     // MARK: - Private Methods
-
-    private func handleRetry(queueStatus: QueueStatus) async throws {
-        B2BLog.ai.warning("⚠️ No good match found for AI recommendation, retrying with new selection")
-
-        // Check if user selected during the failed attempt
-        if userHasSelectedSong() {
-            B2BLog.ai.info("⏭️ User selected a song during failed search - cancelling AI retry")
-            sessionService.setAIThinking(false)
-            return
-        }
-
-        // Retry once with a new recommendation
-        let retryRecommendation = try await selectAISong()
-        B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
-        B2BLog.ai.debug("Retry rationale: \(retryRecommendation.rationale)")
-
-        if let retrySong = await searchAndMatchSong(retryRecommendation) {
-            // Final check if user selected during retry
-            if userHasSelectedSong() {
-                B2BLog.ai.info("⏭️ User selected a song during AI retry - cancelling AI selection")
-                sessionService.setAIThinking(false)
-                return
-            }
-
-            queueAISong(retrySong, rationale: retryRecommendation.rationale, queueStatus: queueStatus)
-            B2BLog.ai.info("✅ Successfully queued AI retry song: \(retrySong.title) as \(queueStatus)")
-            B2BLog.session.debug("Queue after AI retry - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-        } else {
-            B2BLog.ai.error("❌ AI retry also failed to find matching song - giving up")
-            sessionService.setAIThinking(false)
-        }
-    }
 
     private func queueAISong(_ song: Song, rationale: String?, queueStatus: QueueStatus) {
         B2BLog.ai.info("Queueing AI song: \(song.title) with status: \(queueStatus)")

@@ -6,7 +6,7 @@ import OSLog
 
 @MainActor
 @Observable
-class MusicAuthViewModel {
+class MusicAuthViewModel: ViewModelError {
     var authorizationStatus: MusicAuthorization.Status = .notDetermined
     var isAuthorized: Bool = false
     var errorMessage: String?
@@ -34,15 +34,14 @@ class MusicAuthViewModel {
         Task {
             B2BLog.auth.info("👤 User action: Request music authorization")
             isRequestingAuthorization = true
-            errorMessage = nil
+            clearError()
 
             do {
                 try await musicService.requestAuthorization()
                 checkCurrentAuthorizationStatus()
                 B2BLog.auth.info("✅ Authorization request completed")
             } catch {
-                errorMessage = error.localizedDescription
-                B2BLog.auth.error("❌ MusicAuthViewModel.requestAuthorization: \(error.localizedDescription)")
+                handleError(error, context: "Authorization request failed")
             }
 
             isRequestingAuthorization = false

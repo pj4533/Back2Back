@@ -50,21 +50,6 @@ struct ContentView: View {
             .tag(2)
         }
     }
-
-    private func checkAuthorizationStatus() {
-        Task {
-            let status = MusicAuthorization.currentStatus
-            B2BLog.auth.debug("Checking authorization status on app launch: \(String(describing: status))")
-            if status == .notDetermined {
-                B2BLog.auth.info("Authorization not determined, requesting...")
-                do {
-                    try await musicService.requestAuthorization()
-                } catch {
-                    B2BLog.auth.error("❌ ContentView.checkAuthorizationStatus: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
 }
 
 #Preview {
