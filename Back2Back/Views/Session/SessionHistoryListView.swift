@@ -38,6 +38,7 @@ struct SessionHistoryListView: View {
                         // Show AI loading cell if AI is thinking
                         if sessionService.isAIThinking {
                             AILoadingCell()
+                                .id("ai-loading")
                                 .transition(.asymmetric(
                                     insertion: .scale.combined(with: .opacity),
                                     removal: .scale.combined(with: .opacity)
@@ -59,10 +60,12 @@ struct SessionHistoryListView: View {
                     .padding()
                     .animation(.spring(response: 0.3), value: sessionService.sessionHistory.count + sessionService.songQueue.count + (sessionService.isAIThinking ? 1 : 0))
                 }
-                .onChange(of: sessionService.sessionHistory.count + sessionService.songQueue.count) { _, _ in
+                .onChange(of: sessionService.sessionHistory.count + sessionService.songQueue.count + (sessionService.isAIThinking ? 1 : 0)) { _, _ in
                     withAnimation {
-                        // Scroll to last item (whether in history or queue)
-                        if let lastQueued = sessionService.songQueue.last {
+                        // Scroll to last item (whether AI loading, queue, or history)
+                        if sessionService.isAIThinking {
+                            proxy.scrollTo("ai-loading", anchor: .bottom)
+                        } else if let lastQueued = sessionService.songQueue.last {
                             proxy.scrollTo(lastQueued.id, anchor: .bottom)
                         } else if let lastHistory = sessionService.sessionHistory.last {
                             proxy.scrollTo(lastHistory.id, anchor: .bottom)
