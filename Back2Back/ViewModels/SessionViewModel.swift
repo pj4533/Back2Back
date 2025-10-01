@@ -153,9 +153,9 @@ final class SessionViewModel {
             B2BLog.session.error("Failed to skip to queued song in MusicKit: \(error)")
         }
 
-        // Queue the next song based on who selected the current song
-        let queueStatus = turnManager.determineNextQueueStatus(after: sessionSong.selectedBy)
-        aiSongCoordinator.startPrefetch(queueStatus: queueStatus)
+        // Note: We don't need to call startPrefetch here because
+        // handleSongAdvanced() will be called automatically when the queue advances
+        // and it will queue the next AI song with the correct status
     }
 
     // MARK: - Private Methods
