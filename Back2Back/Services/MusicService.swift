@@ -64,7 +64,7 @@ class MusicService: MusicServiceProtocol {
 
     // MARK: - Search (delegated to MusicSearchService)
 
-    func searchCatalog(for searchTerm: String, limit: Int = 25) async throws {
+    func searchCatalog(for searchTerm: String, limit: Int = 25) async throws -> [MusicSearchResult] {
         try await searchService.searchCatalog(for: searchTerm, limit: limit)
     }
 

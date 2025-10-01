@@ -23,13 +23,14 @@ final class MusicSearchService {
     }
 
     /// Search the Apple Music catalog
-    func searchCatalog(for searchTerm: String, limit: Int = 25) async throws {
+    func searchCatalog(for searchTerm: String, limit: Int = 25) async throws -> [MusicSearchResult] {
         guard !searchTerm.isEmpty else {
-            B2BLog.search.debug("Empty search term, clearing results")
+            B2BLog.search.debug("Empty search term, returning empty results")
             await MainActor.run {
                 searchResults = []
+                isSearching = false
             }
-            return
+            return []
         }
 
         B2BLog.search.info("🔍 Searching for: \(searchTerm)")
@@ -56,6 +57,8 @@ final class MusicSearchService {
                 searchResults = results
                 isSearching = false
             }
+
+            return results
         } catch {
             B2BLog.search.error("❌ searchCatalog: \(error.localizedDescription)")
             await MainActor.run {

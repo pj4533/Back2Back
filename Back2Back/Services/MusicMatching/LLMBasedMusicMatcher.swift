@@ -26,15 +26,12 @@ final class LLMBasedMusicMatcher: MusicMatchingProtocol {
         B2BLog.musicKit.info("LLM-based matching for: \(recommendation.song) by \(recommendation.artist)")
 
         // Perform MusicKit search
-        try await musicService.searchCatalog(
+        var searchResults = try await musicService.searchCatalog(
             for: "\(recommendation.artist) \(recommendation.song)"
         )
 
-        var searchResults = musicService.searchResults
-
         if searchResults.isEmpty {
-            try await musicService.searchCatalog(for: recommendation.song)
-            searchResults = musicService.searchResults
+            searchResults = try await musicService.searchCatalog(for: recommendation.song)
         }
 
         if searchResults.isEmpty {

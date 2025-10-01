@@ -24,17 +24,14 @@ final class StringBasedMusicMatcher: MusicMatchingProtocol {
         B2BLog.musicKit.info("Searching for: \(recommendation.song) by \(recommendation.artist)")
 
         // Try exact search first
-        try await musicService.searchCatalog(
+        var searchResults = try await musicService.searchCatalog(
             for: "\(recommendation.artist) \(recommendation.song)"
         )
-
-        var searchResults = musicService.searchResults
 
         if searchResults.isEmpty {
             // Try with just song title
             B2BLog.musicKit.debug("No results from combined search, trying title-only search")
-            try await musicService.searchCatalog(for: recommendation.song)
-            searchResults = musicService.searchResults
+            searchResults = try await musicService.searchCatalog(for: recommendation.song)
         }
 
         if searchResults.isEmpty {

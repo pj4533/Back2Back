@@ -23,15 +23,16 @@ struct MusicServiceTests {
         #expect(service.authorizationStatus == MusicAuthorization.currentStatus)
     }
 
-    @Test func searchWithEmptyTermClearsResults() async throws {
+    @Test func searchWithEmptyTermReturnsEmptyResults() async throws {
         let service = MusicService.shared
-        try await service.searchCatalog(for: "")
+        let results = try await service.searchCatalog(for: "")
+        #expect(results.isEmpty)
         #expect(service.searchResults.isEmpty)
     }
 
     @Test func searchWithEmptyTermDoesNotTriggerSearching() async throws {
         let service = MusicService.shared
-        try await service.searchCatalog(for: "")
+        _ = try await service.searchCatalog(for: "")
         #expect(!service.isSearching)
     }
 

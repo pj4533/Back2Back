@@ -25,13 +25,14 @@ class MockMusicService: MusicServiceProtocol {
         authorizationStatus = .authorized
     }
 
-    func searchCatalog(for searchTerm: String, limit: Int = 25) async throws {
+    func searchCatalog(for searchTerm: String, limit: Int = 25) async throws -> [MusicSearchResult] {
         searchCatalogCalled = true
         lastSearchTerm = searchTerm
         isSearching = true
         // Simulate delay
         try? await Task.sleep(nanoseconds: 100_000_000)
         isSearching = false
+        return searchResults
     }
 
     func playSong(_ song: Song) async throws {

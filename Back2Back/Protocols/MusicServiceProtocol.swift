@@ -11,7 +11,7 @@ protocol MusicServiceProtocol {
     var playbackState: ApplicationMusicPlayer.PlaybackStatus { get }
 
     func requestAuthorization() async throws
-    func searchCatalog(for searchTerm: String, limit: Int) async throws
+    func searchCatalog(for searchTerm: String, limit: Int) async throws -> [MusicSearchResult]
     func playSong(_ song: Song) async throws
     func addToQueue(_ song: Song) async throws
     func togglePlayPause() async throws
