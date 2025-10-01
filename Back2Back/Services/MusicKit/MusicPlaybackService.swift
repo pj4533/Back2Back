@@ -21,6 +21,7 @@ final class MusicPlaybackService {
     var currentSongId: String? = nil
 
     private let player = ApplicationMusicPlayer.shared
+    private let queueSync = QueueSynchronizationService.shared
     private var cancellables = Set<AnyCancellable>()
     private var lastLoggedSongId: String?
 
@@ -98,91 +99,45 @@ final class MusicPlaybackService {
 
     // MARK: - Playback Control
 
-    /// Play a specific song
-    func playSong(_ song: Song) async throws {
-        B2BLog.playback.info("👤 Play song: \(song.title)")
+    /// Start playback with a song (used for first song or when queue is empty)
+    /// Delegates to QueueSynchronizationService for queue management
+    func startPlayback(with song: Song) async throws {
+        B2BLog.playback.info("👤 Start playback: \(song.title)")
         B2BLog.playback.debug("   Song ID: \(song.id.rawValue)")
-        B2BLog.playback.debug("   Song contentRating: \(String(describing: song.contentRating))")
 
         do {
-            // Log current state before any changes
-            let beforeState = player.state.playbackStatus
-            let beforeQueueCount = player.queue.entries.count
-            B2BLog.playback.debug("📝 BEFORE setQueue:")
-            B2BLog.playback.debug("   - Player state: \(String(describing: beforeState))")
-            B2BLog.playback.debug("   - Queue entries: \(beforeQueueCount)")
-
-            // Create queue and set it
-            let setQueueStartTime = Date()
-            player.queue = ApplicationMusicPlayer.Queue(for: [song])
-            let setQueueDuration = Date().timeIntervalSince(setQueueStartTime)
-            B2BLog.playback.debug("⏱️ setQueue completed in \(setQueueDuration)s")
-
-            // Check queue state immediately after setQueue
-            let afterSetQueueCount = player.queue.entries.count
-            let afterSetQueueHasEntry = player.queue.currentEntry != nil
-            B2BLog.playback.debug("📝 IMMEDIATELY after setQueue:")
-            B2BLog.playback.debug("   - Queue entries: \(afterSetQueueCount)")
-            B2BLog.playback.debug("   - Has current entry: \(afterSetQueueHasEntry)")
-
-            // CRITICAL: Use prepareToPlay() to ensure the queue is ready before calling play()
-            // This is an async operation that loads and prepares the media
-            B2BLog.playback.debug("⏱️ Calling prepareToPlay()...")
-            let prepareStartTime = Date()
-            try await player.prepareToPlay()
-            let prepareDuration = Date().timeIntervalSince(prepareStartTime)
-            B2BLog.playback.debug("⏱️ prepareToPlay() completed in \(prepareDuration)s")
-
-            // Check queue state after prepareToPlay
-            let afterPrepareCount = player.queue.entries.count
-            let afterPrepareHasEntry = player.queue.currentEntry != nil
-            let afterPrepareState = player.state.playbackStatus
-            B2BLog.playback.debug("📝 AFTER prepareToPlay():")
-            B2BLog.playback.debug("   - Player state: \(String(describing: afterPrepareState))")
-            B2BLog.playback.debug("   - Queue entries: \(afterPrepareCount)")
-            B2BLog.playback.debug("   - Has current entry: \(afterPrepareHasEntry)")
-
-            // Verify queue is actually ready
-            guard player.queue.entries.count > 0 else {
-                B2BLog.playback.error("❌ Queue still empty after prepareToPlay() - song may not be available")
-                B2BLog.playback.error("   Song details: \(song.title) by \(song.artistName)")
-                B2BLog.playback.error("   Song ID: \(song.id.rawValue)")
-                throw MusicPlaybackError.queueFailed
-            }
-
-            // Now call play()
-            B2BLog.playback.debug("⏱️ Calling play()...")
-            let playStartTime = Date()
-            try await player.play()
-            let playDuration = Date().timeIntervalSince(playStartTime)
-            B2BLog.playback.debug("⏱️ play() completed in \(playDuration)s")
-
-            // Log final state
-            let finalState = player.state.playbackStatus
-            B2BLog.playback.debug("📝 AFTER play():")
-            B2BLog.playback.debug("   - Player state: \(String(describing: finalState))")
-
+            // Delegate to QueueSynchronizationService
+            try await queueSync.addToQueue(song)
             B2BLog.playback.info("✅ Started playback: \(song.title) by \(song.artistName)")
         } catch {
             let playbackError = MusicPlaybackError.playbackFailed(error)
-            B2BLog.playback.error("❌ playSong: \(playbackError.localizedDescription)")
+            B2BLog.playback.error("❌ startPlayback: \(playbackError.localizedDescription)")
             B2BLog.playback.error("   Error details: \(error)")
             throw playbackError
         }
     }
 
-    /// Add a song to the playback queue
-    func addToQueue(_ song: Song) async throws {
-        B2BLog.playback.info("➕ Adding to queue: \(song.title)")
+    /// Add a song to the playback queue (used for subsequent songs)
+    /// Delegates to QueueSynchronizationService for queue management
+    func queueNextSong(_ song: Song) async throws {
+        B2BLog.playback.info("➕ Queue next song: \(song.title)")
 
         do {
-            try await player.queue.insert(song, position: .tail)
-            B2BLog.playback.info("✅ Added to queue: \(song.title)")
+            // Delegate to QueueSynchronizationService
+            try await queueSync.addToQueue(song)
+            B2BLog.playback.info("✅ Queued next song: \(song.title)")
         } catch {
             let queueError = MusicPlaybackError.queueFailed
-            B2BLog.playback.error("❌ addToQueue: \(queueError.localizedDescription)")
+            B2BLog.playback.error("❌ queueNextSong: \(queueError.localizedDescription)")
             throw queueError
         }
+    }
+
+    /// Play a specific song (backward compatibility wrapper)
+    /// Uses startPlayback internally
+    @available(*, deprecated, message: "Use startPlayback(with:) or queueNextSong(_:) instead")
+    func playSong(_ song: Song) async throws {
+        try await startPlayback(with: song)
     }
 
     /// Toggle play/pause

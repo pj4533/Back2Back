@@ -23,28 +23,28 @@ final class SessionViewModel {
     private let sessionService: SessionService
 
     // Coordinators handle specific responsibilities
-    private let playbackCoordinator: PlaybackCoordinator
+    private let queueSync: QueueSynchronizationService
     private let aiSongCoordinator: AISongCoordinator
     private let turnManager: TurnManager
 
     init(
         musicService: MusicService = MusicService.shared,
         sessionService: SessionService = SessionService.shared,
-        playbackCoordinator: PlaybackCoordinator? = nil,
+        queueSync: QueueSynchronizationService? = nil,
         aiSongCoordinator: AISongCoordinator? = nil,
         turnManager: TurnManager? = nil
     ) {
         self.musicService = musicService
         self.sessionService = sessionService
-        self.playbackCoordinator = playbackCoordinator ?? PlaybackCoordinator()
+        self.queueSync = queueSync ?? QueueSynchronizationService.shared
         self.aiSongCoordinator = aiSongCoordinator ?? AISongCoordinator()
         self.turnManager = turnManager ?? TurnManager()
 
         B2BLog.session.info("SessionViewModel initialized")
 
-        // Setup playback callback
-        self.playbackCoordinator.onSongEnded = { [weak self] in
-            await self?.handleSongEnded()
+        // Setup queue advancement callback
+        self.queueSync.onSongAdvanced = { [weak self] in
+            await self?.handleSongAdvanced()
         }
     }
 
@@ -61,29 +61,47 @@ final class SessionViewModel {
         // Cancel any existing prefetch
         aiSongCoordinator.cancelPrefetch()
 
-        // Clear any AI queued songs (user takes control)
+        // Clear any AI queued songs from SessionService (user takes control)
         B2BLog.session.info("Clearing AI queue - User taking control")
         sessionService.clearAIQueuedSongs()
         sessionService.clearNextAISong()
+
+        // Also clear AI songs from MusicKit queue
+        do {
+            try await queueSync.removeAISongs()
+        } catch {
+            B2BLog.session.error("Failed to remove AI songs from MusicKit queue: \(error)")
+        }
 
         // Check if something is currently playing
         let isMusicPlaying = musicService.playbackState == .playing || musicService.currentlyPlaying != nil
 
         if isMusicPlaying {
-            // Music is playing - queue the song
+            // Music is playing - queue the song in both SessionService and MusicKit
             B2BLog.session.info("Music currently playing - queueing user song with 'upNext' status")
             _ = sessionService.queueSong(song, selectedBy: .user, rationale: nil, queueStatus: .upNext)
+
+            // Add to MusicKit queue
+            do {
+                try await musicService.queueNextSong(song)
+            } catch {
+                B2BLog.session.error("Failed to queue song in MusicKit: \(error)")
+            }
 
             // Start pre-fetching AI's next song to play after the user's queued song
             B2BLog.session.info("Starting AI prefetch for next position after user's queued song")
             aiSongCoordinator.startPrefetch(queueStatus: .upNext)
         } else {
-            // Nothing playing - play immediately
+            // Nothing playing - start playback
             B2BLog.session.info("No music playing - starting playback immediately")
             sessionService.addSongToHistory(song, selectedBy: .user, rationale: nil, queueStatus: .playing)
 
-            // Play the song
-            await playCurrentSong(song)
+            // Start playback (will initialize queue)
+            do {
+                try await musicService.startPlayback(with: song)
+            } catch {
+                B2BLog.session.error("Failed to start playback: \(error)")
+            }
 
             // Start pre-fetching AI's next song while user's song plays
             B2BLog.session.info("Starting AI prefetch for 'upNext' position")
@@ -99,8 +117,12 @@ final class SessionViewModel {
                 // Add to history with "playing" status since we'll play it immediately
                 sessionService.addSongToHistory(song, selectedBy: .ai, rationale: nil, queueStatus: .playing)
 
-                // Play the song
-                await playCurrentSong(song)
+                // Start playback
+                do {
+                    try await musicService.startPlayback(with: song)
+                } catch {
+                    B2BLog.session.error("Failed to start playback: \(error)")
+                }
 
                 // Queue another AI song as backup in case user doesn't select
                 B2BLog.session.info("AI's first song playing - prefetching backup AI track")
@@ -115,11 +137,21 @@ final class SessionViewModel {
         // Cancel any existing prefetch
         aiSongCoordinator.cancelPrefetch()
 
-        // Use turn manager to handle skip
-        let song = await turnManager.skipToSong(sessionSong)
+        // Find song index in MusicKit queue
+        guard let songIndex = queueSync.findSongIndex(sessionSong.song.id.rawValue) else {
+            B2BLog.session.error("Song not found in MusicKit queue for skip")
+            return
+        }
 
-        // Play the tapped song
-        await playCurrentSong(song)
+        // Use turn manager to handle skip in SessionService
+        _ = await turnManager.skipToSong(sessionSong)
+
+        // Skip to the song in MusicKit queue
+        do {
+            try await queueSync.skipToEntry(at: songIndex)
+        } catch {
+            B2BLog.session.error("Failed to skip to queued song in MusicKit: \(error)")
+        }
 
         // Queue the next song based on who selected the current song
         let queueStatus = turnManager.determineNextQueueStatus(after: sessionSong.selectedBy)
@@ -128,23 +160,17 @@ final class SessionViewModel {
 
     // MARK: - Private Methods
 
-    private func playCurrentSong(_ song: Song) async {
-        do {
-            B2BLog.playback.info("Starting playback: \(song.title)")
-            try await musicService.playSong(song)
-        } catch {
-            B2BLog.playback.error("Failed to play song: \(error)")
-        }
-    }
+    /// Handle when MusicKit queue advances to next song automatically
+    private func handleSongAdvanced() async {
+        B2BLog.session.info("🔄 MusicKit queue advanced - handling transition")
 
-    private func handleSongEnded() async {
-        // Use turn manager to advance to next song
+        // Use turn manager to advance to next song in SessionService
         guard let (song, selectedBy) = await turnManager.advanceToNextSong() else {
+            B2BLog.session.warning("No queued song available after advancement")
             return
         }
 
-        // Play the song
-        await playCurrentSong(song)
+        B2BLog.session.info("✅ Advanced to: \(song.title) (selected by \(selectedBy.rawValue))")
 
         // Queue the next song based on who selected the current song
         let queueStatus = turnManager.determineNextQueueStatus(after: selectedBy)

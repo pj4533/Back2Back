@@ -82,12 +82,21 @@ class MusicService: MusicServiceProtocol {
 
     // MARK: - Playback (delegated to MusicPlaybackService)
 
+    @available(*, deprecated, message: "Use startPlayback(with:) or queueNextSong(_:) instead")
     func playSong(_ song: Song) async throws {
-        try await playbackService.playSong(song)
+        try await playbackService.startPlayback(with: song)
+    }
+
+    func startPlayback(with song: Song) async throws {
+        try await playbackService.startPlayback(with: song)
+    }
+
+    func queueNextSong(_ song: Song) async throws {
+        try await playbackService.queueNextSong(song)
     }
 
     func addToQueue(_ song: Song) async throws {
-        try await playbackService.addToQueue(song)
+        try await playbackService.queueNextSong(song)
     }
 
     func togglePlayPause() async throws {

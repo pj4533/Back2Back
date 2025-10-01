@@ -45,6 +45,17 @@ class MockMusicService: MusicServiceProtocol {
         playbackState = .playing
     }
 
+    func startPlayback(with song: Song) async throws {
+        playSongCalled = true
+        lastPlayedSong = song
+        playbackState = .playing
+    }
+
+    func queueNextSong(_ song: Song) async throws {
+        addToQueueCalled = true
+        lastQueuedSong = song
+    }
+
     func addToQueue(_ song: Song) async throws {
         addToQueueCalled = true
         lastQueuedSong = song

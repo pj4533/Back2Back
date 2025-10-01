@@ -14,6 +14,8 @@ protocol MusicServiceProtocol {
     func searchCatalog(for searchTerm: String, limit: Int) async throws -> [MusicSearchResult]
     func searchCatalogWithPagination(for searchTerm: String, pageSize: Int, maxResults: Int) async throws -> [MusicSearchResult]
     func playSong(_ song: Song) async throws
+    func startPlayback(with song: Song) async throws
+    func queueNextSong(_ song: Song) async throws
     func addToQueue(_ song: Song) async throws
     func togglePlayPause() async throws
     func skipToNext() async throws

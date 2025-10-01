@@ -106,6 +106,15 @@ Key MusicKit resources:
    - Model options: GPT-5, GPT-5 Mini, GPT-5 Nano
    - Reasoning levels: low, medium, high
 
+10. **Native MusicKit Queue Progression** ✅ (Issue #33)
+   - QueueSynchronizationService for MusicKit queue management
+   - Observes `queue.currentEntry` for automatic song advancement
+   - Builds queue dynamically using `insert(_:position: .tail)`
+   - Removed polling-based playback monitoring (PlaybackCoordinator deleted)
+   - Songs play to 100% completion naturally (no more 97% cutoff)
+   - Synchronizes SessionService queue with MusicKit queue
+   - Transient item handling with timeout protection
+
 ### Not Yet Implemented
 - Playlist export to Apple Music
 - Crossfade/BPM-aware transitions
@@ -139,6 +148,7 @@ Back2Back/
 │   │   └── ConfigurationView.swift       # AI model settings and debug tools
 │   ├── Services/
 │   │   ├── MusicService.swift            # Singleton MusicKit wrapper (@MainActor)
+│   │   ├── QueueSynchronizationService.swift  # Native MusicKit queue management
 │   │   ├── SessionService.swift          # Session state management
 │   │   ├── PersonaService.swift          # Persona CRUD operations
 │   │   ├── PersonaSongCacheService.swift # 24hr song repetition prevention
@@ -153,6 +163,9 @@ Back2Back/
 │   │       ├── MusicMatchingProtocol.swift      # Matcher interface
 │   │       ├── StringBasedMusicMatcher.swift    # Fuzzy string matching
 │   │       └── LLMBasedMusicMatcher.swift       # Future LLM matcher (stub)
+│   ├── Coordinators/
+│   │   ├── AISongCoordinator.swift       # AI song selection and queueing
+│   │   └── TurnManager.swift             # Turn state transitions
 │   ├── ViewModels/
 │   │   ├── MusicAuthViewModel.swift      # Auth state management
 │   │   ├── MusicSearchViewModel.swift    # Search with 0.75s debouncing
@@ -177,6 +190,7 @@ Back2Back/
     ├── PersonaServiceTests.swift
     ├── PersonasViewModelTests.swift
     ├── PersonaSongCacheServiceTests.swift  # 24hr cache tests
+    ├── QueueSynchronizationServiceTests.swift  # Native queue progression tests
     ├── OpenAIClientTests.swift
     ├── OpenAIModelsTests.swift
     ├── OpenAISongSelectionTests.swift
@@ -260,9 +274,20 @@ xcodebuild test -project Back2Back.xcodeproj -scheme Back2Back -destination 'pla
 xcodebuild clean -project Back2Back.xcodeproj -scheme Back2Back
 ```
 
-## Recent Improvements (September 2025)
+## Recent Improvements
 
-### Time-Based Song Repetition Prevention (PR #19)
+### Native MusicKit Queue Progression (October 2025, Issue #33)
+Major refactor to replace manual playback polling with MusicKit's native queue progression:
+- **QueueSynchronizationService**: New service to manage MusicKit queue
+- **Queue observer**: Uses `queue.currentEntry` changes instead of polling every 0.5s
+- **Dynamic queue building**: Uses `insert(_:position: .tail)` instead of replacing queue
+- **PlaybackCoordinator deleted**: Removed entire polling-based approach (165 lines deleted)
+- **Songs play to 100%**: No more 97% threshold causing early cutoffs (fixes #29)
+- **Simplified architecture**: Fewer moving parts, more reliable behavior
+- **User overrides**: Properly removes AI songs from MusicKit queue when user selects
+- **Skip functionality**: Uses MusicKit's native skip APIs
+
+### Time-Based Song Repetition Prevention (September 2025, PR #19)
 Implemented a 24-hour cache system to prevent personas from selecting the same songs across different sessions:
 - **PersonaSongCache models**: CachedSong and PersonaSongCache with automatic expiration
 - **PersonaSongCacheService**: Singleton with UserDefaults persistence

@@ -18,6 +18,7 @@ final class AISongCoordinator {
     private let openAIClient = OpenAIClient.shared
     private let sessionService = SessionService.shared
     private let environmentService = EnvironmentService.shared
+    private let musicService = MusicService.shared
     private let musicMatcher: MusicMatchingProtocol
 
     private(set) var prefetchTask: Task<Void, Never>?
@@ -148,8 +149,18 @@ final class AISongCoordinator {
     private func queueAISong(_ song: Song, rationale: String?, queueStatus: QueueStatus) {
         B2BLog.ai.info("Queueing AI song: \(song.title) with status: \(queueStatus)")
 
-        // Add to queue (not history yet)
+        // Add to SessionService queue (not history yet)
         _ = sessionService.queueSong(song, selectedBy: .ai, rationale: rationale, queueStatus: queueStatus)
+
+        // Also add to MusicKit queue
+        Task {
+            do {
+                try await musicService.queueNextSong(song)
+                B2BLog.ai.debug("✅ Added AI song to MusicKit queue")
+            } catch {
+                B2BLog.ai.error("❌ Failed to add AI song to MusicKit queue: \(error)")
+            }
+        }
 
         sessionService.setAIThinking(false)
     }
