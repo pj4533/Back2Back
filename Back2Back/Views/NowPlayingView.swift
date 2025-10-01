@@ -49,7 +49,14 @@ struct NowPlayingView: View {
 
             progressBar(nowPlaying: nowPlaying)
 
-            HStack(spacing: 40) {
+            HStack(spacing: 30) {
+                // -15s button
+                Button(action: viewModel.skipBackward) {
+                    Image(systemName: "gobackward.15")
+                        .font(.title3)
+                }
+                .disabled(!viewModel.canSkipToPrevious)
+
                 Button(action: viewModel.skipToPrevious) {
                     Image(systemName: "backward.fill")
                         .font(.title)
@@ -64,6 +71,13 @@ struct NowPlayingView: View {
                 Button(action: viewModel.skipToNext) {
                     Image(systemName: "forward.fill")
                         .font(.title)
+                }
+                .disabled(!viewModel.canSkipToNext)
+
+                // +15s button
+                Button(action: viewModel.skipForward) {
+                    Image(systemName: "goforward.15")
+                        .font(.title3)
                 }
                 .disabled(!viewModel.canSkipToNext)
             }
@@ -110,21 +124,42 @@ struct NowPlayingView: View {
         VStack(spacing: 4) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
+                    // Background track
                     Rectangle()
                         .fill(Color.gray.opacity(0.3))
                         .frame(height: 4)
                         .cornerRadius(2)
 
+                    // Progress indicator
                     Rectangle()
                         .fill(Color.accentColor)
-                        .frame(width: progressWidth(for: nowPlaying, in: geometry.size.width), height: 4)
+                        .frame(
+                            width: progressWidth(
+                                current: viewModel.livePlaybackTime,
+                                duration: nowPlaying.duration,
+                                in: geometry.size.width
+                            ),
+                            height: 4
+                        )
                         .cornerRadius(2)
                 }
+                .contentShape(Rectangle()) // Make entire area tappable
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onEnded { value in
+                            let time = calculateTime(
+                                from: value.location.x,
+                                in: geometry.size.width,
+                                duration: nowPlaying.duration
+                            )
+                            viewModel.seek(to: time)
+                        }
+                )
             }
-            .frame(height: 4)
+            .frame(height: 20) // Increase hit area for better touch target
 
             HStack {
-                Text(formatTime(nowPlaying.playbackTime))
+                Text(formatTime(viewModel.livePlaybackTime))
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -138,10 +173,15 @@ struct NowPlayingView: View {
         .padding(.horizontal)
     }
 
-    private func progressWidth(for nowPlaying: NowPlayingItem, in totalWidth: CGFloat) -> CGFloat {
-        guard nowPlaying.duration > 0 else { return 0 }
-        let progress = nowPlaying.playbackTime / nowPlaying.duration
+    private func progressWidth(current: TimeInterval, duration: TimeInterval, in totalWidth: CGFloat) -> CGFloat {
+        guard duration > 0 else { return 0 }
+        let progress = current / duration
         return totalWidth * min(max(progress, 0), 1)
+    }
+
+    private func calculateTime(from xPosition: CGFloat, in width: CGFloat, duration: TimeInterval) -> TimeInterval {
+        let progress = max(0, min(1, xPosition / width))
+        return duration * progress
     }
 
     private func formatTime(_ time: TimeInterval) -> String {
