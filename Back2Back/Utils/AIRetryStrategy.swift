@@ -17,7 +17,7 @@ final class AIRetryStrategy {
     /// - Parameters:
     ///   - operation: The async operation to execute
     ///   - retryOperation: The retry operation to execute if first attempt fails
-    ///   - maxAttempts: Maximum number of attempts (default: 2)
+    ///   - maxAttempts: Maximum number of attempts (default: 10)
     ///   - shouldRetry: Optional closure to determine if retry should occur based on result
     ///   - onRetry: Optional callback invoked before retry attempt
     /// - Returns: The result of the operation
@@ -25,7 +25,7 @@ final class AIRetryStrategy {
     static func executeWithRetry<T>(
         operation: @escaping () async throws -> T?,
         retryOperation: (() async throws -> T?)? = nil,
-        maxAttempts: Int = 2,
+        maxAttempts: Int = 10,
         shouldRetry: ((T?) -> Bool)? = nil,
         onRetry: (() async -> Void)? = nil
     ) async throws -> T? {
@@ -39,8 +39,10 @@ final class AIRetryStrategy {
             if let shouldRetryCheck = shouldRetry {
                 if shouldRetryCheck(result) {
                     B2BLog.ai.warning("⚠️ First attempt returned invalid result, retrying...")
-                    return try await performRetry(
+                    return try await performRetries(
                         retryOperation: retryOperation ?? operation,
+                        remainingAttempts: maxAttempts - 1,
+                        attemptNumber: 2,
                         onRetry: onRetry
                     )
                 }
@@ -49,8 +51,10 @@ final class AIRetryStrategy {
             // Check if result is nil and we should retry
             if result == nil && maxAttempts > 1 {
                 B2BLog.ai.warning("⚠️ First attempt returned nil, retrying...")
-                return try await performRetry(
+                return try await performRetries(
                     retryOperation: retryOperation ?? operation,
+                    remainingAttempts: maxAttempts - 1,
+                    attemptNumber: 2,
                     onRetry: onRetry
                 )
             }
@@ -62,8 +66,10 @@ final class AIRetryStrategy {
             B2BLog.ai.warning("⚠️ First attempt failed with error: \(error)")
 
             if maxAttempts > 1 {
-                return try await performRetry(
+                return try await performRetries(
                     retryOperation: retryOperation ?? operation,
+                    remainingAttempts: maxAttempts - 1,
+                    attemptNumber: 2,
                     onRetry: onRetry
                 )
             } else {
@@ -72,29 +78,56 @@ final class AIRetryStrategy {
         }
     }
 
-    /// Execute retry operation
-    private static func performRetry<T>(
+    /// Execute retry operations with multiple attempts
+    private static func performRetries<T>(
         retryOperation: () async throws -> T?,
+        remainingAttempts: Int,
+        attemptNumber: Int,
         onRetry: (() async -> Void)?
     ) async throws -> T? {
+        guard remainingAttempts > 0 else {
+            B2BLog.ai.error("❌ All retry attempts exhausted - giving up")
+            return nil
+        }
+
         // Call optional pre-retry callback
         if let onRetry = onRetry {
             await onRetry()
         }
 
         do {
+            B2BLog.ai.info("🔄 Retry attempt \(attemptNumber) of maximum attempts")
             let retryResult = try await retryOperation()
 
             if retryResult != nil {
-                B2BLog.ai.info("✅ Retry attempt succeeded")
+                B2BLog.ai.info("✅ Retry attempt \(attemptNumber) succeeded")
                 return retryResult
             } else {
-                B2BLog.ai.error("❌ Retry attempt returned nil - giving up")
-                return nil
+                B2BLog.ai.warning("⚠️ Retry attempt \(attemptNumber) returned nil, continuing...")
+
+                // Recursive retry with remaining attempts
+                return try await performRetries(
+                    retryOperation: retryOperation,
+                    remainingAttempts: remainingAttempts - 1,
+                    attemptNumber: attemptNumber + 1,
+                    onRetry: onRetry
+                )
             }
         } catch {
-            B2BLog.ai.error("❌ Retry attempt failed with error: \(error) - giving up")
-            throw error
+            B2BLog.ai.warning("⚠️ Retry attempt \(attemptNumber) failed with error: \(error)")
+
+            if remainingAttempts > 1 {
+                // Continue with remaining attempts
+                return try await performRetries(
+                    retryOperation: retryOperation,
+                    remainingAttempts: remainingAttempts - 1,
+                    attemptNumber: attemptNumber + 1,
+                    onRetry: onRetry
+                )
+            } else {
+                B2BLog.ai.error("❌ Final retry attempt failed - giving up")
+                throw error
+            }
         }
     }
 }
