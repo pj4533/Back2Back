@@ -164,16 +164,18 @@ final class SessionViewModel {
     private func handleSongAdvanced() async {
         B2BLog.session.info("🔄 MusicKit queue advanced - handling transition")
 
-        // Use turn manager to advance to next song in SessionService
-        guard let (song, selectedBy) = await turnManager.advanceToNextSong() else {
-            B2BLog.session.warning("No queued song available after advancement")
+        // Note: updateCurrentlyPlayingSong has already moved the song from queue to history
+        // We just need to queue the next AI song based on who selected the current song
+
+        guard let currentSong = sessionService.getCurrentlyPlayingSessionSong() else {
+            B2BLog.session.warning("No currently playing song after advancement")
             return
         }
 
-        B2BLog.session.info("✅ Advanced to: \(song.title) (selected by \(selectedBy.rawValue))")
+        B2BLog.session.info("✅ Song now playing: \(currentSong.song.title) (selected by \(currentSong.selectedBy.rawValue))")
 
         // Queue the next song based on who selected the current song
-        let queueStatus = turnManager.determineNextQueueStatus(after: selectedBy)
+        let queueStatus = turnManager.determineNextQueueStatus(after: currentSong.selectedBy)
         aiSongCoordinator.startPrefetch(queueStatus: queueStatus)
     }
 }
