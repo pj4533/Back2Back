@@ -120,57 +120,82 @@ struct NowPlayingView: View {
         }
     }
 
+    // MARK: - Animation-Based Progress Bar
+    // Uses TimelineView for smooth, GPU-accelerated updates
+    // This approach is recommended by Apple engineers instead of polling
+    // See: https://forums.developer.apple.com/forums/thread/687487
     private func progressBar(nowPlaying: NowPlayingItem) -> some View {
         VStack(spacing: 4) {
             GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    // Background track
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: 4)
-                        .cornerRadius(2)
+                // 60fps updates for buttery-smooth progress bar animation
+                // Only updates when playing (paused parameter stops animation when not playing)
+                TimelineView(.animation(minimumInterval: 1.0/60.0, paused: !viewModel.isPlaying)) { context in
+                    let currentTime = viewModel.getCurrentPlaybackTime()
 
-                    // Progress indicator
-                    Rectangle()
-                        .fill(Color.accentColor)
-                        .frame(
-                            width: progressWidth(
-                                current: viewModel.livePlaybackTime,
-                                duration: nowPlaying.duration,
-                                in: geometry.size.width
-                            ),
-                            height: 4
-                        )
-                        .cornerRadius(2)
-                }
-                .contentShape(Rectangle()) // Make entire area tappable
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onEnded { value in
-                            let time = calculateTime(
-                                from: value.location.x,
-                                in: geometry.size.width,
-                                duration: nowPlaying.duration
+                    ZStack(alignment: .leading) {
+                        // Background track
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 4)
+                            .cornerRadius(2)
+
+                        // Progress indicator - animates smoothly via TimelineView
+                        Rectangle()
+                            .fill(Color.accentColor)
+                            .frame(
+                                width: progressWidth(
+                                    current: currentTime,
+                                    duration: nowPlaying.duration,
+                                    in: geometry.size.width
+                                ),
+                                height: 4
                             )
-                            viewModel.seek(to: time)
-                        }
-                )
+                            .cornerRadius(2)
+                    }
+                    .contentShape(Rectangle()) // Make entire area tappable
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onEnded { value in
+                                let time = calculateTime(
+                                    from: value.location.x,
+                                    in: geometry.size.width,
+                                    duration: nowPlaying.duration
+                                )
+                                viewModel.seek(to: time)
+                            }
+                    )
+                }
             }
             .frame(height: 20) // Increase hit area for better touch target
 
-            HStack {
-                Text(formatTime(viewModel.livePlaybackTime))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            // 2fps updates for time labels (lower frequency is fine for text)
+            // Reduces state updates while maintaining smooth visual experience
+            TimelineView(.animation(minimumInterval: 0.5, paused: !viewModel.isPlaying)) { context in
+                let currentTime = viewModel.getCurrentPlaybackTime()
 
-                Spacer()
+                HStack {
+                    Text(formatTime(currentTime))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
-                Text(formatTime(nowPlaying.duration))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    Spacer()
+
+                    Text(formatTime(nowPlaying.duration))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .padding(.horizontal)
+        .onChange(of: viewModel.playbackState) { oldValue, newValue in
+            // Reset animation base time when playback state changes
+            // This ensures accuracy when play/pause/skip occurs
+            viewModel.updateBasePlaybackTime()
+        }
+        .onAppear {
+            // Initialize base time when view appears
+            viewModel.updateBasePlaybackTime()
+        }
     }
 
     private func progressWidth(current: TimeInterval, duration: TimeInterval, in totalWidth: CGFloat) -> CGFloat {

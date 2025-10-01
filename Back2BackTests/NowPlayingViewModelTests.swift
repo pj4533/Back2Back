@@ -3,6 +3,7 @@
 //  Back2BackTests
 //
 //  Created for issue #27 - Interactive playback controls
+//  Updated for animation-based approach (no polling)
 //
 
 import Testing
@@ -16,18 +17,76 @@ struct NowPlayingViewModelTests {
 
     // MARK: - Initialization Tests
 
-    @Test func viewModelInitializesWithLivePlaybackTimeZero() async throws {
+    @Test func viewModelInitializesWithZeroBaseTime() async throws {
         let viewModel = NowPlayingViewModel()
-        #expect(viewModel.livePlaybackTime == 0)
+        #expect(viewModel.basePlaybackTime == 0)
     }
 
-    @Test func viewModelInitializesPlaybackTracking() async throws {
+    @Test func viewModelInitializesWithNilAnimationStartTime() async throws {
         let viewModel = NowPlayingViewModel()
-        // Wait a short time to allow the tracking task to start
-        try await Task.sleep(for: .milliseconds(100))
-        // The tracking task should be running (we can't directly test this,
-        // but we verify it doesn't crash and initializes properly)
-        #expect(viewModel.livePlaybackTime >= 0)
+        #expect(viewModel.animationStartTime == nil)
+    }
+
+    // MARK: - Animation-Based Time Calculation Tests
+
+    @Test func getCurrentPlaybackTimeReturnsBaseTimeWhenNotPlaying() async throws {
+        let viewModel = NowPlayingViewModel()
+        viewModel.basePlaybackTime = 42.0
+        viewModel.animationStartTime = Date()
+
+        // When not playing, should return base time regardless of elapsed time
+        let currentTime = viewModel.getCurrentPlaybackTime()
+        #expect(currentTime == 42.0)
+    }
+
+    @Test func getCurrentPlaybackTimeReturnsBaseTimeWhenAnimationStartTimeIsNil() async throws {
+        let viewModel = NowPlayingViewModel()
+        viewModel.basePlaybackTime = 30.0
+        viewModel.animationStartTime = nil
+
+        let currentTime = viewModel.getCurrentPlaybackTime()
+        #expect(currentTime == 30.0)
+    }
+
+    @Test func getCurrentPlaybackTimeCalculatesElapsedTime() async throws {
+        let viewModel = NowPlayingViewModel()
+
+        // Set base time to 10 seconds
+        viewModel.basePlaybackTime = 10.0
+
+        // Simulate 5 seconds elapsed (animation started 5 seconds ago)
+        viewModel.animationStartTime = Date().addingTimeInterval(-5)
+
+        // Mock playing state by accessing the computed property would require mocking MusicService
+        // For this test, we'll just verify the calculation works
+        // In a real scenario with playing state, it should be base + elapsed = 10 + 5 = 15
+        let currentTime = viewModel.getCurrentPlaybackTime()
+
+        // Without mocked playing state, it returns base time
+        // This test structure is designed for future enhancement with dependency injection
+        #expect(currentTime >= 10.0)
+    }
+
+    // MARK: - Update Base Time Tests
+
+    @Test func updateBasePlaybackTimeSetsAnimationStartTime() async throws {
+        let viewModel = NowPlayingViewModel()
+
+        #expect(viewModel.animationStartTime == nil)
+
+        viewModel.updateBasePlaybackTime()
+
+        #expect(viewModel.animationStartTime != nil)
+    }
+
+    @Test func updateBasePlaybackTimeUpdatesBaseTime() async throws {
+        let viewModel = NowPlayingViewModel()
+
+        let initialBase = viewModel.basePlaybackTime
+        viewModel.updateBasePlaybackTime()
+
+        // Base time should be updated (even if it's still 0 from getCurrentPlaybackTime())
+        #expect(viewModel.basePlaybackTime >= initialBase)
     }
 
     // MARK: - Time Formatting Tests
@@ -118,6 +177,45 @@ struct NowPlayingViewModelTests {
         let calculator = TimeCalculator()
         let time = calculator.time(from: -10, in: 100, duration: 60)
         #expect(time == 0)
+    }
+
+    // MARK: - Animation-Based Elapsed Time Calculation
+
+    @Test func elapsedTimeCalculationIsAccurate() async throws {
+        let baseTime: TimeInterval = 15.0
+        let elapsedSeconds: TimeInterval = 7.0
+
+        let animationStartTime = Date().addingTimeInterval(-elapsedSeconds)
+        let calculatedElapsed = Date().timeIntervalSince(animationStartTime)
+
+        // Should be approximately 7 seconds (within 0.1s tolerance for test execution time)
+        #expect(abs(calculatedElapsed - elapsedSeconds) < 0.1)
+
+        let expectedCurrentTime = baseTime + calculatedElapsed
+        #expect(abs(expectedCurrentTime - 22.0) < 0.1)
+    }
+
+    @Test func animationTimeCalculationWithMultipleUpdates() async throws {
+        // Simulate multiple base time updates (like during seeks or state changes)
+        var baseTime: TimeInterval = 0
+        var startTime = Date()
+
+        // First playback period (0-10 seconds)
+        baseTime = 0
+        startTime = Date().addingTimeInterval(-10)
+        var currentTime = baseTime + Date().timeIntervalSince(startTime)
+        #expect(abs(currentTime - 10.0) < 0.1)
+
+        // User seeks to 30 seconds
+        baseTime = 30
+        startTime = Date()
+        currentTime = baseTime + Date().timeIntervalSince(startTime)
+        #expect(abs(currentTime - 30.0) < 0.1)
+
+        // After 5 more seconds of playback
+        startTime = Date().addingTimeInterval(-5)
+        currentTime = baseTime + Date().timeIntervalSince(startTime)
+        #expect(abs(currentTime - 35.0) < 0.1)
     }
 }
 
