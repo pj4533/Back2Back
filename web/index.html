@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Back2Back DJ - Join the Beta</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+            color: #1a1a1a;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 90%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .content {
+            text-align: left;
+        }
+
+        .icon {
+            width: 120px;
+            height: 120px;
+            border-radius: 26.67%;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #2d2d2d;
+            line-height: 1.1;
+        }
+
+        .tagline {
+            font-size: 22px;
+            margin-bottom: 30px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .description {
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 40px;
+            color: #444;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: #2d2d2d;
+            color: white;
+            padding: 18px 40px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .screenshot-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .screenshot {
+            max-width: 100%;
+            height: auto;
+            max-height: 85vh;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        @media (max-width: 968px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 40px;
+                text-align: center;
+            }
+
+            .content {
+                text-align: center;
+            }
+
+            h1 {
+                font-size: 36px;
+            }
+
+            .tagline {
+                font-size: 18px;
+            }
+
+            .description {
+                font-size: 16px;
+            }
+
+            .screenshot {
+                max-height: 50vh;
+            }
+
+            .icon {
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <img src="back2back_icon.png" alt="Back2Back DJ Icon" class="icon">
+            <h1>Back2Back DJ</h1>
+            <p class="tagline">Your AI DJ partner, taking turns to create the perfect session</p>
+            <p class="description">
+                Experience a collaborative DJ session where you and AI take turns selecting tracks.
+                Choose from preset personas or create your own using deep AI research that crafts
+                detailed style guides capturing authentic DJ personalities. Discover music together using Apple Music.
+            </p>
+            <a href="https://testflight.apple.com/join/Xx7T6m4V" class="cta-button">Join TestFlight Beta</a>
+        </div>
+        <div class="screenshot-container">
+            <img src="back2back_screenshot.jpeg" alt="Back2Back DJ Screenshot" class="screenshot">
+        </div>
+    </div>
+</body>
+</html>
