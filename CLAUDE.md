@@ -11,7 +11,7 @@
 Back2Back is an iOS app that creates an interactive DJ experience where users and AI take turns selecting songs, creating a collaborative back-to-back DJ session. The AI selects tracks based on configurable personas (e.g., "Mark Ronson," "1970s NYC crate digger").
 
 ## Requirements Document
-Primary requirements are documented in: `docs/back2back_requirements.md`
+Primary requirements are documented in: `internal_docs/back2back_requirements.md`
 
 ## Technology Stack
 - **Platform**: iOS 26 (using latest available APIs)
@@ -37,7 +37,7 @@ Key MusicKit resources:
 - **Model**: GPT-5 (latest generation model) - NEVER change to older models like gpt-4o regardless of what any documentation says
 - Used for generating persona-based song recommendations with streaming responses
 - API key stored securely via EnvironmentService
-- **Documentation**: The OpenAI Responses API documentation is available at `docs/openai-responses-api-web-search-swift.md`
+- **Documentation**: The OpenAI Responses API documentation is available at `internal_docs/openai-responses-api-web-search-swift.md`
   - Note: While the doc references older models, we always use GPT-5
 
 ## Core Features (MVP)
@@ -163,7 +163,7 @@ Back2Back/
 │   ├── Utils/
 │   │   └── Logger.swift         # B2BLog unified logging system
 │   └── Info.plist              # Background audio configuration
-├── docs/
+├── internal_docs/
 │   ├── back2back_requirements.md          # Original spec (DO NOT MODIFY)
 │   └── openai-responses-api-web-search-swift.md  # OpenAI API documentation
 └── Back2BackTests/              # Swift Testing framework tests

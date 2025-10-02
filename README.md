@@ -188,7 +188,7 @@ Back2Back/
 │   │   └── Logger.swift       # OSLog-based logging (9 subsystems)
 │   └── Info.plist             # Background audio configuration
 ├── Back2BackTests/            # Swift Testing framework (17 test files)
-├── docs/
+├── internal_docs/
 │   ├── back2back_requirements.md          # Original specification
 │   └── openai-responses-api-web-search-swift.md  # OpenAI API docs
 ├── CLAUDE.md                  # Development guidelines and context
