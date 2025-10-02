@@ -65,6 +65,25 @@
             color: #444;
         }
 
+        .description ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .description li {
+            margin-bottom: 12px;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .description li:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #2d2d2d;
+            font-weight: bold;
+        }
+
         .cta-button {
             display: inline-block;
             background: #2d2d2d;
@@ -136,12 +155,14 @@
         <div class="content">
             <img src="back2back_icon.png" alt="Back2Back DJ Icon" class="icon">
             <h1>Back2Back DJ</h1>
-            <p class="tagline">Your AI DJ partner, taking turns to create the perfect session</p>
-            <p class="description">
-                Experience a collaborative DJ session where you and AI take turns selecting tracks.
-                Choose from preset personas or create your own using deep AI research that crafts
-                detailed style guides capturing authentic DJ personalities. Discover music together using Apple Music.
-            </p>
+            <p class="tagline">Your AI DJ partner for collaborative music sessions</p>
+            <div class="description">
+                <ul>
+                    <li>Take turns with AI selecting tracks in a collaborative DJ session</li>
+                    <li>Use preset personas or create custom ones with deep AI research</li>
+                    <li>Discover music together with Apple Music</li>
+                </ul>
+            </div>
             <a href="https://testflight.apple.com/join/Xx7T6m4V" class="cta-button">Join TestFlight Beta</a>
         </div>
         <div class="screenshot-container">
