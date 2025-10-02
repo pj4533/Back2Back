@@ -121,8 +121,8 @@ final class SessionViewModel {
         // Play the tapped song
         await playCurrentSong(song)
 
-        // Queue the next song based on who selected the current song
-        let queueStatus = turnManager.determineNextQueueStatus(after: sessionSong.selectedBy)
+        // Queue the next song based on current turn
+        let queueStatus = turnManager.determineNextQueueStatus()
         aiSongCoordinator.startPrefetch(queueStatus: queueStatus)
     }
 
@@ -146,8 +146,8 @@ final class SessionViewModel {
         // Play the song
         await playCurrentSong(song)
 
-        // Queue the next song based on who selected the current song
-        let queueStatus = turnManager.determineNextQueueStatus(after: selectedBy)
+        // Queue the next song based on current turn (turn was already updated in advanceToNextSong)
+        let queueStatus = turnManager.determineNextQueueStatus()
         aiSongCoordinator.startPrefetch(queueStatus: queueStatus)
     }
 }

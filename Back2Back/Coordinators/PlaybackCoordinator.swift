@@ -28,6 +28,9 @@ final class PlaybackCoordinator {
     // Callback for when a song ends and we need to advance
     var onSongEnded: (() async -> Void)?
 
+    // Track if we've queued the next song at 95%
+    private var hasQueuedNextSongAt95: Bool = false
+
     init() {
         B2BLog.session.debug("PlaybackCoordinator initialized")
         startPlaybackMonitoring()
@@ -71,6 +74,7 @@ final class PlaybackCoordinator {
                 B2BLog.playback.info("🎵 Song transition detected via state observer: \(nowPlaying.song.title)")
                 lastSongId = currentSongId
                 hasTriggeredEndOfSong = false
+                hasQueuedNextSongAt95 = false  // Reset for new song
                 sessionService.updateCurrentlyPlayingSong(songId: currentSongId)
             }
         }
@@ -103,6 +107,7 @@ final class PlaybackCoordinator {
                 B2BLog.playback.info("🎵 New song detected: \(nowPlaying.song.title)")
                 lastSongId = currentSongId
                 hasTriggeredEndOfSong = false
+                hasQueuedNextSongAt95 = false  // Reset for new song
                 lastPlaybackTime = currentPlaybackTime
 
                 // CRITICAL: Update the queue status to show this song is now playing
@@ -119,22 +124,41 @@ final class PlaybackCoordinator {
             // Detailed logging when approaching song end
             if progress >= 0.90 && progress < 0.99 {
                 B2BLog.playback.debug("📊 Near song end: \(nowPlaying.song.title) - Progress: \(String(format: "%.1f%%", progress * 100)) (\(Int(currentPlaybackTime))s/\(Int(nowPlaying.duration))s)")
+                B2BLog.playback.debug("  - hasQueuedNextSongAt95: \(self.hasQueuedNextSongAt95)")
                 B2BLog.playback.debug("  - hasTriggeredEndOfSong: \(self.hasTriggeredEndOfSong)")
                 B2BLog.playback.debug("  - Playback state: \(String(describing: self.musicService.playbackState))")
                 B2BLog.playback.debug("  - Is playing: \(nowPlaying.isPlaying)")
             }
 
-            // Check if song has ended (100% complete or very close) and we haven't triggered yet
-            // Lower threshold to 97% to catch songs that might not reach exactly 99%
-            if progress >= 0.97 && !hasTriggeredEndOfSong && nowPlaying.duration > 0 {
-                B2BLog.playback.info("🎵 Song ending detected at \(String(format: "%.1f%%", progress * 100)) - advancing to next song")
+            // Queue next song at 95% for smooth MusicKit transition
+            if progress >= 0.95 && !hasQueuedNextSongAt95 && nowPlaying.duration > 0 {
+                hasQueuedNextSongAt95 = true
+                B2BLog.playback.info("🎵 Song at 95% - queueing next song to MusicKit")
+
+                // Get next queued song from session
+                if let nextSessionSong = sessionService.getNextQueuedSong() {
+                    B2BLog.playback.info("📝 Queueing to MusicKit: \(nextSessionSong.song.title) (\(nextSessionSong.queueStatus))")
+
+                    do {
+                        try await musicService.addToQueue(nextSessionSong.song)
+                        B2BLog.playback.info("✅ Successfully queued next song to MusicKit")
+                    } catch {
+                        B2BLog.playback.error("❌ Failed to queue next song to MusicKit: \(error)")
+                        // If queueing fails, fall back to manual transition
+                        hasTriggeredEndOfSong = true
+                        sessionService.markCurrentSongAsPlayed()
+                        await onSongEnded?()
+                    }
+                } else {
+                    B2BLog.playback.info("ℹ️ No queued song available at 95%")
+                }
+            }
+
+            // Fallback: If we reach near 100% and haven't queued, trigger manual transition
+            if progress >= 0.99 && !hasTriggeredEndOfSong && nowPlaying.duration > 0 {
+                B2BLog.playback.warning("⚠️ Song at 99% and no transition - falling back to manual advance")
                 hasTriggeredEndOfSong = true
-                B2BLog.playback.debug("Queue state - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
-
-                // Mark current song as played before transitioning
                 sessionService.markCurrentSongAsPlayed()
-
-                // Notify delegate to advance to next queued song
                 await onSongEnded?()
             }
 

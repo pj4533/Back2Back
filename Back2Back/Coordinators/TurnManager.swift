@@ -77,13 +77,16 @@ final class TurnManager {
         return sessionSong.song
     }
 
-    /// Determine what queue status to use for next AI song based on current context
-    func determineNextQueueStatus(after selectedBy: TurnType) -> QueueStatus {
-        if selectedBy == .ai {
-            // AI song playing -> queue another AI as upNext to continue the flow
-            return .upNext
+    /// Determine what queue status to use for next AI song based on current turn
+    func determineNextQueueStatus() -> QueueStatus {
+        // Check whose turn it currently is to determine what status the AI should queue
+        if sessionService.currentTurn == .user {
+            // User's turn → AI queues a backup song (only plays if user doesn't pick)
+            B2BLog.session.debug("Current turn is USER → AI queuing as .queuedIfUserSkips (backup)")
+            return .queuedIfUserSkips
         } else {
-            // User song playing -> queue AI as upNext
+            // AI's turn → AI queues its active pick (will definitely play)
+            B2BLog.session.debug("Current turn is AI → AI queuing as .upNext (AI's pick)")
             return .upNext
         }
     }
