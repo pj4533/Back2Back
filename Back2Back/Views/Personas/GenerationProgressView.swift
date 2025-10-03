@@ -19,6 +19,12 @@ struct GenerationProgressView: View {
                 .fontWeight(.semibold)
                 .padding(.top)
 
+            Text("This uses our most advanced AI models and may take several minutes to complete")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 280)
+
             statusIcon
                 .frame(height: 60)
 
@@ -28,6 +34,10 @@ struct GenerationProgressView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 250)
                 .animation(.easeInOut(duration: 0.3), value: statusMessage)
+
+            Text("This process can take a while")
+                .font(.caption2)
+                .foregroundColor(.secondary.opacity(0.7))
                 .padding(.bottom)
         }
         .padding(.horizontal)
