@@ -93,8 +93,17 @@ final class SessionService: SessionStateManagerProtocol {
 
                     historyService.moveToHistory(removedSong)
 
-                    // Update turn based on who selected this song
-                    currentTurn = removedSong.selectedBy == .user ? .ai : .user
+                    // Update turn based on queue status:
+                    // - .upNext → switch turn to other person (someone took their turn)
+                    // - .queuedIfUserSkips → keep turn on user (AI backup, user hasn't picked)
+                    if removedSong.queueStatus == .upNext {
+                        let newTurn = removedSong.selectedBy == .user ? TurnType.ai : TurnType.user
+                        B2BLog.session.info("🔄 Turn switch: \(self.currentTurn.rawValue) → \(newTurn.rawValue) (.upNext played)")
+                        currentTurn = newTurn
+                    } else if removedSong.queueStatus == .queuedIfUserSkips {
+                        B2BLog.session.info("🔄 Turn stays on USER (.queuedIfUserSkips played - AI backup)")
+                        currentTurn = .user
+                    }
 
                     B2BLog.session.info("Moved to playing from queue: \(removedSong.song.title)")
                 }
@@ -132,9 +141,17 @@ final class SessionService: SessionStateManagerProtocol {
         if let song = queueManager.removeSong(withId: songId) {
             historyService.moveToHistory(song)
 
-            // Update turn based on who selected this song
-            currentTurn = song.selectedBy == .user ? .ai : .user
-            B2BLog.session.debug("Turn change after queue move: \(song.selectedBy.rawValue) -> \(self.currentTurn.rawValue)")
+            // Update turn based on queue status:
+            // - .upNext → switch turn to other person (someone took their turn)
+            // - .queuedIfUserSkips → keep turn on user (AI backup, user hasn't picked)
+            if song.queueStatus == .upNext {
+                let newTurn = song.selectedBy == .user ? TurnType.ai : TurnType.user
+                B2BLog.session.info("🔄 Turn switch: \(self.currentTurn.rawValue) → \(newTurn.rawValue) (.upNext played)")
+                currentTurn = newTurn
+            } else if song.queueStatus == .queuedIfUserSkips {
+                B2BLog.session.info("🔄 Turn stays on USER (.queuedIfUserSkips played - AI backup)")
+                currentTurn = .user
+            }
         }
     }
 
