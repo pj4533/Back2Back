@@ -185,8 +185,13 @@ final class SessionViewModel {
         B2BLog.session.info("👤 User requested direction change: \(directionChange.buttonLabel)")
         B2BLog.ai.debug("Direction prompt: \(directionChange.directionPrompt)")
 
-        // Cancel any existing prefetch
+        // Cancel any existing prefetch and ensure AI thinking state is cleared
+        B2BLog.session.debug("Cancelling any in-flight AI song selection")
         aiSongCoordinator.cancelPrefetch()
+
+        // Explicitly reset AI thinking state to handle race conditions
+        // (in case the cancelled task hasn't finished its cleanup yet)
+        sessionService.setAIThinking(false)
 
         // Clear any AI queued songs (we'll replace with new direction)
         B2BLog.session.info("Clearing AI queue - User requested direction change")
