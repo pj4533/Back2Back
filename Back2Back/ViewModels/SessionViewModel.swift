@@ -219,9 +219,14 @@ final class SessionViewModel {
             B2BLog.playback.info("Starting playback: \(song.title)")
             try await musicService.playSong(song)
 
-            // Clear direction cache when a new song starts playing
-            // This will trigger regeneration when the button appears
+            // Clear direction cache and regenerate when a new song starts playing
+            // This ensures button always shows fresh suggestions as the session evolves
             clearDirectionCache()
+
+            // Only regenerate if it's the user's turn (button is visible)
+            if sessionService.currentTurn == .user {
+                await generateDirectionChange()
+            }
         } catch {
             B2BLog.playback.error("Failed to play song: \(error)")
         }
