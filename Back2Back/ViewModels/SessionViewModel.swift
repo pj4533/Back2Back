@@ -198,8 +198,10 @@ final class SessionViewModel {
         B2BLog.session.info("Queuing AI song with direction change - turn stays on user")
         aiSongCoordinator.startPrefetch(queueStatus: .queuedIfUserSkips, directionChange: directionChange)
 
-        // Clear cached direction so we generate a fresh one when the next song plays
+        // Clear cached direction and regenerate a fresh one immediately
+        // This allows user to tap again if they don't like the queued track
         clearDirectionCache()
+        await generateDirectionChange()
     }
 
     /// Clear the direction change cache and reset to default state
