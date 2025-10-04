@@ -42,12 +42,21 @@ final class OpenAIClient: AIRecommendationServiceProtocol {
 
     // MARK: - Feature Services
 
-    func selectNextSong(persona: String, personaId: UUID, sessionHistory: [SessionSong], config: AIModelConfig = .default) async throws -> SongRecommendation {
+    func selectNextSong(persona: String, personaId: UUID, sessionHistory: [SessionSong], directionChange: DirectionChange? = nil, config: AIModelConfig = .default) async throws -> SongRecommendation {
         try await SongSelectionService.shared.selectNextSong(
             persona: persona,
             personaId: personaId,
             sessionHistory: sessionHistory,
+            directionChange: directionChange,
             config: config,
+            client: self
+        )
+    }
+
+    func generateDirectionChange(persona: String, sessionHistory: [SessionSong]) async throws -> DirectionChange {
+        try await SongSelectionService.shared.generateDirectionChange(
+            persona: persona,
+            sessionHistory: sessionHistory,
             client: self
         )
     }

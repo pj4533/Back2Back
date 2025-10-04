@@ -358,4 +358,51 @@ struct SessionViewModelTests {
         return cleaned.trimmingCharacters(in: .whitespaces)
     }
 
+    // MARK: - Direction Change Tests
+
+    @MainActor
+    @Test("Direction change initial state")
+    func testDirectionChangeInitialState() {
+        let viewModel = SessionViewModel.shared
+
+        // Initial state should have default button label
+        #expect(viewModel.directionButtonLabel == "Different Direction")
+        #expect(viewModel.isGeneratingDirection == false)
+    }
+
+    @MainActor
+    @Test("Direction change button label updates")
+    func testDirectionChangeButtonLabelUpdates() {
+        let viewModel = SessionViewModel.shared
+
+        // Reset to default
+        viewModel.directionButtonLabel = "Different Direction"
+        #expect(viewModel.directionButtonLabel == "Different Direction")
+
+        // Simulate updating to a new direction
+        viewModel.directionButtonLabel = "Older tracks"
+        #expect(viewModel.directionButtonLabel == "Older tracks")
+
+        // Reset back
+        viewModel.directionButtonLabel = "Different Direction"
+        #expect(viewModel.directionButtonLabel == "Different Direction")
+    }
+
+    @MainActor
+    @Test("Direction change generation state management")
+    func testDirectionChangeGenerationStateManagement() {
+        let viewModel = SessionViewModel.shared
+
+        // Initial state
+        #expect(viewModel.isGeneratingDirection == false)
+
+        // Simulate generation start
+        viewModel.isGeneratingDirection = true
+        #expect(viewModel.isGeneratingDirection == true)
+
+        // Simulate generation complete
+        viewModel.isGeneratingDirection = false
+        #expect(viewModel.isGeneratingDirection == false)
+    }
+
 }

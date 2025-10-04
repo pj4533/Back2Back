@@ -60,8 +60,11 @@ final class AISongCoordinator {
     }
 
     /// Prefetch and queue AI song for specified queue position
-    func prefetchAndQueueAISong(queueStatus: QueueStatus) async {
+    func prefetchAndQueueAISong(queueStatus: QueueStatus, directionChange: DirectionChange? = nil) async {
         B2BLog.ai.info("🤖 Starting AI song selection for queue position: \(queueStatus)")
+        if let direction = directionChange {
+            B2BLog.ai.info("🎯 Applying direction change: \(direction.buttonLabel)")
+        }
         B2BLog.ai.debug("Current session has \(self.sessionService.sessionHistory.count) songs played")
         sessionService.setAIThinking(true)
 
@@ -69,7 +72,7 @@ final class AISongCoordinator {
             // Use retry strategy to handle song selection and matching
             let result: (Song, String)? = try await AIRetryStrategy.executeWithRetry(
                 operation: {
-                    let recommendation = try await self.selectAISong()
+                    let recommendation = try await self.selectAISong(directionChange: directionChange)
                     B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
                     B2BLog.ai.debug("Rationale: \(recommendation.rationale)")
 
@@ -96,7 +99,7 @@ final class AISongCoordinator {
                         return nil
                     }
 
-                    let retryRecommendation = try await self.selectAISong()
+                    let retryRecommendation = try await self.selectAISong(directionChange: directionChange)
                     B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
                     B2BLog.ai.debug("Retry rationale: \(retryRecommendation.rationale)")
 
@@ -136,10 +139,10 @@ final class AISongCoordinator {
     }
 
     /// Start prefetching in background
-    func startPrefetch(queueStatus: QueueStatus) {
+    func startPrefetch(queueStatus: QueueStatus, directionChange: DirectionChange? = nil) {
         cancelPrefetch()
         prefetchTask = Task.detached { [weak self] in
-            await self?.prefetchAndQueueAISong(queueStatus: queueStatus)
+            await self?.prefetchAndQueueAISong(queueStatus: queueStatus, directionChange: directionChange)
         }
     }
 
@@ -154,7 +157,7 @@ final class AISongCoordinator {
         sessionService.setAIThinking(false)
     }
 
-    private func selectAISong() async throws -> SongRecommendation {
+    private func selectAISong(directionChange: DirectionChange? = nil) async throws -> SongRecommendation {
         B2BLog.ai.info("Selecting next AI song")
 
         guard environmentService.getOpenAIKey() != nil else {
@@ -171,6 +174,7 @@ final class AISongCoordinator {
             persona: sessionService.currentPersonaStyleGuide,
             personaId: currentPersona.id,
             sessionHistory: sessionService.sessionHistory,
+            directionChange: directionChange,
             config: config
         )
 
@@ -183,6 +187,7 @@ final class AISongCoordinator {
                 persona: retryPersona,
                 personaId: currentPersona.id,
                 sessionHistory: sessionService.sessionHistory,
+                directionChange: directionChange,
                 config: config
             )
 

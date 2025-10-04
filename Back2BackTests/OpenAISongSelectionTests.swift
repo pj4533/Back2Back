@@ -157,4 +157,84 @@ struct OpenAISongSelectionTests {
         let isConfigured = client.isConfigured
         #expect(isConfigured == false || isConfigured == true)
     }
+
+    @MainActor
+    @Test("DirectionChange JSON structure")
+    func testDirectionChangeStructure() throws {
+        // Test that DirectionChange can be decoded from expected JSON
+        let jsonString = """
+        {
+            "directionPrompt": "Focus on tracks from the 1960s-70s era with analog warmth",
+            "buttonLabel": "Older tracks"
+        }
+        """
+
+        let jsonData = jsonString.data(using: .utf8)!
+        let directionChange = try JSONDecoder().decode(DirectionChange.self, from: jsonData)
+
+        #expect(directionChange.directionPrompt == "Focus on tracks from the 1960s-70s era with analog warmth")
+        #expect(directionChange.buttonLabel == "Older tracks")
+    }
+
+    @MainActor
+    @Test("DirectionChange encoding/decoding")
+    func testDirectionChangeCodable() throws {
+        let directionChange = DirectionChange(
+            directionPrompt: "Shift toward more uptempo, energetic selections",
+            buttonLabel: "More energy"
+        )
+
+        // Encode
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(directionChange)
+
+        // Decode
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(DirectionChange.self, from: data)
+
+        #expect(decoded.directionPrompt == directionChange.directionPrompt)
+        #expect(decoded.buttonLabel == directionChange.buttonLabel)
+    }
+
+    @MainActor
+    @Test("DirectionChange equality")
+    func testDirectionChangeEquality() {
+        let direction1 = DirectionChange(
+            directionPrompt: "Explore mellower, late-night vibes",
+            buttonLabel: "Mellower vibe"
+        )
+        let direction2 = DirectionChange(
+            directionPrompt: "Explore mellower, late-night vibes",
+            buttonLabel: "Mellower vibe"
+        )
+        let direction3 = DirectionChange(
+            directionPrompt: "Different prompt",
+            buttonLabel: "Different label"
+        )
+
+        #expect(direction1 == direction2)
+        #expect(direction1 != direction3)
+    }
+
+    @MainActor
+    @Test("DirectionChange button label length")
+    func testDirectionChangeButtonLabelLength() throws {
+        // Test various button label lengths
+        let shortLabel = DirectionChange(
+            directionPrompt: "Test prompt",
+            buttonLabel: "Test"
+        )
+        let mediumLabel = DirectionChange(
+            directionPrompt: "Test prompt",
+            buttonLabel: "Older tracks"
+        )
+        let longerLabel = DirectionChange(
+            directionPrompt: "Test prompt",
+            buttonLabel: "Branch to jazz"
+        )
+
+        #expect(shortLabel.buttonLabel.count <= 20)
+        #expect(mediumLabel.buttonLabel.count <= 20)
+        #expect(longerLabel.buttonLabel.count <= 20)
+    }
 }
