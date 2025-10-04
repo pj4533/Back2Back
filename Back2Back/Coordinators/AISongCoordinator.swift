@@ -21,6 +21,7 @@ final class AISongCoordinator {
     private let musicMatcher: MusicMatchingProtocol
 
     private(set) var prefetchTask: Task<Void, Never>?
+    private var prefetchTaskId: UUID?
 
     // AI Model configuration
     private var aiModelConfig: AIModelConfig {
@@ -60,18 +61,31 @@ final class AISongCoordinator {
     }
 
     /// Prefetch and queue AI song for specified queue position
-    func prefetchAndQueueAISong(queueStatus: QueueStatus, directionChange: DirectionChange? = nil) async {
+    func prefetchAndQueueAISong(queueStatus: QueueStatus, directionChange: DirectionChange? = nil, taskId: UUID) async {
         B2BLog.ai.info("🤖 Starting AI song selection for queue position: \(queueStatus)")
         if let direction = directionChange {
             B2BLog.ai.info("🎯 Applying direction change: \(direction.buttonLabel)")
         }
         B2BLog.ai.debug("Current session has \(self.sessionService.sessionHistory.count) songs played")
+
+        // Check if this task is still valid before starting
+        guard taskId == prefetchTaskId else {
+            B2BLog.ai.info("⏹️ Task \(taskId) superseded by newer task, stopping")
+            return
+        }
+
         sessionService.setAIThinking(true)
 
         do {
             // Use retry strategy to handle song selection and matching
             let result: (Song, String)? = try await AIRetryStrategy.executeWithRetry(
                 operation: {
+                    // Check if task is still valid
+                    guard taskId == self.prefetchTaskId else {
+                        B2BLog.ai.info("⏹️ Task \(taskId) superseded during operation, stopping")
+                        return nil
+                    }
+
                     let recommendation = try await self.selectAISong(directionChange: directionChange)
                     B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
                     B2BLog.ai.debug("Rationale: \(recommendation.rationale)")
@@ -82,17 +96,36 @@ final class AISongCoordinator {
                         return nil
                     }
 
+                    // Check if task is still valid after AI selection
+                    guard taskId == self.prefetchTaskId else {
+                        B2BLog.ai.info("⏹️ Task \(taskId) superseded after AI selection, stopping")
+                        return nil
+                    }
+
                     if let song = await self.searchAndMatchSong(recommendation) {
                         // Double-check again after search
                         if self.userHasSelectedSong() {
                             B2BLog.ai.info("⏭️ User selected a song during AI search - cancelling AI selection")
                             return nil
                         }
+
+                        // Final task validity check
+                        guard taskId == self.prefetchTaskId else {
+                            B2BLog.ai.info("⏹️ Task \(taskId) superseded after search, stopping")
+                            return nil
+                        }
+
                         return (song, recommendation.rationale)
                     }
                     return nil
                 },
                 retryOperation: {
+                    // Check if task is still valid before retry
+                    guard taskId == self.prefetchTaskId else {
+                        B2BLog.ai.info("⏹️ Task \(taskId) superseded before retry, stopping")
+                        return nil
+                    }
+
                     // Check if user selected during the failed attempt
                     if self.userHasSelectedSong() {
                         B2BLog.ai.info("⏭️ User selected a song during failed search - cancelling AI retry")
@@ -103,17 +136,37 @@ final class AISongCoordinator {
                     B2BLog.ai.info("🔄 AI retry recommended: \(retryRecommendation.song) by \(retryRecommendation.artist)")
                     B2BLog.ai.debug("Retry rationale: \(retryRecommendation.rationale)")
 
+                    // Check if task is still valid after retry AI selection
+                    guard taskId == self.prefetchTaskId else {
+                        B2BLog.ai.info("⏹️ Task \(taskId) superseded after retry selection, stopping")
+                        return nil
+                    }
+
                     if let retrySong = await self.searchAndMatchSong(retryRecommendation) {
                         // Final check if user selected during retry
                         if self.userHasSelectedSong() {
                             B2BLog.ai.info("⏭️ User selected a song during AI retry - cancelling AI selection")
                             return nil
                         }
+
+                        // Final task validity check
+                        guard taskId == self.prefetchTaskId else {
+                            B2BLog.ai.info("⏹️ Task \(taskId) superseded after retry search, stopping")
+                            return nil
+                        }
+
                         return (retrySong, retryRecommendation.rationale)
                     }
                     return nil
                 }
             )
+
+            // Final check before queueing
+            guard taskId == prefetchTaskId else {
+                B2BLog.ai.info("⏹️ Task \(taskId) superseded before queueing, stopping")
+                sessionService.setAIThinking(false)
+                return
+            }
 
             // If we got a result, queue the song
             if let (song, rationale) = result {
@@ -135,14 +188,23 @@ final class AISongCoordinator {
             B2BLog.session.debug("Cancelling existing AI prefetch task")
             prefetchTask?.cancel()
             prefetchTask = nil
+            prefetchTaskId = nil
         }
     }
 
     /// Start prefetching in background
     func startPrefetch(queueStatus: QueueStatus, directionChange: DirectionChange? = nil) {
-        cancelPrefetch()
+        // Don't cancel existing task here - just invalidate its ID
+        // This prevents race conditions where the new task checks Task.isCancelled
+        if prefetchTask != nil {
+            B2BLog.session.debug("Superseding existing AI prefetch task with new task")
+        }
+
+        let taskId = UUID()
+        prefetchTaskId = taskId
+
         prefetchTask = Task.detached { [weak self] in
-            await self?.prefetchAndQueueAISong(queueStatus: queueStatus, directionChange: directionChange)
+            await self?.prefetchAndQueueAISong(queueStatus: queueStatus, directionChange: directionChange, taskId: taskId)
         }
     }
 
