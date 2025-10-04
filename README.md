@@ -13,18 +13,23 @@ Back2Back transforms music listening into a collaborative DJ experience. Users p
 #### Apple Music Integration
 - Full MusicKit authorization flow with proper error handling
 - Real-time catalog search with performance-optimized debouncing (0.75s)
-- Music playback via ApplicationMusicPlayer with prepareToPlay() for queue readiness
-- Now Playing view with mini/expanded player UI
-- Queue management and playback controls
+- Music playback via ApplicationMusicPlayer with automatic queue management
+- Intelligent 95% queueing strategy for smooth song transitions
+- Now Playing view with mini/expanded player UI and interactive controls
+- Live playback progress tracking with scrubbing support
+- Skip forward/backward controls (±15s jumps)
 - Tap-to-skip functionality for queued songs
 
 #### AI-Powered DJ Experience
 - **OpenAI Integration**: GPT-5 Responses API for intelligent song selection
 - **Persona System**: Create, edit, and manage custom DJ personas
   - Default personas: "Rare Groove Collector", "Modern Electronic DJ"
-  - Configurable style guides for unique AI behavior
+  - AI-powered style guide generation with streaming progress
+  - Generation time warnings for proper user expectations
   - Persistent storage via UserDefaults
 - **Turn-based Logic**: Automatic alternation between user and AI selections
+  - Smart queue status: `.upNext` (AI's turn) vs `.queuedIfUserSkips` (user's turn)
+  - Turn switching based on queue status for correct behavior
 - **Intelligent Prefetching**: AI pre-selects next song while current song plays
 - **AI Model Configuration**: Choose between GPT-5, GPT-5 Mini, GPT-5 Nano with adjustable reasoning levels
 
@@ -53,7 +58,9 @@ Back2Back transforms music listening into a collaborative DJ experience. Users p
 - Comprehensive logging system using OSLog with 9 subsystem categories
 - Swift 6+ concurrency with async/await patterns throughout
 - Non-blocking UI updates using Swift Concurrency
-- MVVM architecture with @Observable ViewModels
+- MVVM + Coordinators architecture with clear separation of concerns
+- Protocol-oriented design for testability and flexibility
+- Facade pattern for service layer organization
 - Secure API key management via EnvironmentService
 
 #### User Interface
@@ -153,41 +160,72 @@ Back2Back/
 │   │   ├── OpenAIModels+Core.swift     # Base request/response types
 │   │   ├── OpenAIModels+Components.swift  # Message, ToolCall, etc.
 │   │   └── OpenAIModels+Streaming.swift   # Streaming response types
+│   ├── Coordinators/          # Coordination layer for complex workflows
+│   │   ├── PlaybackCoordinator.swift   # 95% queueing & transitions
+│   │   ├── TurnManager.swift           # Turn logic & queue advancement
+│   │   └── AISongCoordinator.swift     # AI song selection workflow
+│   ├── Protocols/             # Protocol abstractions for testability
+│   │   ├── MusicServiceProtocol.swift
+│   │   ├── AIRecommendationServiceProtocol.swift
+│   │   └── SessionStateManagerProtocol.swift
 │   ├── Services/
-│   │   ├── MusicService.swift            # MusicKit API wrapper
-│   │   ├── SessionService.swift          # DJ session state management
+│   │   ├── MusicService.swift            # Facade pattern wrapper
+│   │   ├── SessionService.swift          # Session coordination
 │   │   ├── PersonaService.swift          # Persona CRUD operations
 │   │   ├── PersonaSongCacheService.swift # 24hr repetition prevention
 │   │   ├── EnvironmentService.swift      # Secure API key management
-│   │   ├── OpenAIClient.swift            # Core OpenAI HTTP client
-│   │   ├── OpenAIClient+Responses.swift  # Responses API
-│   │   ├── OpenAIClient+Streaming.swift  # Streaming handlers
-│   │   ├── OpenAIClient+StreamHelpers.swift # Stream parsing
-│   │   ├── OpenAIClient+SongSelection.swift # Song recommendation
-│   │   ├── OpenAIClient+Persona.swift    # Persona generation
+│   │   ├── MusicKit/          # MusicKit service layer
+│   │   │   ├── MusicAuthService.swift    # Authorization
+│   │   │   ├── MusicSearchService.swift  # Catalog search
+│   │   │   └── MusicPlaybackService.swift # Playback controls
+│   │   ├── Session/           # Session management
+│   │   │   ├── QueueManager.swift
+│   │   │   └── SessionHistoryService.swift
+│   │   ├── OpenAI/            # OpenAI service layer
+│   │   │   ├── Core/
+│   │   │   │   ├── OpenAIClient.swift
+│   │   │   │   └── OpenAIConfig.swift
+│   │   │   ├── Features/
+│   │   │   │   ├── SongSelectionService.swift
+│   │   │   │   └── PersonaGenerationService.swift
+│   │   │   └── Networking/
+│   │   │       ├── OpenAINetworking.swift
+│   │   │       └── OpenAIStreaming.swift
 │   │   └── MusicMatching/
-│   │       ├── MusicMatchingProtocol.swift      # Matcher interface
-│   │       ├── StringBasedMusicMatcher.swift    # Fuzzy string matching
-│   │       └── LLMBasedMusicMatcher.swift       # Future LLM matcher
+│   │       ├── MusicMatchingProtocol.swift
+│   │       ├── StringBasedMusicMatcher.swift
+│   │       └── LLMBasedMusicMatcher.swift
 │   ├── ViewModels/
 │   │   ├── MusicAuthViewModel.swift      # Authorization state
 │   │   ├── MusicSearchViewModel.swift    # Search with debouncing
 │   │   ├── SessionViewModel.swift        # DJ session logic
-│   │   ├── NowPlayingViewModel.swift     # Playback state
+│   │   ├── NowPlayingViewModel.swift     # Playback with live tracking
 │   │   ├── PersonasViewModel.swift       # Persona list management
-│   │   └── PersonaDetailViewModel.swift  # Persona editing
+│   │   ├── PersonaDetailViewModel.swift  # Persona editing
+│   │   └── ViewModelError.swift          # Unified error handling
 │   ├── Views/
 │   │   ├── MusicAuthorizationView.swift  # Authorization UI
 │   │   ├── MusicSearchView.swift         # Search interface
-│   │   ├── NowPlayingView.swift          # Playback controls
+│   │   ├── NowPlayingView.swift          # Interactive playback controls
 │   │   ├── SessionView.swift             # DJ session UI
 │   │   ├── PersonasListView.swift        # Persona management
 │   │   ├── PersonaDetailView.swift       # Edit/create persona
-│   │   └── ConfigurationView.swift       # AI settings and debug
+│   │   ├── ConfigurationView.swift       # AI settings and debug
+│   │   ├── Session/           # Session subviews
+│   │   │   ├── SessionHeaderView.swift
+│   │   │   ├── SessionHistoryListView.swift
+│   │   │   ├── SessionSongRow.swift
+│   │   │   ├── SessionActionButtons.swift
+│   │   │   └── AILoadingCell.swift
+│   │   └── Personas/          # Persona subviews
+│   │       ├── GenerationProgressView.swift
+│   │       ├── KeyboardToolbarGenerateButton.swift
+│   │       └── SourcesListView.swift
 │   ├── Utils/
-│   │   └── Logger.swift       # OSLog-based logging (9 subsystems)
+│   │   ├── Logger.swift       # OSLog-based logging (9 subsystems)
+│   │   └── AIRetryStrategy.swift # Generic retry logic
 │   └── Info.plist             # Background audio configuration
-├── Back2BackTests/            # Swift Testing framework (17 test files)
+├── Back2BackTests/            # Swift Testing framework (20+ test files)
 ├── internal_docs/
 │   ├── back2back_requirements.md          # Original specification
 │   └── openai-responses-api-web-search-swift.md  # OpenAI API docs
@@ -205,21 +243,35 @@ Back2Back/
 
 ### Key Components
 
-#### MusicService
-Central service managing all MusicKit interactions:
-- Authorization handling with Settings deep-linking
-- Catalog search with TopResults prioritization
-- Playback control via ApplicationMusicPlayer
-- Queue management with prepareToPlay()
-- Real-time playback state updates
+#### Coordinators Layer (NEW)
+**PlaybackCoordinator**: Monitors playback and manages transitions
+- 95% queueing strategy for smooth transitions
+- State observer for automatic song change detection
+- Fallback logic at 99% if queueing fails
+
+**TurnManager**: Manages turn state and queue advancement
+- `determineNextQueueStatus()` - decides queue status based on current turn
+- `advanceToNextSong()` - handles automatic song progression
+- `skipToSong()` - handles user-initiated skips
+
+**AISongCoordinator**: Orchestrates AI song selection workflow
+- Coordinates between AI service, music matching, and session state
+- Handles retry logic using AIRetryStrategy
+- Manages prefetching for smooth playback
+
+#### MusicService (Facade Pattern)
+Central service delegating to specialized sub-services:
+- **MusicAuthService**: Authorization handling with Settings deep-linking
+- **MusicSearchService**: Catalog search with pagination support
+- **MusicPlaybackService**: Playback control, seek, skip (±15s), real-time state
+- Maintains backward compatibility while enabling single-responsibility services
 
 #### SessionService
-Manages the back-to-back DJ session:
-- Session history tracking with metadata
-- Queue management (upNext, queuedIfUserSkips)
-- Turn management (User/AI alternation)
-- Currently playing song tracking
-- Song status updates (playing, played)
+Coordinates session state across sub-services:
+- **SessionHistoryService**: History tracking with metadata and status updates
+- **QueueManager**: Queue operations (add, remove, get next)
+- Turn management with queue status-based logic
+- Integration point for PlaybackCoordinator and TurnManager
 
 #### PersonaService
 Handles DJ persona management:
@@ -235,12 +287,18 @@ Time-based repetition prevention:
 - UserDefaults persistence
 - Recent song exclusion for AI prompts
 
-#### OpenAIClient
-Handles all AI interactions:
-- GPT-5 Responses API integration
-- Song selection with persona context
-- Streaming persona generation
-- Configurable models and reasoning levels
+#### OpenAI Services (Organized by Layer)
+**Core Layer**:
+- **OpenAIClient**: HTTP client with request/response handling
+- **OpenAIConfig**: Configuration management
+
+**Features Layer**:
+- **SongSelectionService**: GPT-5-powered song recommendations with persona context
+- **PersonaGenerationService**: Streaming persona style guide generation
+
+**Networking Layer**:
+- **OpenAINetworking**: Network request handling
+- **OpenAIStreaming**: Streaming response parsing
 
 #### StringBasedMusicMatcher
 Intelligent track matching:
@@ -345,29 +403,35 @@ Comprehensive test coverage includes:
 - Keep UI responsive with background processing
 - Document complex logic with inline comments
 
-## Recent Updates (September 2025)
+## Recent Updates (September-October 2025)
 
-### Time-Based Song Repetition Prevention (PR #19)
-Implemented 24-hour cache system to prevent personas from repeating songs:
-- PersonaSongCacheService with automatic expiration
-- Per-persona song tracking in UserDefaults
-- AI prompts include exclusion list
-- Debug UI to clear cache
+### Simplified Queue Management (PR #36, October 2025)
+Complete overhaul for smoother playback experience:
+- **95% Queueing**: Songs queued to MusicKit at 95% instead of manual stop at 97%
+- **Natural Transitions**: MusicKit handles fade-outs automatically
+- **Fixed Turn Logic**: Correct queue status based on current turn state
+- **Benefits**: Songs play to completion, smoother transitions, simpler code
 
-### Tap-to-Skip Functionality
-Users can now tap any queued song to skip ahead:
-- Tap gesture on SessionSongRow
-- Automatic queue management
-- Smooth transition handling
+### Interactive Playback Controls (PR #27, September 2025)
+Full-featured playback control implementation:
+- **Live Progress**: 500ms polling for real-time position tracking
+- **Interactive Scrubbing**: Tap-to-seek and drag gesture support
+- **Skip Controls**: ±15s forward/backward buttons
+- **Enhanced UI**: Larger hit areas, visual feedback
 
-### Intelligent Track Matching (PR #17)
-Enhanced verification between AI recommendations and Apple Music:
-- Unicode normalization (curly quotes, diacritics)
-- Artist/title normalization (featuring, "The" prefix, ampersands)
-- Parenthetical stripping (Remastered, Live, Part numbers)
-- Confidence scoring requiring BOTH matches
-- AI retry logic for failed matches
-- Protocol-based architecture for future LLM matching
+### Architecture Refactoring (PRs #23, #25, September 2025)
+Major organization improvements:
+- **Coordinators**: PlaybackCoordinator, TurnManager, AISongCoordinator
+- **Service Layer Split**: MusicKit, Session, OpenAI organized by responsibility
+- **Protocol Abstractions**: Testable interfaces for all major services
+- **Code Quality**: Reduced from 8 files >300 lines to 0
+
+### AI & UX Enhancements
+- **Persona Generation**: Time warnings and streaming progress for style guide creation
+- **Song Repetition Prevention**: 24-hour cache prevents persona repeats (PR #19)
+- **Track Matching**: Unicode normalization, fuzzy matching, retry logic (PR #17)
+- **Pagination**: MusicKit search with pagination support
+- **Tap-to-Skip**: Skip to any queued song with a tap
 
 ## Future Roadmap
 

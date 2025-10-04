@@ -90,6 +90,12 @@ final class AIRetryStrategy {
             return nil
         }
 
+        // Check if task has been cancelled before retrying
+        if Task.isCancelled {
+            B2BLog.ai.info("⏹️ Task cancelled - stopping retry attempts")
+            return nil
+        }
+
         // Call optional pre-retry callback
         if let onRetry = onRetry {
             await onRetry()
@@ -114,6 +120,12 @@ final class AIRetryStrategy {
                 )
             }
         } catch {
+            // Check if this is a cancellation error
+            if Task.isCancelled {
+                B2BLog.ai.info("⏹️ Task cancelled during retry - stopping")
+                return nil
+            }
+
             B2BLog.ai.warning("⚠️ Retry attempt \(attemptNumber) failed with error: \(error)")
 
             if remainingAttempts > 1 {

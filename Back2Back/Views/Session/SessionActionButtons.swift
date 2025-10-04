@@ -11,9 +11,11 @@ import OSLog
 
 struct SessionActionButtons: View {
     private let sessionService = SessionService.shared
+    private let sessionViewModel = SessionViewModel.shared
 
     let onUserSelectTapped: () -> Void
     let onAIStartTapped: () -> Void
+    let onDirectionChangeTapped: () -> Void
 
     // Check if user has already selected a song in the queue
     private var hasUserSelectedSong: Bool {
@@ -58,20 +60,52 @@ struct SessionActionButtons: View {
                     }
                 }
             } else if sessionService.currentTurn == .user && !hasUserSelectedSong {
-                // After session has started, only show user selection button on their turn
-                Button(action: {
-                    B2BLog.ui.debug("User tapped select song button")
-                    onUserSelectTapped()
-                }) {
-                    Label(
-                        "Select Your Track",
-                        systemImage: "plus.circle.fill"
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+                // After session has started, show user selection button and direction change button on their turn
+                HStack(spacing: 12) {
+                    // User selection button
+                    Button(action: {
+                        B2BLog.ui.debug("User tapped select song button")
+                        onUserSelectTapped()
+                    }) {
+                        Label(
+                            "Select Your Track",
+                            systemImage: "plus.circle.fill"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+
+                    // Direction change button
+                    Button(action: {
+                        B2BLog.ui.debug("User tapped direction change button: \(sessionViewModel.directionButtonLabel)")
+                        onDirectionChangeTapped()
+                    }) {
+                        HStack {
+                            if sessionViewModel.isGeneratingDirection {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                            }
+                            Text(sessionViewModel.directionButtonLabel)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.secondary)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(sessionViewModel.isGeneratingDirection)
+                }
+                .task {
+                    // Generate direction change when buttons appear
+                    await sessionViewModel.generateDirectionChange()
                 }
             }
         }

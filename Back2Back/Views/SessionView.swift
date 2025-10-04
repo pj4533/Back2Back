@@ -26,6 +26,9 @@ struct SessionView: View {
                 onUserSelectTapped: { showSongPicker = true },
                 onAIStartTapped: {
                     Task { await handleAIStartFirst() }
+                },
+                onDirectionChangeTapped: {
+                    Task { await handleDirectionChange() }
                 }
             )
         }
@@ -65,6 +68,12 @@ struct SessionView: View {
     private func handleAIStartFirst() async {
         B2BLog.session.info("User requested AI to start first")
         await sessionViewModel.handleAIStartFirst()
+    }
+
+    @MainActor
+    private func handleDirectionChange() async {
+        B2BLog.session.info("User requested direction change")
+        await sessionViewModel.handleDirectionChange()
     }
 }
 
