@@ -32,6 +32,11 @@ Back2Back transforms music listening into a collaborative DJ experience. Users p
   - Turn switching based on queue status for correct behavior
 - **Intelligent Prefetching**: AI pre-selects next song while current song plays
 - **AI Model Configuration**: Choose between GPT-5, GPT-5 Mini, GPT-5 Nano with adjustable reasoning levels
+- **Dynamic Direction Change**: AI-generated contextual suggestions to steer the session
+  - Analyzes session history to identify dominant patterns
+  - Suggests dramatic contrasts (different eras, regions, tempos, moods)
+  - Smart button labels like "West Coast vibes", "60s garage rock"
+  - Automatically regenerates as session evolves
 
 #### Advanced Song Matching
 - **StringBasedMusicMatcher**: Fuzzy matching with sophisticated normalization
@@ -155,6 +160,7 @@ Back2Back/
 │   │   ├── MusicModels.swift           # Music search and playback models
 │   │   ├── PersonaModels.swift         # Persona and generation result types
 │   │   ├── PersonaSongCache.swift      # 24-hour song cache models
+│   │   ├── DirectionChange.swift       # Direction change prompt and button label
 │   │   ├── AIModelConfig.swift         # AI configuration and persistence
 │   │   ├── OpenAIModels.swift          # OpenAI API types
 │   │   ├── OpenAIModels+Core.swift     # Base request/response types
@@ -186,7 +192,7 @@ Back2Back/
 │   │   │   │   ├── OpenAIClient.swift
 │   │   │   │   └── OpenAIConfig.swift
 │   │   │   ├── Features/
-│   │   │   │   ├── SongSelectionService.swift
+│   │   │   │   ├── SongSelectionService.swift    # Song selection & direction changes
 │   │   │   │   └── PersonaGenerationService.swift
 │   │   │   └── Networking/
 │   │   │       ├── OpenAINetworking.swift
@@ -198,7 +204,7 @@ Back2Back/
 │   ├── ViewModels/
 │   │   ├── MusicAuthViewModel.swift      # Authorization state
 │   │   ├── MusicSearchViewModel.swift    # Search with debouncing
-│   │   ├── SessionViewModel.swift        # DJ session logic
+│   │   ├── SessionViewModel.swift        # DJ session logic & direction changes
 │   │   ├── NowPlayingViewModel.swift     # Playback with live tracking
 │   │   ├── PersonasViewModel.swift       # Persona list management
 │   │   ├── PersonaDetailViewModel.swift  # Persona editing
@@ -404,6 +410,15 @@ Comprehensive test coverage includes:
 - Document complex logic with inline comments
 
 ## Recent Updates (September-October 2025)
+
+### Dynamic Direction Change Button (PR #38, October 2025)
+Intelligent session steering with AI-powered suggestions:
+- **Contextual Analysis**: GPT-5-mini examines session history to identify patterns
+- **Contrasting Suggestions**: Proposes dramatic direction changes (different eras, regions, styles)
+- **Smart Labels**: Context-aware button text like "West Coast vibes", "Downtempo shift"
+- **Automatic Updates**: Regenerates when songs play or button is tapped
+- **Race Condition Prevention**: Task ID-based coordination prevents cancellation issues
+- **Bug Fixes**: Addressed task cancellation bleeding, retry loops, state race conditions
 
 ### Simplified Queue Management (PR #36, October 2025)
 Complete overhaul for smoother playback experience:

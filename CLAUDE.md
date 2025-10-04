@@ -120,6 +120,15 @@ Key MusicKit resources:
    - Visual feedback during scrubbing
    - Increased hit areas for better touch targets
 
+11. **Dynamic Direction Change Button** ✅
+   - AI-generated contextual direction suggestions during user's turn
+   - Analyzes session history to suggest contrasting musical directions
+   - Smart button label generation (e.g., "West Coast vibes", "60s garage rock")
+   - Automatically regenerates when new songs play
+   - Task ID-based cancellation prevents race conditions
+   - GPT-5-mini powered for fast, cost-effective suggestions
+   - Turn remains on user after direction change (AI provides backup)
+
 ### Not Yet Implemented
 - Playlist export to Apple Music
 - Crossfade/BPM-aware transitions
@@ -138,6 +147,7 @@ Back2Back/
 │   │   ├── MusicModels.swift           # MusicSearchResult, NowPlayingItem, error types
 │   │   ├── PersonaModels.swift         # Persona and PersonaGenerationResult
 │   │   ├── PersonaSongCache.swift      # CachedSong, PersonaSongCache (24hr expiration)
+│   │   ├── DirectionChange.swift       # Direction change prompt and button label
 │   │   ├── AIModelConfig.swift         # AI model configuration and persistence
 │   │   ├── OpenAIModels.swift          # Core OpenAI API types
 │   │   ├── OpenAIModels+Core.swift     # Base request/response types
@@ -187,7 +197,7 @@ Back2Back/
 │   │   │   │   ├── OpenAIClient.swift    # HTTP client
 │   │   │   │   └── OpenAIConfig.swift    # Configuration
 │   │   │   ├── Features/
-│   │   │   │   ├── SongSelectionService.swift    # Song recommendations
+│   │   │   │   ├── SongSelectionService.swift    # Song recommendations & direction changes
 │   │   │   │   └── PersonaGenerationService.swift # Persona generation
 │   │   │   └── Networking/
 │   │   │       ├── OpenAINetworking.swift # Network layer
@@ -199,7 +209,7 @@ Back2Back/
 │   ├── ViewModels/
 │   │   ├── MusicAuthViewModel.swift      # Auth state management
 │   │   ├── MusicSearchViewModel.swift    # Search with 0.75s debouncing
-│   │   ├── SessionViewModel.swift        # DJ session logic and AI coordination
+│   │   ├── SessionViewModel.swift        # DJ session logic, AI coordination, direction changes
 │   │   ├── NowPlayingViewModel.swift     # Playback state with live tracking
 │   │   ├── PersonasViewModel.swift       # Persona list management
 │   │   ├── PersonaDetailViewModel.swift  # Persona editing/creation
@@ -307,6 +317,21 @@ xcodebuild clean -project Back2Back.xcodeproj -scheme Back2Back
 
 ## Recent Improvements (September-October 2025)
 
+### Dynamic Direction Change Button (PR #38, October 2025)
+Intelligent AI-powered session steering feature:
+- **AI-Generated Suggestions**: GPT-5-mini analyzes session history to suggest contrasting musical directions
+- **Smart Prompts**: Identifies dominant patterns (regions, eras, tempos, genres) and suggests dramatic contrasts
+- **Dynamic Button Labels**: Context-aware labels like "West Coast vibes", "60s garage rock", "Downtempo shift"
+- **Automatic Regeneration**: Button updates when new songs play and when tapped
+- **Turn Logic**: Direction changes queue AI backup song while keeping turn on user
+- **Task ID-Based Cancellation**: Prevents race conditions when tapping during AI thinking
+- **DirectionChange Model**: Contains both detailed prompt for AI and short button label for UI
+- **Bug Fixes**:
+  - Fixed cancellation state bleeding between old and new tasks (b220ef5)
+  - Added Task.isCancelled checks to stop retry loops (d79c19f)
+  - Explicit AI thinking state reset to prevent race conditions (0f4af4a)
+  - Active regeneration when songs play during user's turn (d8ca5f7)
+
 ### Simplified Queue Management (PR #36, October 2025)
 Complete overhaul of queue management for smoother playback:
 - **95% Queueing Strategy**: Songs queued to MusicKit at 95% progress instead of manual stop at 97%
@@ -413,6 +438,48 @@ The app uses a sophisticated queue management system that leverages MusicKit's n
    - Correct turn logic prevents UI button confusion
    - Simpler codebase using native queue progression
 
+### Direction Change System
+The app provides intelligent musical direction steering during user turns:
+
+1. **AI-Powered Direction Generation**:
+   - Uses GPT-5-mini for fast, cost-effective suggestions
+   - `SongSelectionService.generateDirectionChange()` analyzes session history
+   - Identifies dominant patterns: regions, eras, tempos, genres, moods, production styles
+   - Suggests DRAMATIC CONTRASTS rather than minor variations
+   - Example: If session has many New Orleans tracks → suggests "West Coast psychedelic" not "Southern soul"
+
+2. **DirectionChange Model**:
+   - `directionPrompt`: Detailed guidance for AI song selection (1-2 sentences)
+   - `buttonLabel`: User-facing text for UI button (2-4 words max)
+   - Example: `{directionPrompt: "Focus on West Coast psychedelic rock with experimental production", buttonLabel: "West Coast vibes"}`
+
+3. **Automatic Regeneration Triggers**:
+   - When direction button first appears (`.task` modifier in SessionActionButtons)
+   - When user taps direction button (`clearDirectionCache()` + `generateDirectionChange()`)
+   - When new song starts playing during user's turn (`playCurrentSong()` checks turn state)
+   - Caching prevents redundant generation for same song
+
+4. **Task Management for Race Condition Prevention**:
+   - **Task ID System**: Each prefetch gets unique UUID, checked throughout operation
+   - **Superseding Not Cancelling**: New tasks invalidate old task IDs without calling `.cancel()`
+   - **Prevents Cancellation Bleeding**: Task.isCancelled doesn't affect new tasks
+   - **Multiple Checkpoints**: Task ID validated before/after AI selection, search, queueing
+   - **Retry Loop Protection**: `AIRetryStrategy` checks `Task.isCancelled` before retries
+   - **Explicit State Reset**: `sessionService.setAIThinking(false)` before starting new task
+
+5. **User Interaction Flow**:
+   - User's turn → direction button appears with suggestion
+   - User taps button → cancels existing AI task, clears queue, starts new prefetch with direction
+   - New AI selection uses `directionPrompt` appended to persona prompt
+   - Song queued as `.queuedIfUserSkips` (turn stays on user, not switched)
+   - Direction cache cleared immediately, fresh suggestion generated for next tap
+
+6. **Turn Logic Integration**:
+   - Direction changes treated as AI suggestions, not user selections
+   - Turn remains `.user` after direction change
+   - User can tap direction multiple times or select their own song
+   - AI backup removed if user selects manually
+
 ### Architecture Patterns
 - **MVVM + Coordinators**: Clear separation with coordination layer for complex workflows
 - **@Observable**: Modern observation framework (iOS 17+, enhanced in iOS 26)
@@ -421,6 +488,7 @@ The app uses a sophisticated queue management system that leverages MusicKit's n
 - **Single Responsibility**: Services split by concern (Auth, Search, Playback, Queue, History)
 - **Swift Concurrency**: async/await throughout, no completion handlers
 - **@MainActor**: Ensures UI updates on main thread
+- **Task ID-Based Coordination**: Prevents race conditions in async workflows
 
 ### Current Test Coverage
 - Authorization flow (MusicAuthViewModelTests)
