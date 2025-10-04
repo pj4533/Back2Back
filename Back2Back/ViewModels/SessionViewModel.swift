@@ -31,6 +31,7 @@ final class SessionViewModel {
     var directionButtonLabel: String = "Different Direction"
     var isGeneratingDirection: Bool = false
     private var cachedDirectionChange: DirectionChange?
+    private var lastDirectionGenerationSongId: String?
 
     init(
         musicService: MusicService = MusicService.shared,
@@ -138,6 +139,15 @@ final class SessionViewModel {
             return
         }
 
+        // Check if we need to regenerate based on current playing song
+        let currentSongId = sessionService.sessionHistory.last?.song.id.rawValue
+        if let lastSongId = lastDirectionGenerationSongId,
+           let currentId = currentSongId,
+           lastSongId == currentId {
+            B2BLog.ai.debug("Direction already generated for current song, skipping")
+            return
+        }
+
         isGeneratingDirection = true
         defer { isGeneratingDirection = false }
 
@@ -150,6 +160,7 @@ final class SessionViewModel {
 
             cachedDirectionChange = directionChange
             directionButtonLabel = directionChange.buttonLabel
+            lastDirectionGenerationSongId = currentSongId
 
             B2BLog.ai.info("Direction change generated: \(directionChange.buttonLabel)")
         } catch {
@@ -160,6 +171,7 @@ final class SessionViewModel {
                 directionPrompt: "Select a track that takes the session in a different musical direction while staying true to your persona.",
                 buttonLabel: "Different Direction"
             )
+            lastDirectionGenerationSongId = currentSongId
         }
     }
 
@@ -186,9 +198,16 @@ final class SessionViewModel {
         B2BLog.session.info("Queuing AI song with direction change - turn stays on user")
         aiSongCoordinator.startPrefetch(queueStatus: .queuedIfUserSkips, directionChange: directionChange)
 
-        // Clear cached direction so we generate a fresh one next time
+        // Clear cached direction so we generate a fresh one when the next song plays
+        clearDirectionCache()
+    }
+
+    /// Clear the direction change cache and reset to default state
+    private func clearDirectionCache() {
+        B2BLog.ai.debug("Clearing direction change cache")
         cachedDirectionChange = nil
         directionButtonLabel = "Different Direction"
+        lastDirectionGenerationSongId = nil
     }
 
     // MARK: - Private Methods
@@ -197,6 +216,10 @@ final class SessionViewModel {
         do {
             B2BLog.playback.info("Starting playback: \(song.title)")
             try await musicService.playSong(song)
+
+            // Clear direction cache when a new song starts playing
+            // This will trigger regeneration when the button appears
+            clearDirectionCache()
         } catch {
             B2BLog.playback.error("Failed to play song: \(error)")
         }

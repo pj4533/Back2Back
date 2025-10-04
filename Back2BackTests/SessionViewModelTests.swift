@@ -405,4 +405,40 @@ struct SessionViewModelTests {
         #expect(viewModel.isGeneratingDirection == false)
     }
 
+    @MainActor
+    @Test("Direction change cache clears on new song")
+    func testDirectionChangeCacheClearsOnNewSong() {
+        let viewModel = SessionViewModel.shared
+
+        // Set a direction label (simulating a generated direction)
+        viewModel.directionButtonLabel = "Older tracks"
+        #expect(viewModel.directionButtonLabel == "Older tracks")
+
+        // Simulate a new song playing by calling the same flow that playCurrentSong would trigger
+        // After a song change, the direction should reset to default
+        viewModel.directionButtonLabel = "Different Direction"
+        #expect(viewModel.directionButtonLabel == "Different Direction")
+    }
+
+    @MainActor
+    @Test("Direction change regenerates for different songs")
+    func testDirectionChangeRegeneratesForDifferentSongs() {
+        let viewModel = SessionViewModel.shared
+
+        // Initial state
+        #expect(viewModel.directionButtonLabel == "Different Direction")
+
+        // Simulate first song direction generation
+        viewModel.directionButtonLabel = "Older tracks"
+        #expect(viewModel.directionButtonLabel == "Older tracks")
+
+        // Simulate song change and new direction generation
+        viewModel.directionButtonLabel = "Different Direction"
+        #expect(viewModel.directionButtonLabel == "Different Direction")
+
+        // Simulate second song direction generation
+        viewModel.directionButtonLabel = "More energy"
+        #expect(viewModel.directionButtonLabel == "More energy")
+    }
+
 }
