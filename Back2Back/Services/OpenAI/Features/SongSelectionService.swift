@@ -191,22 +191,23 @@ class SongSelectionService {
         \(persona)
         \(historyText)
 
-        Based on the persona's style and the session so far, suggest a single musical direction change that would be interesting and appropriate. This should be a subtle nudge in a different direction while staying true to the persona's overall taste.
+        IMPORTANT: Analyze the session history to identify dominant patterns (geographic regions, eras, tempos, genres, moods, production styles, etc.). Then suggest a direction that is DRAMATICALLY DIFFERENT from these patterns while still fitting within the persona's overall style guide.
 
-        Examples of good direction changes:
-        - "Focus on tracks from the 1960s-70s era with analog warmth"
-        - "Shift toward more uptempo, energetic selections"
-        - "Explore mellower, late-night vibes"
-        - "Branch into related genres like soul or funk"
-        - "Emphasize more recent releases and modern production"
+        For example:
+        - If many songs are from New Orleans → DON'T suggest "Southern soul" or "Gulf Coast blues" → DO suggest "West Coast psychedelic" or "British acid jazz" or "Chicago house"
+        - If many songs are from the 1970s → DON'T suggest "Late 70s disco" → DO suggest "1960s garage rock" or "1990s trip-hop" or "2010s indie"
+        - If many songs are uptempo → DON'T suggest "More energetic" → DO suggest "Downtempo grooves" or "Ambient soundscapes"
+        - If many songs are from similar artists → DON'T suggest related artists → DO suggest completely different subgenres within the persona's taste
+
+        The goal is to create CONTRAST and SURPRISE while staying true to the persona's broader aesthetic. Think of it as exploring a different corner of the persona's musical universe that hasn't been visited yet in this session.
 
         You MUST respond with ONLY a valid JSON object (no markdown, no extra text) in this exact format:
         {
-          "directionPrompt": "A detailed description of the musical direction change (1-2 sentences)",
+          "directionPrompt": "A detailed description of the musical direction change that contrasts with current patterns (1-2 sentences)",
           "buttonLabel": "A short label for the UI button (2-4 words max)"
         }
 
-        Keep the buttonLabel concise and user-friendly. Examples: "Older tracks", "More energy", "Mellower vibe", "Branch to jazz"
+        Keep the buttonLabel concise and user-friendly. Examples: "West Coast vibes", "60s garage rock", "Downtempo shift", "British invasion", "Modern production"
         """
     }
 
