@@ -97,7 +97,7 @@ struct SessionActionButtons: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.indigo)
+                        .background(Color.orange)
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
