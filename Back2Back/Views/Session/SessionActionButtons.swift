@@ -15,7 +15,7 @@ struct SessionActionButtons: View {
 
     let onUserSelectTapped: () -> Void
     let onAIStartTapped: () -> Void
-    let onDirectionChangeTapped: () -> Void
+    let onDirectionOptionSelected: (DirectionOption) -> Void
 
     // Check if user has already selected a song in the queue
     private var hasUserSelectedSong: Bool {
@@ -78,34 +78,34 @@ struct SessionActionButtons: View {
                         .cornerRadius(12)
                     }
 
-                    // Direction change button
-                    Button(action: {
-                        B2BLog.ui.debug("User tapped direction change button: \(sessionViewModel.directionButtonLabel)")
-                        onDirectionChangeTapped()
-                    }) {
-                        HStack {
-                            if sessionViewModel.isGeneratingDirection {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "arrow.triangle.2.circlepath")
+                    // Direction change menu
+                    Menu {
+                        Section("Nudge toward...") {
+                            ForEach(sessionViewModel.cachedDirectionChange?.options ?? []) { option in
+                                Button(option.buttonLabel) {
+                                    B2BLog.ui.debug("User selected direction option: \(option.buttonLabel)")
+                                    onDirectionOptionSelected(option)
+                                }
                             }
-                            Text(sessionViewModel.directionButtonLabel)
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "slider.horizontal.3")
+                            Text("Nudge The DJ")
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.secondary)
+                        .background(Color.orange)
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
-                    .disabled(sessionViewModel.isGeneratingDirection)
+                    .disabled(sessionViewModel.isGeneratingDirection || sessionViewModel.cachedDirectionChange?.options.isEmpty ?? true)
                 }
                 .task {
-                    // Generate direction change when buttons appear
-                    await sessionViewModel.generateDirectionChange()
+                    // Generate direction change options when buttons appear (non-blocking)
+                    sessionViewModel.generateDirectionChange()
                 }
             }
         }

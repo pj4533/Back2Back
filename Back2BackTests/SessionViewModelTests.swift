@@ -365,27 +365,42 @@ struct SessionViewModelTests {
     func testDirectionChangeInitialState() {
         let viewModel = SessionViewModel.shared
 
-        // Initial state should have default button label
-        #expect(viewModel.directionButtonLabel == "Different Direction")
+        // Initial state should have no cached direction
+        #expect(viewModel.cachedDirectionChange == nil)
         #expect(viewModel.isGeneratingDirection == false)
     }
 
     @MainActor
-    @Test("Direction change button label updates")
-    func testDirectionChangeButtonLabelUpdates() {
-        let viewModel = SessionViewModel.shared
+    @Test("Direction change contains multiple options")
+    func testDirectionChangeMultipleOptions() {
+        // Test the DirectionChange model with multiple options
+        let option1 = DirectionOption(
+            directionPrompt: "Focus on West Coast psychedelic rock",
+            buttonLabel: "West Coast vibes"
+        )
+        let option2 = DirectionOption(
+            directionPrompt: "Explore Chicago house and Detroit techno",
+            buttonLabel: "Midwest electronic"
+        )
+        let directionChange = DirectionChange(options: [option1, option2])
 
-        // Reset to default
-        viewModel.directionButtonLabel = "Different Direction"
-        #expect(viewModel.directionButtonLabel == "Different Direction")
+        #expect(directionChange.options.count == 2)
+        #expect(directionChange.options[0].buttonLabel == "West Coast vibes")
+        #expect(directionChange.options[1].buttonLabel == "Midwest electronic")
+    }
 
-        // Simulate updating to a new direction
-        viewModel.directionButtonLabel = "Older tracks"
-        #expect(viewModel.directionButtonLabel == "Older tracks")
+    @MainActor
+    @Test("Direction change backward compatibility")
+    func testDirectionChangeBackwardCompatibility() {
+        // Test the backward compatibility initializer
+        let directionChange = DirectionChange(
+            directionPrompt: "Select older tracks",
+            buttonLabel: "Older tracks"
+        )
 
-        // Reset back
-        viewModel.directionButtonLabel = "Different Direction"
-        #expect(viewModel.directionButtonLabel == "Different Direction")
+        #expect(directionChange.options.count == 1)
+        #expect(directionChange.options[0].buttonLabel == "Older tracks")
+        #expect(directionChange.options[0].directionPrompt == "Select older tracks")
     }
 
     @MainActor
@@ -406,39 +421,15 @@ struct SessionViewModelTests {
     }
 
     @MainActor
-    @Test("Direction change cache clears on new song")
-    func testDirectionChangeCacheClearsOnNewSong() {
-        let viewModel = SessionViewModel.shared
+    @Test("DirectionOption identifiable conformance")
+    func testDirectionOptionIdentifiable() {
+        let option = DirectionOption(
+            directionPrompt: "Test prompt",
+            buttonLabel: "Test label"
+        )
 
-        // Set a direction label (simulating a generated direction)
-        viewModel.directionButtonLabel = "Older tracks"
-        #expect(viewModel.directionButtonLabel == "Older tracks")
-
-        // Simulate a new song playing by calling the same flow that playCurrentSong would trigger
-        // After a song change, the direction should reset to default
-        viewModel.directionButtonLabel = "Different Direction"
-        #expect(viewModel.directionButtonLabel == "Different Direction")
-    }
-
-    @MainActor
-    @Test("Direction change regenerates for different songs")
-    func testDirectionChangeRegeneratesForDifferentSongs() {
-        let viewModel = SessionViewModel.shared
-
-        // Initial state
-        #expect(viewModel.directionButtonLabel == "Different Direction")
-
-        // Simulate first song direction generation
-        viewModel.directionButtonLabel = "Older tracks"
-        #expect(viewModel.directionButtonLabel == "Older tracks")
-
-        // Simulate song change and new direction generation
-        viewModel.directionButtonLabel = "Different Direction"
-        #expect(viewModel.directionButtonLabel == "Different Direction")
-
-        // Simulate second song direction generation
-        viewModel.directionButtonLabel = "More energy"
-        #expect(viewModel.directionButtonLabel == "More energy")
+        // ID should use buttonLabel
+        #expect(option.id == "Test label")
     }
 
 }

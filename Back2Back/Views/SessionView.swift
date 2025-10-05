@@ -27,8 +27,8 @@ struct SessionView: View {
                 onAIStartTapped: {
                     Task { await handleAIStartFirst() }
                 },
-                onDirectionChangeTapped: {
-                    Task { await handleDirectionChange() }
+                onDirectionOptionSelected: { option in
+                    Task { await handleDirectionChange(option: option) }
                 }
             )
         }
@@ -71,9 +71,9 @@ struct SessionView: View {
     }
 
     @MainActor
-    private func handleDirectionChange() async {
-        B2BLog.session.info("User requested direction change")
-        await sessionViewModel.handleDirectionChange()
+    private func handleDirectionChange(option: DirectionOption) async {
+        B2BLog.session.info("User selected direction option: \(option.buttonLabel)")
+        await sessionViewModel.handleDirectionChange(option: option)
     }
 }
 

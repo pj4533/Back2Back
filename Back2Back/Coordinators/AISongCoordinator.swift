@@ -63,8 +63,8 @@ final class AISongCoordinator {
     /// Prefetch and queue AI song for specified queue position
     func prefetchAndQueueAISong(queueStatus: QueueStatus, directionChange: DirectionChange? = nil, taskId: UUID) async {
         B2BLog.ai.info("🤖 Starting AI song selection for queue position: \(queueStatus)")
-        if let direction = directionChange {
-            B2BLog.ai.info("🎯 Applying direction change: \(direction.buttonLabel)")
+        if let direction = directionChange, let firstOption = direction.options.first {
+            B2BLog.ai.info("🎯 Applying direction change: \(firstOption.buttonLabel)")
         }
         B2BLog.ai.debug("Current session has \(self.sessionService.sessionHistory.count) songs played")
 
