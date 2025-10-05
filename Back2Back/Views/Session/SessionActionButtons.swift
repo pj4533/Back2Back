@@ -80,28 +80,24 @@ struct SessionActionButtons: View {
 
                     // Direction change menu
                     Menu {
-                        ForEach(sessionViewModel.cachedDirectionChange?.options ?? []) { option in
-                            Button(option.buttonLabel) {
-                                B2BLog.ui.debug("User selected direction option: \(option.buttonLabel)")
-                                onDirectionOptionSelected(option)
+                        Section("Nudge toward...") {
+                            ForEach(sessionViewModel.cachedDirectionChange?.options ?? []) { option in
+                                Button(option.buttonLabel) {
+                                    B2BLog.ui.debug("User selected direction option: \(option.buttonLabel)")
+                                    onDirectionOptionSelected(option)
+                                }
                             }
                         }
                     } label: {
                         HStack {
-                            if sessionViewModel.isGeneratingDirection {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                            }
+                            Image(systemName: "slider.horizontal.3")
                             Text("Nudge The DJ")
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.secondary)
+                        .background(Color.indigo)
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
