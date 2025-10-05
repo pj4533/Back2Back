@@ -153,9 +153,12 @@ final class SessionViewModel {
 
         do {
             B2BLog.ai.info("Generating direction change suggestion")
+
+            // Pass the previously cached direction to avoid repetition
             let directionChange = try await OpenAIClient.shared.generateDirectionChange(
                 persona: sessionService.currentPersonaStyleGuide,
-                sessionHistory: sessionService.sessionHistory
+                sessionHistory: sessionService.sessionHistory,
+                previousDirection: cachedDirectionChange
             )
 
             cachedDirectionChange = directionChange

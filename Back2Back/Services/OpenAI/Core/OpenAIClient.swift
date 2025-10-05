@@ -53,10 +53,11 @@ final class OpenAIClient: AIRecommendationServiceProtocol {
         )
     }
 
-    func generateDirectionChange(persona: String, sessionHistory: [SessionSong]) async throws -> DirectionChange {
+    func generateDirectionChange(persona: String, sessionHistory: [SessionSong], previousDirection: DirectionChange? = nil) async throws -> DirectionChange {
         try await SongSelectionService.shared.generateDirectionChange(
             persona: persona,
             sessionHistory: sessionHistory,
+            previousDirection: previousDirection,
             client: self
         )
     }

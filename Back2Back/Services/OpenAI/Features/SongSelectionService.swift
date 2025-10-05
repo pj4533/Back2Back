@@ -76,17 +76,23 @@ class SongSelectionService {
     /// - Parameters:
     ///   - persona: The current DJ persona's style guide
     ///   - sessionHistory: The songs played so far in the session
+    ///   - previousDirection: The previously generated direction (if any) to avoid repetition
     ///   - client: The OpenAI client to use for the request
     /// - Returns: A `DirectionChange` containing the direction prompt and button label
     /// - Throws: OpenAI API errors or JSON decoding errors
     func generateDirectionChange(
         persona: String,
         sessionHistory: [SessionSong],
+        previousDirection: DirectionChange? = nil,
         client: OpenAIClient
     ) async throws -> DirectionChange {
         B2BLog.ai.info("Generating direction change suggestion")
 
-        let prompt = buildDirectionChangePrompt(persona: persona, history: sessionHistory)
+        if let previous = previousDirection {
+            B2BLog.ai.debug("Previous direction: \(previous.buttonLabel)")
+        }
+
+        let prompt = buildDirectionChangePrompt(persona: persona, history: sessionHistory, previousDirection: previousDirection)
 
         // Use GPT-5-mini for fast, cost-effective direction generation
         let request = ResponsesRequest(
@@ -173,7 +179,7 @@ class SongSelectionService {
         """
     }
 
-    private func buildDirectionChangePrompt(persona: String, history: [SessionSong]) -> String {
+    private func buildDirectionChangePrompt(persona: String, history: [SessionSong], previousDirection: DirectionChange? = nil) -> String {
         var historyText = ""
         if !history.isEmpty {
             historyText = """
@@ -184,12 +190,26 @@ class SongSelectionService {
             """
         }
 
+        var previousDirectionText = ""
+        if let previous = previousDirection {
+            previousDirectionText = """
+
+
+            PREVIOUS DIRECTION SUGGESTION (DO NOT REPEAT THIS):
+            Button Label: "\(previous.buttonLabel)"
+            Direction Prompt: "\(previous.directionPrompt)"
+
+            You MUST suggest something COMPLETELY DIFFERENT from this previous suggestion. Explore a different aspect of the persona's musical universe.
+
+            """
+        }
+
         return """
         You are helping a DJ persona suggest a musical direction change for their set.
 
         Current DJ persona:
         \(persona)
-        \(historyText)
+        \(historyText)\(previousDirectionText)
 
         IMPORTANT: Analyze the session history to identify dominant patterns (geographic regions, eras, tempos, genres, moods, production styles, etc.). Then suggest a direction that is DRAMATICALLY DIFFERENT from these patterns while still fitting within the persona's overall style guide.
 
