@@ -28,9 +28,8 @@ final class SessionViewModel {
     private let turnManager: TurnManager
 
     // Direction change state
-    var directionButtonLabel: String = "Different Direction"
     var isGeneratingDirection: Bool = false
-    private var cachedDirectionChange: DirectionChange?
+    private(set) var cachedDirectionChange: DirectionChange?
     private var lastDirectionGenerationSongId: String?
 
     init(
@@ -132,61 +131,70 @@ final class SessionViewModel {
         aiSongCoordinator.startPrefetch(queueStatus: queueStatus)
     }
 
-    /// Generate a contextual direction change suggestion for the current session
-    func generateDirectionChange() async {
-        guard !isGeneratingDirection else {
-            B2BLog.ai.debug("Direction generation already in progress, skipping")
-            return
-        }
+    /// Generate contextual direction change suggestions for the current session (non-blocking)
+    ///
+    /// This method generates 2 direction options in the background without blocking the UI.
+    /// Results are stored in `cachedDirectionChange` and can be displayed in a menu.
+    func generateDirectionChange() {
+        // Fire-and-forget pattern to avoid blocking
+        Task.detached { @MainActor [weak self] in
+            guard let self else { return }
 
-        // Check if we need to regenerate based on current playing song
-        let currentSongId = sessionService.sessionHistory.last?.song.id.rawValue
-        if let lastSongId = lastDirectionGenerationSongId,
-           let currentId = currentSongId,
-           lastSongId == currentId {
-            B2BLog.ai.debug("Direction already generated for current song, skipping")
-            return
-        }
+            guard !self.isGeneratingDirection else {
+                B2BLog.ai.debug("Direction generation already in progress, skipping")
+                return
+            }
 
-        isGeneratingDirection = true
-        defer { isGeneratingDirection = false }
+            // Check if we need to regenerate based on current playing song
+            let currentSongId = self.sessionService.sessionHistory.last?.song.id.rawValue
+            if let lastSongId = self.lastDirectionGenerationSongId,
+               let currentId = currentSongId,
+               lastSongId == currentId {
+                B2BLog.ai.debug("Direction already generated for current song, skipping")
+                return
+            }
 
-        do {
-            B2BLog.ai.info("Generating direction change suggestion")
+            self.isGeneratingDirection = true
+            defer { self.isGeneratingDirection = false }
 
-            // Pass the previously cached direction to avoid repetition
-            let directionChange = try await OpenAIClient.shared.generateDirectionChange(
-                persona: sessionService.currentPersonaStyleGuide,
-                sessionHistory: sessionService.sessionHistory,
-                previousDirection: cachedDirectionChange
-            )
+            do {
+                B2BLog.ai.info("Generating direction change suggestions (2 options)")
 
-            cachedDirectionChange = directionChange
-            directionButtonLabel = directionChange.buttonLabel
-            lastDirectionGenerationSongId = currentSongId
+                // Pass the previously cached direction to avoid repetition
+                let directionChange = try await OpenAIClient.shared.generateDirectionChange(
+                    persona: self.sessionService.currentPersonaStyleGuide,
+                    sessionHistory: self.sessionService.sessionHistory,
+                    previousDirection: self.cachedDirectionChange
+                )
 
-            B2BLog.ai.info("Direction change generated: \(directionChange.buttonLabel)")
-        } catch {
-            B2BLog.ai.error("Failed to generate direction change: \(error)")
-            // Use fallback label
-            directionButtonLabel = "Different Direction"
-            cachedDirectionChange = DirectionChange(
-                directionPrompt: "Select a track that takes the session in a different musical direction while staying true to your persona.",
-                buttonLabel: "Different Direction"
-            )
-            lastDirectionGenerationSongId = currentSongId
+                self.cachedDirectionChange = directionChange
+                self.lastDirectionGenerationSongId = currentSongId
+
+                let labels = directionChange.options.map { $0.buttonLabel }.joined(separator: ", ")
+                B2BLog.ai.info("Direction changes generated: \(labels)")
+            } catch {
+                B2BLog.ai.error("Failed to generate direction change: \(error)")
+                // Use fallback options
+                self.cachedDirectionChange = DirectionChange(options: [
+                    DirectionOption(
+                        directionPrompt: "Select a track that takes the session in a different musical direction while staying true to your persona.",
+                        buttonLabel: "Different direction"
+                    ),
+                    DirectionOption(
+                        directionPrompt: "Explore a contrasting tempo or mood while maintaining the persona's aesthetic.",
+                        buttonLabel: "Change the vibe"
+                    )
+                ])
+                self.lastDirectionGenerationSongId = currentSongId
+            }
         }
     }
 
-    /// Handle user tapping the direction change button
-    func handleDirectionChange() async {
-        guard let directionChange = cachedDirectionChange else {
-            B2BLog.ai.warning("Direction change button tapped but no cached direction available")
-            return
-        }
-
-        B2BLog.session.info("👤 User requested direction change: \(directionChange.buttonLabel)")
-        B2BLog.ai.debug("Direction prompt: \(directionChange.directionPrompt)")
+    /// Handle user selecting a specific direction option from the menu
+    /// - Parameter option: The direction option the user selected
+    func handleDirectionChange(option: DirectionOption) async {
+        B2BLog.session.info("👤 User requested direction change: \(option.buttonLabel)")
+        B2BLog.ai.debug("Direction prompt: \(option.directionPrompt)")
 
         // Cancel any existing prefetch and ensure AI thinking state is cleared
         B2BLog.session.debug("Cancelling any in-flight AI song selection")
@@ -201,6 +209,12 @@ final class SessionViewModel {
         sessionService.clearAIQueuedSongs()
         sessionService.clearNextAISong()
 
+        // Convert the selected option to a DirectionChange for the prefetch
+        let directionChange = DirectionChange(
+            directionPrompt: option.directionPrompt,
+            buttonLabel: option.buttonLabel
+        )
+
         // Queue new AI song with direction change
         // Turn remains on user since they didn't select a song themselves
         B2BLog.session.info("Queuing AI song with direction change - turn stays on user")
@@ -209,14 +223,13 @@ final class SessionViewModel {
         // Clear cached direction and regenerate a fresh one immediately
         // This allows user to tap again if they don't like the queued track
         clearDirectionCache()
-        await generateDirectionChange()
+        generateDirectionChange()
     }
 
     /// Clear the direction change cache and reset to default state
     private func clearDirectionCache() {
         B2BLog.ai.debug("Clearing direction change cache")
         cachedDirectionChange = nil
-        directionButtonLabel = "Different Direction"
         lastDirectionGenerationSongId = nil
     }
 
@@ -228,12 +241,12 @@ final class SessionViewModel {
             try await musicService.playSong(song)
 
             // Clear direction cache and regenerate when a new song starts playing
-            // This ensures button always shows fresh suggestions as the session evolves
+            // This ensures menu always shows fresh suggestions as the session evolves
             clearDirectionCache()
 
-            // Only regenerate if it's the user's turn (button is visible)
+            // Only regenerate if it's the user's turn (menu is visible)
             if sessionService.currentTurn == .user {
-                await generateDirectionChange()
+                generateDirectionChange()
             }
         } catch {
             B2BLog.playback.error("Failed to play song: \(error)")

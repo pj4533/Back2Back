@@ -15,7 +15,7 @@ struct SessionActionButtons: View {
 
     let onUserSelectTapped: () -> Void
     let onAIStartTapped: () -> Void
-    let onDirectionChangeTapped: () -> Void
+    let onDirectionOptionSelected: (DirectionOption) -> Void
 
     // Check if user has already selected a song in the queue
     private var hasUserSelectedSong: Bool {
@@ -78,11 +78,15 @@ struct SessionActionButtons: View {
                         .cornerRadius(12)
                     }
 
-                    // Direction change button
-                    Button(action: {
-                        B2BLog.ui.debug("User tapped direction change button: \(sessionViewModel.directionButtonLabel)")
-                        onDirectionChangeTapped()
-                    }) {
+                    // Direction change menu
+                    Menu {
+                        ForEach(sessionViewModel.cachedDirectionChange?.options ?? []) { option in
+                            Button(option.buttonLabel) {
+                                B2BLog.ui.debug("User selected direction option: \(option.buttonLabel)")
+                                onDirectionOptionSelected(option)
+                            }
+                        }
+                    } label: {
                         HStack {
                             if sessionViewModel.isGeneratingDirection {
                                 ProgressView()
@@ -91,7 +95,7 @@ struct SessionActionButtons: View {
                             } else {
                                 Image(systemName: "arrow.triangle.2.circlepath")
                             }
-                            Text(sessionViewModel.directionButtonLabel)
+                            Text("Nudge The DJ")
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
@@ -101,11 +105,11 @@ struct SessionActionButtons: View {
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
-                    .disabled(sessionViewModel.isGeneratingDirection)
+                    .disabled(sessionViewModel.isGeneratingDirection || sessionViewModel.cachedDirectionChange?.options.isEmpty ?? true)
                 }
                 .task {
-                    // Generate direction change when buttons appear
-                    await sessionViewModel.generateDirectionChange()
+                    // Generate direction change options when buttons appear (non-blocking)
+                    sessionViewModel.generateDirectionChange()
                 }
             }
         }

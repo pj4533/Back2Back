@@ -23,8 +23,8 @@ class SongSelectionService {
     ) async throws -> SongRecommendation {
         B2BLog.ai.info("Requesting AI song selection with persona using model: \(config.songSelectionModel), reasoning: \(config.songSelectionReasoningLevel.rawValue)")
 
-        if let direction = directionChange {
-            B2BLog.ai.info("Applying direction change: \(direction.directionPrompt)")
+        if let direction = directionChange, let firstOption = direction.options.first {
+            B2BLog.ai.info("Applying direction change: \(firstOption.directionPrompt)")
         }
 
         let prompt = buildDJPrompt(persona: persona, personaId: personaId, history: sessionHistory, directionChange: directionChange)
@@ -67,18 +67,18 @@ class SongSelectionService {
         return response.outputText
     }
 
-    /// Generates a contextual direction change suggestion based on the current persona and session history
+    /// Generates contextual direction change suggestions based on the current persona and session history
     ///
-    /// This method uses GPT-5-mini to analyze the current DJ session and suggest a musical direction
-    /// change that the user might want to explore. It returns both a detailed direction prompt for
-    /// the AI to use when selecting the next song, and a short button label for the UI.
+    /// This method uses GPT-5-mini to analyze the current DJ session and suggest multiple musical direction
+    /// options that the user might want to explore. It returns 2 distinct direction options, each with a
+    /// detailed direction prompt for the AI to use when selecting the next song, and a short button label for the UI.
     ///
     /// - Parameters:
     ///   - persona: The current DJ persona's style guide
     ///   - sessionHistory: The songs played so far in the session
-    ///   - previousDirection: The previously generated direction (if any) to avoid repetition
+    ///   - previousDirection: The previously generated directions (if any) to avoid repetition
     ///   - client: The OpenAI client to use for the request
-    /// - Returns: A `DirectionChange` containing the direction prompt and button label
+    /// - Returns: A `DirectionChange` containing an array of 2 direction options
     /// - Throws: OpenAI API errors or JSON decoding errors
     func generateDirectionChange(
         persona: String,
@@ -86,10 +86,10 @@ class SongSelectionService {
         previousDirection: DirectionChange? = nil,
         client: OpenAIClient
     ) async throws -> DirectionChange {
-        B2BLog.ai.info("Generating direction change suggestion")
+        B2BLog.ai.info("Generating direction change suggestions (requesting 2 options)")
 
-        if let previous = previousDirection {
-            B2BLog.ai.debug("Previous direction: \(previous.buttonLabel)")
+        if let previous = previousDirection, !previous.options.isEmpty {
+            B2BLog.ai.debug("Previous directions: \(previous.options.map { $0.buttonLabel }.joined(separator: ", "))")
         }
 
         let prompt = buildDirectionChangePrompt(persona: persona, history: sessionHistory, previousDirection: previousDirection)
@@ -112,8 +112,8 @@ class SongSelectionService {
 
             let directionChange = try JSONDecoder().decode(DirectionChange.self, from: jsonData)
 
-            B2BLog.ai.info("Generated direction change: \(directionChange.buttonLabel)")
-            B2BLog.ai.debug("Direction prompt: \(directionChange.directionPrompt)")
+            B2BLog.ai.info("Generated \(directionChange.options.count) direction change options: \(directionChange.options.map { $0.buttonLabel }.joined(separator: ", "))")
+            B2BLog.ai.debug("Direction prompts: \(directionChange.options.map { $0.directionPrompt }.joined(separator: " | "))")
 
             return directionChange
         } catch {
@@ -151,12 +151,12 @@ class SongSelectionService {
 
         // Add direction change section if provided
         var directionText = ""
-        if let direction = directionChange {
+        if let direction = directionChange, let firstOption = direction.options.first {
             directionText = """
 
 
             NEW DIRECTION FOR THIS SELECTION:
-            \(direction.directionPrompt)
+            \(firstOption.directionPrompt)
 
             """
         }
@@ -191,27 +191,30 @@ class SongSelectionService {
         }
 
         var previousDirectionText = ""
-        if let previous = previousDirection {
+        if let previous = previousDirection, !previous.options.isEmpty {
+            let previousLabels = previous.options.map { "\"\($0.buttonLabel)\"" }.joined(separator: ", ")
+            let previousPrompts = previous.options.map { "- \($0.directionPrompt)" }.joined(separator: "\n")
             previousDirectionText = """
 
 
-            PREVIOUS DIRECTION SUGGESTION (DO NOT REPEAT THIS):
-            Button Label: "\(previous.buttonLabel)"
-            Direction Prompt: "\(previous.directionPrompt)"
+            PREVIOUS DIRECTION SUGGESTIONS (DO NOT REPEAT THESE):
+            Button Labels: \(previousLabels)
+            Direction Prompts:
+            \(previousPrompts)
 
-            You MUST suggest something COMPLETELY DIFFERENT from this previous suggestion. Explore a different aspect of the persona's musical universe.
+            You MUST suggest options that are COMPLETELY DIFFERENT from these previous suggestions. Explore different aspects of the persona's musical universe.
 
             """
         }
 
         return """
-        You are helping a DJ persona suggest a musical direction change for their set.
+        You are helping a DJ persona suggest musical direction changes for their set.
 
         Current DJ persona:
         \(persona)
         \(historyText)\(previousDirectionText)
 
-        IMPORTANT: Analyze the session history to identify dominant patterns (geographic regions, eras, tempos, genres, moods, production styles, etc.). Then suggest a direction that is DRAMATICALLY DIFFERENT from these patterns while still fitting within the persona's overall style guide.
+        IMPORTANT: Analyze the session history to identify dominant patterns (geographic regions, eras, tempos, genres, moods, production styles, etc.). Then suggest 2 DISTINCT directions that are DRAMATICALLY DIFFERENT from these patterns AND from each other, while still fitting within the persona's overall style guide.
 
         For example:
         - If many songs are from New Orleans → DON'T suggest "Southern soul" or "Gulf Coast blues" → DO suggest "West Coast psychedelic" or "British acid jazz" or "Chicago house"
@@ -219,15 +222,25 @@ class SongSelectionService {
         - If many songs are uptempo → DON'T suggest "More energetic" → DO suggest "Downtempo grooves" or "Ambient soundscapes"
         - If many songs are from similar artists → DON'T suggest related artists → DO suggest completely different subgenres within the persona's taste
 
-        The goal is to create CONTRAST and SURPRISE while staying true to the persona's broader aesthetic. Think of it as exploring a different corner of the persona's musical universe that hasn't been visited yet in this session.
+        The goal is to create CONTRAST and SURPRISE while staying true to the persona's broader aesthetic. Think of it as exploring different corners of the persona's musical universe that haven't been visited yet in this session.
+
+        The 2 options you provide should be DISTINCT from each other - they should represent meaningfully different musical directions, not slight variations on the same theme.
 
         You MUST respond with ONLY a valid JSON object (no markdown, no extra text) in this exact format:
         {
-          "directionPrompt": "A detailed description of the musical direction change that contrasts with current patterns (1-2 sentences)",
-          "buttonLabel": "A short label for the UI button (2-4 words max)"
+          "options": [
+            {
+              "directionPrompt": "A detailed description of the first musical direction change (1-2 sentences)",
+              "buttonLabel": "A short label for the UI menu (2-4 words max)"
+            },
+            {
+              "directionPrompt": "A detailed description of the second musical direction change (1-2 sentences)",
+              "buttonLabel": "A short label for the UI menu (2-4 words max)"
+            }
+          ]
         }
 
-        Keep the buttonLabel concise and user-friendly. Examples: "West Coast vibes", "60s garage rock", "Downtempo shift", "British invasion", "Modern production"
+        Keep the buttonLabels concise and user-friendly. Examples: "West Coast vibes", "60s garage rock", "Downtempo shift", "British invasion", "Modern production"
         """
     }
 

@@ -159,30 +159,46 @@ struct OpenAISongSelectionTests {
     }
 
     @MainActor
-    @Test("DirectionChange JSON structure")
+    @Test("DirectionChange JSON structure with multiple options")
     func testDirectionChangeStructure() throws {
-        // Test that DirectionChange can be decoded from expected JSON
+        // Test that DirectionChange can be decoded from expected JSON with multiple options
         let jsonString = """
         {
-            "directionPrompt": "Focus on tracks from the 1960s-70s era with analog warmth",
-            "buttonLabel": "Older tracks"
+            "options": [
+                {
+                    "directionPrompt": "Focus on tracks from the 1960s-70s era with analog warmth",
+                    "buttonLabel": "Vintage vibes"
+                },
+                {
+                    "directionPrompt": "Explore modern electronic production with synthesizers",
+                    "buttonLabel": "Modern synth"
+                }
+            ]
         }
         """
 
         let jsonData = jsonString.data(using: .utf8)!
         let directionChange = try JSONDecoder().decode(DirectionChange.self, from: jsonData)
 
-        #expect(directionChange.directionPrompt == "Focus on tracks from the 1960s-70s era with analog warmth")
-        #expect(directionChange.buttonLabel == "Older tracks")
+        #expect(directionChange.options.count == 2)
+        #expect(directionChange.options[0].directionPrompt == "Focus on tracks from the 1960s-70s era with analog warmth")
+        #expect(directionChange.options[0].buttonLabel == "Vintage vibes")
+        #expect(directionChange.options[1].directionPrompt == "Explore modern electronic production with synthesizers")
+        #expect(directionChange.options[1].buttonLabel == "Modern synth")
     }
 
     @MainActor
-    @Test("DirectionChange encoding/decoding")
+    @Test("DirectionChange encoding/decoding with multiple options")
     func testDirectionChangeCodable() throws {
-        let directionChange = DirectionChange(
+        let option1 = DirectionOption(
             directionPrompt: "Shift toward more uptempo, energetic selections",
             buttonLabel: "More energy"
         )
+        let option2 = DirectionOption(
+            directionPrompt: "Explore downtempo, ambient soundscapes",
+            buttonLabel: "Chill vibes"
+        )
+        let directionChange = DirectionChange(options: [option1, option2])
 
         // Encode
         let encoder = JSONEncoder()
@@ -192,43 +208,46 @@ struct OpenAISongSelectionTests {
         let decoder = JSONDecoder()
         let decoded = try decoder.decode(DirectionChange.self, from: data)
 
-        #expect(decoded.directionPrompt == directionChange.directionPrompt)
-        #expect(decoded.buttonLabel == directionChange.buttonLabel)
+        #expect(decoded.options.count == 2)
+        #expect(decoded.options[0].directionPrompt == option1.directionPrompt)
+        #expect(decoded.options[0].buttonLabel == option1.buttonLabel)
+        #expect(decoded.options[1].directionPrompt == option2.directionPrompt)
+        #expect(decoded.options[1].buttonLabel == option2.buttonLabel)
     }
 
     @MainActor
     @Test("DirectionChange equality")
     func testDirectionChangeEquality() {
-        let direction1 = DirectionChange(
+        let option1 = DirectionOption(
             directionPrompt: "Explore mellower, late-night vibes",
             buttonLabel: "Mellower vibe"
         )
-        let direction2 = DirectionChange(
-            directionPrompt: "Explore mellower, late-night vibes",
-            buttonLabel: "Mellower vibe"
+        let option2 = DirectionOption(
+            directionPrompt: "Explore upbeat, energetic selections",
+            buttonLabel: "More energy"
         )
-        let direction3 = DirectionChange(
-            directionPrompt: "Different prompt",
-            buttonLabel: "Different label"
-        )
+
+        let direction1 = DirectionChange(options: [option1, option2])
+        let direction2 = DirectionChange(options: [option1, option2])
+        let direction3 = DirectionChange(options: [option1])
 
         #expect(direction1 == direction2)
         #expect(direction1 != direction3)
     }
 
     @MainActor
-    @Test("DirectionChange button label length")
-    func testDirectionChangeButtonLabelLength() throws {
-        // Test various button label lengths
-        let shortLabel = DirectionChange(
+    @Test("DirectionOption button label length")
+    func testDirectionOptionButtonLabelLength() throws {
+        // Test various button label lengths for DirectionOption
+        let shortLabel = DirectionOption(
             directionPrompt: "Test prompt",
             buttonLabel: "Test"
         )
-        let mediumLabel = DirectionChange(
+        let mediumLabel = DirectionOption(
             directionPrompt: "Test prompt",
             buttonLabel: "Older tracks"
         )
-        let longerLabel = DirectionChange(
+        let longerLabel = DirectionOption(
             directionPrompt: "Test prompt",
             buttonLabel: "Branch to jazz"
         )
@@ -236,5 +255,19 @@ struct OpenAISongSelectionTests {
         #expect(shortLabel.buttonLabel.count <= 20)
         #expect(mediumLabel.buttonLabel.count <= 20)
         #expect(longerLabel.buttonLabel.count <= 20)
+    }
+
+    @MainActor
+    @Test("DirectionChange backward compatibility")
+    func testDirectionChangeBackwardCompatibility() throws {
+        // Test the backward compatibility initializer
+        let directionChange = DirectionChange(
+            directionPrompt: "Shift toward more uptempo, energetic selections",
+            buttonLabel: "More energy"
+        )
+
+        #expect(directionChange.options.count == 1)
+        #expect(directionChange.options[0].directionPrompt == "Shift toward more uptempo, energetic selections")
+        #expect(directionChange.options[0].buttonLabel == "More energy")
     }
 }
