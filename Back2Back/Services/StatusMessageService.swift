@@ -84,6 +84,25 @@ final class StatusMessageService {
         B2BLog.ai.warning("Cleared all status message caches")
     }
 
+    /// Pregenerate status messages for a persona if needed
+    /// Called proactively (on app start or persona change) to ensure messages are ready
+    func pregenerateMessages(for persona: Persona) {
+        // Check if we already have valid cached messages
+        if let cached = cachedMessages[persona.id], !cached.shouldRegenerate {
+            B2BLog.ai.debug("Pregeneration skipped - valid cache exists for persona: \(persona.name)")
+            return
+        }
+
+        // Either no cache or regeneration needed - start generation
+        B2BLog.ai.info("Pregenerating status messages for persona: \(persona.name)")
+
+        if !isGenerating {
+            generateMessages(for: persona)
+        } else {
+            B2BLog.ai.debug("Generation already in progress, skipping pregeneration")
+        }
+    }
+
     // MARK: - Private Methods
 
     /// Generate messages using Foundation Models framework (fire-and-forget pattern)
