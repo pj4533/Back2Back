@@ -28,20 +28,28 @@ final class StatusMessageService {
 
     /// Get status messages for a persona (returns cached or generates new)
     /// This method uses a fire-and-forget pattern for non-blocking generation
-    /// Returns default messages immediately if generation hasn't completed
+    /// Returns default messages only if no cache exists, otherwise returns cached while regenerating
     func getStatusMessages(for persona: Persona) -> StatusMessages {
-        // Check cache first
-        if let cached = cachedMessages[persona.id], !cached.shouldRegenerate {
+        // Check if we have any cached messages
+        if let cached = cachedMessages[persona.id] {
+            // We have cache - return it
             B2BLog.ai.debug("Using cached status messages for persona: \(persona.name)")
+
+            // If regeneration is needed, trigger background generation while returning old cache
+            if cached.shouldRegenerate && !isGenerating {
+                B2BLog.ai.info("Cache needs regeneration, starting background generation for persona: \(persona.name)")
+                generateMessages(for: persona)
+            }
+
             return cached.messages
         }
 
-        // Start generation in background if not already generating
+        // No cache exists - start generation and return defaults
+        B2BLog.ai.info("No cache found for persona: \(persona.name), generating new messages")
         if !isGenerating {
             generateMessages(for: persona)
         }
 
-        // Return defaults immediately (non-blocking)
         return fallbackMessages()
     }
 
