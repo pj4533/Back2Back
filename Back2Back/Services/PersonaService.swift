@@ -133,6 +133,9 @@ final class PersonaService {
             personas[index].isSelected = true
             savePersonas()
             B2BLog.general.info("✅ Selected persona: \(persona.name)")
+
+            // Pregenerate status messages for the newly selected persona
+            StatusMessageService.shared.pregenerateMessages(for: persona)
         } else {
             B2BLog.general.error("❌ Failed to find persona for selection: \(persona.id)")
         }
