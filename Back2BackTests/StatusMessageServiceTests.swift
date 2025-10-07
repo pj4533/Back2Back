@@ -105,16 +105,16 @@ struct StatusMessageServiceTests {
             messages: messages,
             personaId: personaId,
             generatedAt: Date(),
-            usageCount: 5
+            usageCount: 2
         )
         #expect(cached.shouldRegenerate == false)
 
         // Test with usage count at threshold
-        cached.usageCount = 10
+        cached.usageCount = 3
         #expect(cached.shouldRegenerate == true)
 
         // Test with usage count above threshold
-        cached.usageCount = 15
+        cached.usageCount = 5
         #expect(cached.shouldRegenerate == true)
     }
 

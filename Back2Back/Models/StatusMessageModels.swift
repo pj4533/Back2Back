@@ -26,8 +26,8 @@ struct CachedStatusMessages: Codable, Sendable {
     var usageCount: Int
 
     /// Determines if messages should be regenerated
-    /// Regenerates after 10 uses to keep content fresh
+    /// Regenerates after 3 uses to keep content fresh
     var shouldRegenerate: Bool {
-        usageCount >= 10
+        usageCount >= 3
     }
 }

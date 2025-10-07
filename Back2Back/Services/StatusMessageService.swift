@@ -56,7 +56,7 @@ final class StatusMessageService {
         B2BLog.ai.debug("Incremented usage count to \(cached.usageCount) for persona \(personaId)")
 
         if cached.shouldRegenerate {
-            B2BLog.ai.info("Usage threshold reached (\(cached.usageCount)), will regenerate on next access")
+            B2BLog.ai.info("Usage threshold reached (\(cached.usageCount)/3), will regenerate on next access")
         }
     }
 
