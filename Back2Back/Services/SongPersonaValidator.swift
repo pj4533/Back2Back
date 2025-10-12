@@ -59,32 +59,48 @@ final class SongPersonaValidator {
     ///
     /// **Fail-open behavior**: Returns true if model unavailable or errors occur,
     /// to avoid blocking playback. Validation failures are logged for debugging.
+    ///
+    /// **Note**: Does NOT use Apple Music's genre/release date metadata as it's unreliable
+    /// for rare/obscure tracks. Instead relies on editorial notes and artist context.
     func validate(song: Song, personaDescription: String) async -> Bool {
         guard let session = session else {
             B2BLog.ai.warning("Foundation Model unavailable for validation - accepting by default")
             return true  // Fail open - don't block playback if model unavailable
         }
 
-        // Format release date (handle nil gracefully)
-        let releaseYear: String
-        if let date = song.releaseDate {
-            releaseYear = date.formatted(.dateTime.year())
-        } else {
-            releaseYear = "unknown"
+        // Build context from available editorial content (not metadata like genre/year)
+        var contextParts: [String] = []
+
+        // Song title and artist (always available)
+        contextParts.append("Song: \"\(song.title)\" by \(song.artistName)")
+
+        // Album title provides context
+        if let albumTitle = song.albumTitle {
+            contextParts.append("Album: \(albumTitle)")
         }
 
-        // Format genres (handle empty array)
-        let genres = song.genreNames.isEmpty ? "unknown" : song.genreNames.joined(separator: ", ")
+        // Editorial notes (most reliable for context)
+        if let editorialNotes = song.editorialNotes {
+            if let standard = editorialNotes.standard {
+                contextParts.append("Song description: \(standard)")
+            } else if let short = editorialNotes.short {
+                contextParts.append("Song description: \(short)")
+            }
+        }
 
-        // Keep prompt concise for smaller context windows (~150 tokens total)
+        // Artist editorial notes (if available via with(.artists) - not guaranteed)
+        // Note: This would require fetching with relationship, which we may not have
+        // For now, we work with what's available on the Song object
+
+        let songContext = contextParts.joined(separator: "\n")
+
+        // Keep prompt concise for smaller context windows
         let prompt = """
         Persona: \(personaDescription)
 
-        Song: "\(song.title)" by \(song.artistName)
-        Genre: \(genres)
-        Release: \(releaseYear)
+        \(songContext)
 
-        Does this song match the persona's style?
+        Based on the song title, artist name, and any available context, does this song seem appropriate for the persona to play? Consider musical style and thematic fit. Be lenient - only reject if clearly mismatched.
         """
 
         do {
