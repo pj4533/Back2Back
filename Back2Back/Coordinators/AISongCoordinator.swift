@@ -34,8 +34,36 @@ final class AISongCoordinator {
     }
 
     init(musicMatcher: MusicMatchingProtocol? = nil) {
-        self.musicMatcher = musicMatcher ?? StringBasedMusicMatcher()
-        B2BLog.session.debug("AISongCoordinator initialized")
+        // Use provided matcher, or select based on configuration
+        if let matcher = musicMatcher {
+            self.musicMatcher = matcher
+        } else {
+            // Read configuration to determine which matcher to use
+            let config = Self.loadAIModelConfig()
+            self.musicMatcher = Self.createMatcher(for: config.musicMatcher)
+        }
+        B2BLog.session.debug("AISongCoordinator initialized with \(type(of: self.musicMatcher)) matcher")
+    }
+
+    /// Factory method to create appropriate music matcher based on configuration
+    private static func createMatcher(for type: MusicMatcherType) -> MusicMatchingProtocol {
+        switch type {
+        case .stringBased:
+            B2BLog.session.info("Using String-Based music matcher")
+            return StringBasedMusicMatcher()
+        case .llmBased:
+            B2BLog.session.info("Using LLM-Based music matcher (Apple Intelligence)")
+            return LLMBasedMusicMatcher()
+        }
+    }
+
+    /// Load AI model configuration from UserDefaults
+    private static func loadAIModelConfig() -> AIModelConfig {
+        guard let data = UserDefaults.standard.data(forKey: "aiModelConfig"),
+              let config = try? JSONDecoder().decode(AIModelConfig.self, from: data) else {
+            return .default
+        }
+        return config
     }
 
     // MARK: - Public Methods

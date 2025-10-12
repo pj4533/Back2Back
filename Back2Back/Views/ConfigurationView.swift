@@ -7,10 +7,16 @@
 
 import SwiftUI
 import OSLog
+import FoundationModels
 
 struct ConfigurationView: View {
     @AIModelConfigStorage private var config
     @State private var showingClearCacheAlert = false
+
+    // Check if Apple Intelligence LLM is available
+    private var isLLMAvailable: Bool {
+        SystemLanguageModel.default.availability == .available
+    }
 
     var body: some View {
         Form {
@@ -62,6 +68,60 @@ struct ConfigurationView: View {
             }
 
             Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Music Matching Strategy")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Picker("Strategy", selection: $config.musicMatcher) {
+                        ForEach(MusicMatcherType.allCases, id: \.self) { type in
+                            Text(type.displayName).tag(type)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    // Show description of selected matcher
+                    Text(config.musicMatcher.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+
+                    // Show warning if LLM selected but not available
+                    if config.musicMatcher == .llmBased && !isLLMAvailable {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text("LLM matching requires iOS 26+ with Apple Intelligence enabled. Using string-based matching as fallback.")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                        .padding(.top, 8)
+                    } else if config.musicMatcher == .llmBased && isLLMAvailable {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("Apple Intelligence is available and ready to use for semantic music matching.")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+                .padding(.vertical, 8)
+            } header: {
+                Text("Music Matching")
+            } footer: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Controls how AI song recommendations are matched against Apple Music search results.")
+
+                    Text("• String-Based: Fast, reliable, works on all devices")
+                    Text("• LLM-Based: Semantic understanding, handles variations better (requires Apple Intelligence)")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Button(role: .destructive) {
                     showingClearCacheAlert = true
                 } label: {
@@ -81,7 +141,7 @@ struct ConfigurationView: View {
         .navigationTitle("Configuration")
         .navigationBarTitleDisplayMode(.large)
         .onChange(of: config) { oldValue, newValue in
-            B2BLog.general.info("AI config changed - Model: \(newValue.songSelectionModel), Reasoning: \(newValue.songSelectionReasoningLevel.rawValue)")
+            B2BLog.general.info("AI config changed - Model: \(newValue.songSelectionModel), Reasoning: \(newValue.songSelectionReasoningLevel.rawValue), Matcher: \(newValue.musicMatcher.displayName)")
         }
         .alert("Clear Song Cache?", isPresented: $showingClearCacheAlert) {
             Button("Cancel", role: .cancel) { }
