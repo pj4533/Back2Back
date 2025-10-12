@@ -48,6 +48,14 @@ struct FavoritesListView: View {
             LazyVStack(spacing: 12) {
                 ForEach(favoritesService.getFavorites()) { favoritedSong in
                     FavoriteSongRow(favoritedSong: favoritedSong)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                B2BLog.ui.info("User swiped to remove favorite: \(favoritedSong.title)")
+                                favoritesService.removeFavorite(songId: favoritedSong.songId)
+                            } label: {
+                                Label("Remove", systemImage: "heart.slash.fill")
+                            }
+                        }
                 }
             }
             .padding()
