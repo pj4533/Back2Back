@@ -346,20 +346,22 @@ final class AISongCoordinator {
             // ✨ NEW: Validate song matches persona before accepting
             if let matchedSong = song {
                 let personaDesc = PersonaService.shared.selectedPersona?.description ?? ""
-                let isValid = await validator.validate(song: matchedSong, personaDescription: personaDesc)
+                let validationResult = await validator.validate(song: matchedSong, personaDescription: personaDesc)
 
-                if !isValid {
+                // Fail open: if validationResult is nil (model unavailable/error), accept the song
+                if let validation = validationResult, !validation.isValid {
                     B2BLog.ai.warning("🚫 Validation rejected: '\(matchedSong.title)' by \(matchedSong.artistName)")
 
                     let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
 
-                    // Log error for debugging
+                    // Log error for debugging with both short and detailed reasons
                     SongErrorLoggerService.shared.logError(
                         artistName: matchedSong.artistName,
                         songTitle: matchedSong.title,
                         personaName: personaName,
                         errorType: .validationFailed,
-                        errorReason: "Song didn't match persona genre/style"
+                        errorReason: validation.shortSummary,
+                        detailedReason: validation.reasoning
                     )
 
                     toastService.warning(

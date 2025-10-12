@@ -23,7 +23,9 @@ struct SongErrorsView: View {
                 )
             } else {
                 ForEach(errorService.errors) { error in
-                    SongErrorRow(error: error)
+                    NavigationLink(destination: SongErrorDetailView(error: error)) {
+                        SongErrorRow(error: error)
+                    }
                 }
             }
         }

@@ -16,7 +16,8 @@ struct SongError: Identifiable, Codable {
     let songTitle: String
     let personaName: String
     let errorType: SongErrorType
-    let errorReason: String
+    let errorReason: String  // Short summary for list view
+    let detailedReason: String?  // Full detailed explanation for detail view
     let matchDetails: String?
 
     init(
@@ -27,6 +28,7 @@ struct SongError: Identifiable, Codable {
         personaName: String,
         errorType: SongErrorType,
         errorReason: String,
+        detailedReason: String? = nil,
         matchDetails: String? = nil
     ) {
         self.id = id
@@ -36,6 +38,7 @@ struct SongError: Identifiable, Codable {
         self.personaName = personaName
         self.errorType = errorType
         self.errorReason = errorReason
+        self.detailedReason = detailedReason
         self.matchDetails = matchDetails
     }
 }

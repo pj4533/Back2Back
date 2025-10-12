@@ -30,6 +30,7 @@ final class SongErrorLoggerService {
         personaName: String,
         errorType: SongError.SongErrorType,
         errorReason: String,
+        detailedReason: String? = nil,
         matchDetails: String? = nil
     ) {
         let error = SongError(
@@ -38,6 +39,7 @@ final class SongErrorLoggerService {
             personaName: personaName,
             errorType: errorType,
             errorReason: errorReason,
+            detailedReason: detailedReason,
             matchDetails: matchDetails
         )
 

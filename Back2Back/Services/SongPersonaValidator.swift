@@ -17,8 +17,11 @@ struct ValidationResponse {
     /// true if song matches persona, false otherwise
     let isValid: Bool
 
-    /// Brief reasoning for the decision
+    /// Brief reasoning for the decision (1-2 sentences)
     let reasoning: String
+
+    /// Very short summary for UI display (max 10 words)
+    let shortSummary: String
 }
 
 /// Validates that matched songs actually make sense for the selected Persona.
@@ -55,17 +58,17 @@ final class SongPersonaValidator {
     /// - Parameters:
     ///   - song: The song to validate
     ///   - personaDescription: Concise description of the persona (50-100 words max)
-    /// - Returns: true if song matches persona, false if clearly wrong
+    /// - Returns: ValidationResponse with isValid flag and reasoning, or nil if validation unavailable
     ///
-    /// **Fail-open behavior**: Returns true if model unavailable or errors occur,
+    /// **Fail-open behavior**: Returns nil if model unavailable or errors occur,
     /// to avoid blocking playback. Validation failures are logged for debugging.
     ///
     /// **Note**: Does NOT use Apple Music's genre/release date metadata as it's unreliable
     /// for rare/obscure tracks. Instead relies on editorial notes and artist context.
-    func validate(song: Song, personaDescription: String) async -> Bool {
+    func validate(song: Song, personaDescription: String) async -> ValidationResponse? {
         guard let session = session else {
             B2BLog.ai.warning("Foundation Model unavailable for validation - accepting by default")
-            return true  // Fail open - don't block playback if model unavailable
+            return nil  // Fail open - don't block playback if model unavailable
         }
 
         // Build context from available editorial content (not metadata like genre/year)
@@ -101,6 +104,11 @@ final class SongPersonaValidator {
         \(songContext)
 
         Based on the song title, artist name, and any available context, does this song seem appropriate for the persona to play? Consider musical style and thematic fit. Be lenient - only reject if clearly mismatched.
+
+        In your response, provide:
+        - isValid: true/false
+        - reasoning: 1-2 sentence explanation
+        - shortSummary: Very brief reason (max 10 words, e.g., "Wrong genre - pop vs rap")
         """
 
         do {
@@ -114,10 +122,10 @@ final class SongPersonaValidator {
                 B2BLog.ai.warning("🚫 Validation FAIL: '\(song.title)' - \(validation.reasoning)")
             }
 
-            return validation.isValid
+            return validation
         } catch {
             B2BLog.ai.error("Validation failed with error: \(error.localizedDescription)")
-            return true  // Fail open on errors - don't block playback
+            return nil  // Fail open on errors - don't block playback
         }
     }
 }
