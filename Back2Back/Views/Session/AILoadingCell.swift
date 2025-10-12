@@ -11,7 +11,6 @@ import SwiftUI
 import OSLog
 
 struct AILoadingCell: View {
-    @State private var isAnimating = false
     @State private var loadingStates: [(String, String)] = [
         ("brain.head.profile", "Analyzing the vibe..."),
         ("music.note.list", "Searching the catalog..."),
@@ -64,23 +63,6 @@ struct AILoadingCell: View {
                                 )
                             )
                     }
-
-                    // Animated dots
-                    HStack(spacing: 4) {
-                        ForEach(0..<3, id: \.self) { index in
-                            Circle()
-                                .fill(Color.purple.opacity(0.6))
-                                .frame(width: 6, height: 6)
-                                .scaleEffect(isAnimating && index % 3 == currentPhase % 3 ? 1.2 : 0.8)
-                                .animation(
-                                    .easeInOut(duration: 0.6)
-                                    .repeatForever(autoreverses: true)
-                                    .delay(Double(index) * 0.2),
-                                    value: isAnimating
-                                )
-                        }
-                    }
-                    .padding(.top, 2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -110,9 +92,6 @@ struct AILoadingCell: View {
                         lineWidth: 2
                     )
             )
-            .onAppear {
-                isAnimating = true
-            }
             .task {
                 await loadStatusMessages()
             }
