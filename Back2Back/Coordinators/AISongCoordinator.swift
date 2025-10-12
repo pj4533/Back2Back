@@ -20,6 +20,7 @@ final class AISongCoordinator {
     private let environmentService = EnvironmentService.shared
     private let musicMatcher: MusicMatchingProtocol
     private let toastService = ToastService.shared
+    private let validator = SongPersonaValidator()
 
     private(set) var prefetchTask: Task<Void, Never>?
     private var prefetchTaskId: UUID?
@@ -318,6 +319,22 @@ final class AISongCoordinator {
                     "Song not found in Apple Music: '\(recommendation.song)' by '\(recommendation.artist)'",
                     duration: 5.0
                 )
+                return nil
+            }
+
+            // ✨ NEW: Validate song matches persona before accepting
+            if let matchedSong = song {
+                let personaDesc = PersonaService.shared.selectedPersona?.description ?? ""
+                let isValid = await validator.validate(song: matchedSong, personaDescription: personaDesc)
+
+                if !isValid {
+                    B2BLog.ai.warning("🚫 Validation rejected: '\(matchedSong.title)' by \(matchedSong.artistName)")
+                    toastService.warning(
+                        "Song didn't match persona style - selecting alternative",
+                        duration: 3.0
+                    )
+                    return nil  // Trigger retry with AIRetryStrategy
+                }
             }
 
             return song
