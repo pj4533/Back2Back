@@ -19,6 +19,7 @@ final class AISongCoordinator {
     private let sessionService = SessionService.shared
     private let environmentService = EnvironmentService.shared
     private let musicMatcher: MusicMatchingProtocol
+    private let toastService = ToastService.shared
 
     private(set) var prefetchTask: Task<Void, Never>?
     private var prefetchTaskId: UUID?
@@ -281,9 +282,23 @@ final class AISongCoordinator {
 
     private func searchAndMatchSong(_ recommendation: SongRecommendation) async -> Song? {
         do {
-            return try await musicMatcher.searchAndMatch(recommendation: recommendation)
+            let song = try await musicMatcher.searchAndMatch(recommendation: recommendation)
+
+            // Show toast if no match found
+            if song == nil {
+                toastService.error(
+                    "Song not found in Apple Music: '\(recommendation.song)' by '\(recommendation.artist)'",
+                    duration: 5.0
+                )
+            }
+
+            return song
         } catch {
             B2BLog.musicKit.error("Search and match failed: \(error)")
+            toastService.error(
+                "Failed to search Apple Music: \(error.localizedDescription)",
+                duration: 4.0
+            )
             return nil
         }
     }

@@ -16,10 +16,12 @@ struct ContentView: View {
     var body: some View {
         if musicService.isAuthorized {
             mainContent
+                .toastNotifications()
         } else {
             NavigationStack {
                 MusicAuthorizationView()
             }
+            .toastNotifications()
         }
     }
 
