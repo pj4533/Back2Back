@@ -9,6 +9,28 @@ import Foundation
 import SwiftUI
 import OSLog
 
+/// Music matching strategy type
+enum MusicMatcherType: String, Codable, CaseIterable {
+    case stringBased = "string_based"
+    case llmBased = "llm_based"
+
+    var displayName: String {
+        switch self {
+        case .stringBased: return "String-Based (Default)"
+        case .llmBased: return "LLM-Based (Apple Intelligence)"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .stringBased:
+            return "Fast and reliable string matching with normalization"
+        case .llmBased:
+            return "AI-powered semantic matching (requires iOS 26+ and Apple Intelligence)"
+        }
+    }
+}
+
 /// Configuration for AI model behavior in song selection
 /// Note: These settings only apply to song selection, not style guide generation
 struct AIModelConfig: Codable, Equatable {
@@ -18,15 +40,20 @@ struct AIModelConfig: Codable, Equatable {
     /// Reasoning effort level for song selection
     var songSelectionReasoningLevel: ReasoningEffort
 
+    /// Music matching strategy (default: string-based)
+    var musicMatcher: MusicMatcherType
+
     /// Default configuration now uses automatic mode
     static let `default` = AIModelConfig(
         songSelectionModel: "automatic",
-        songSelectionReasoningLevel: .low
+        songSelectionReasoningLevel: .low,
+        musicMatcher: .stringBased
     )
 
-    init(songSelectionModel: String = "automatic", songSelectionReasoningLevel: ReasoningEffort = .low) {
+    init(songSelectionModel: String = "automatic", songSelectionReasoningLevel: ReasoningEffort = .low, musicMatcher: MusicMatcherType = .stringBased) {
         self.songSelectionModel = songSelectionModel
         self.songSelectionReasoningLevel = songSelectionReasoningLevel
+        self.musicMatcher = musicMatcher
     }
 
     /// Determines the actual configuration to use when "automatic" is selected
