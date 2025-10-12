@@ -39,8 +39,8 @@ struct AIModelConfig: Codable, Equatable {
 
         // Automatic logic: fast for first song, thoughtful for subsequent songs
         if isFirstSong {
-            B2BLog.ai.info("🚀 Automatic mode: Using gpt-5-nano with minimal reasoning for first song (fast start)")
-            return AIModelConfig(songSelectionModel: "gpt-5-nano", songSelectionReasoningLevel: .minimal)
+            B2BLog.ai.info("🚀 Automatic mode: Using gpt-5-nano with low reasoning for first song (fast start)")
+            return AIModelConfig(songSelectionModel: "gpt-5-nano", songSelectionReasoningLevel: .low)
         } else {
             B2BLog.ai.info("🎵 Automatic mode: Using gpt-5 with low reasoning for subsequent songs (thoughtful selection)")
             return AIModelConfig(songSelectionModel: "gpt-5", songSelectionReasoningLevel: .low)

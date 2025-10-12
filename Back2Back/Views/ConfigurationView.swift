@@ -51,7 +51,7 @@ struct ConfigurationView: View {
                     Text("These settings control the AI model behavior when selecting songs during your DJ session.")
 
                     if config.songSelectionModel == "automatic" {
-                        Text("• Automatic: Fast first song (Nano/Minimal), thoughtful picks after (GPT-5/Low)")
+                        Text("• Automatic: Fast first song (Nano/Low), thoughtful picks after (GPT-5/Low)")
                     } else {
                         Text("• Higher reasoning levels provide better song selections but take longer")
                         Text("• Smaller models (Mini, Nano) are faster and more cost-effective but may be less creative")
