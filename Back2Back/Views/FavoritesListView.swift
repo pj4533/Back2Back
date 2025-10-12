@@ -25,41 +25,33 @@ struct FavoritesListView: View {
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "heart.slash")
-                .font(.system(size: 60))
-                .foregroundStyle(.gray)
-
-            Text("No Favorites Yet")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("Tap the heart icon on songs in your session history to add them to your favorites.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ContentUnavailableView(
+            "No Favorites Yet",
+            systemImage: "heart.slash",
+            description: Text("Tap the heart icon on songs in your session history to add them to your favorites.")
+        )
     }
 
     private var favoritesListView: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(favoritesService.getFavorites()) { favoritedSong in
-                    FavoriteSongRow(favoritedSong: favoritedSong)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
+        List {
+            // Sort directly in the ForEach for proper observation
+            ForEach(favoritesService.favorites.sorted { $0.favoritedAt > $1.favoritedAt }) { favoritedSong in
+                FavoriteSongRow(favoritedSong: favoritedSong)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            withAnimation {
                                 B2BLog.ui.info("User swiped to remove favorite: \(favoritedSong.title)")
                                 favoritesService.removeFavorite(songId: favoritedSong.songId)
-                            } label: {
-                                Label("Remove", systemImage: "heart.slash.fill")
                             }
+                        } label: {
+                            Label("Remove", systemImage: "heart.slash.fill")
                         }
-                }
+                    }
             }
-            .padding()
         }
+        .listStyle(.plain)
     }
 }
 

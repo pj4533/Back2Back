@@ -10,7 +10,6 @@ import OSLog
 
 struct FavoriteSongRow: View {
     let favoritedSong: FavoritedSong
-    private let favoritesService = FavoritesService.shared
 
     var body: some View {
         HStack(spacing: 12) {
@@ -63,19 +62,6 @@ struct FavoriteSongRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Unfavorite button
-            Button(action: {
-                B2BLog.ui.info("User unfavorited song: \(favoritedSong.title)")
-                favoritesService.removeFavorite(songId: favoritedSong.songId)
-            }) {
-                Image(systemName: "heart.fill")
-                    .font(.title3)
-                    .foregroundStyle(.red)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
         }
         .padding()
         .background(
