@@ -13,6 +13,7 @@ import OSLog
 struct SessionSongRow: View {
     let sessionSong: SessionSong
     private let sessionViewModel = SessionViewModel.shared
+    private let favoritesService = FavoritesService.shared
 
     // Add computed property to force view updates when queue status changes
     private var statusId: String {
@@ -22,6 +23,11 @@ struct SessionSongRow: View {
     // Determine if this cell is tappable
     private var isTappable: Bool {
         sessionSong.queueStatus == .upNext || sessionSong.queueStatus == .queuedIfUserSkips
+    }
+
+    // Check if this song is favorited
+    private var isFavorited: Bool {
+        favoritesService.isFavorited(songId: sessionSong.song.id.rawValue)
     }
 
     var body: some View {
@@ -49,15 +55,16 @@ struct SessionSongRow: View {
                         .foregroundColor(.white)
                 )
 
-            // Song details
+            // Song details with improved layout
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
+                // First row: Title + Status Badge
+                HStack(alignment: .top, spacing: 8) {
                     Text(sessionSong.song.title)
                         .font(.headline)
                         .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // Queue status badge
-                    // Add animation to status changes
+                    // Status badge - only takes minimal space needed
                     Group {
                         if sessionSong.queueStatus == .upNext {
                             Text("Up Next")
@@ -92,35 +99,51 @@ struct SessionSongRow: View {
                                 .cornerRadius(4)
                         }
                     }
+                    .fixedSize()
                     .animation(.easeInOut(duration: 0.3), value: sessionSong.queueStatus)
                 }
 
-                Text(sessionSong.song.artistName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                // Second row: Artist, metadata, and rationale with full width
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(sessionSong.song.artistName)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
 
-                if !songMetadata.isEmpty {
-                    Text(songMetadata)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        if !songMetadata.isEmpty {
+                            Text(songMetadata)
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        if let rationale = sessionSong.rationale {
+                            Text(rationale)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // Favorite button - fixed 44x44 hit area
+                    Button(action: {
+                        B2BLog.ui.info("User tapped favorite button for: \(sessionSong.song.title)")
+                        let personaService = PersonaService.shared
+                        favoritesService.toggleFavorite(
+                            sessionSong: sessionSong,
+                            personaName: personaService.selectedPersona?.name ?? "Unknown",
+                            personaId: personaService.selectedPersona?.id ?? UUID()
+                        )
+                    }) {
+                        Image(systemName: isFavorited ? "heart.fill" : "heart")
+                            .font(.title3)
+                            .foregroundStyle(isFavorited ? .red : .gray)
+                            .frame(width: 44, height: 44) // Larger hit area
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain) // Prevent button from inheriting row's tap gesture
                 }
-
-                if let rationale = sessionSong.rationale {
-                    Text(rationale)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 2)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Queue indicator
-            if sessionSong.queueStatus == .queuedIfUserSkips {
-                // Additional visual hint for conditional queue
-                Image(systemName: "questionmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
             }
         }
         .padding()
