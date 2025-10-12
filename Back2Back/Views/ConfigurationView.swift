@@ -12,6 +12,7 @@ import FoundationModels
 struct ConfigurationView: View {
     @AIModelConfigStorage private var config
     @State private var showingClearCacheAlert = false
+    @State private var errorService = SongErrorLoggerService.shared
 
     // Check if Apple Intelligence LLM is available
     private var isLLMAvailable: Bool {
@@ -122,6 +123,26 @@ struct ConfigurationView: View {
             }
 
             Section {
+                NavigationLink {
+                    SongErrorsView()
+                } label: {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                        Text("Song Errors")
+                        Spacer()
+                        if errorService.errors.count > 0 {
+                            Text("\(errorService.errors.count)")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+
                 Button(role: .destructive) {
                     showingClearCacheAlert = true
                 } label: {
@@ -133,7 +154,7 @@ struct ConfigurationView: View {
             } header: {
                 Text("Debug")
             } footer: {
-                Text("Clears the 24-hour song repetition cache for all personas. Songs will be allowed to repeat immediately after clearing.")
+                Text("View failed song selections and clear the 24-hour song repetition cache.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
