@@ -231,13 +231,19 @@ final class AISongCoordinator {
             throw OpenAIError.decodingError(NSError(domain: "Back2Back", code: -1, userInfo: [NSLocalizedDescriptionKey: "No persona selected"]))
         }
 
+        // Determine if this is the first song
+        let isFirstSong = sessionService.sessionHistory.isEmpty
+
+        // Get config and resolve for automatic mode (handles both model and reasoning level)
         let config = aiModelConfig
+        let resolvedConfig = config.resolveConfiguration(isFirstSong: isFirstSong)
+
         let recommendation = try await openAIClient.selectNextSong(
             persona: sessionService.currentPersonaStyleGuide,
             personaId: currentPersona.id,
             sessionHistory: sessionService.sessionHistory,
             directionChange: directionChange,
-            config: config
+            config: resolvedConfig
         )
 
         // Check if song has already been played
@@ -250,7 +256,7 @@ final class AISongCoordinator {
                 personaId: currentPersona.id,
                 sessionHistory: sessionService.sessionHistory,
                 directionChange: directionChange,
-                config: config
+                config: resolvedConfig
             )
 
             // Record the retry recommendation in cache
