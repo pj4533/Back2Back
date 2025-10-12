@@ -34,12 +34,20 @@ struct ContentView: View {
             .tag(0)
 
             NavigationStack {
+                FavoritesListView()
+            }
+            .tabItem {
+                Label("Favorites", systemImage: "heart.fill")
+            }
+            .tag(1)
+
+            NavigationStack {
                 PersonasListView()
             }
             .tabItem {
                 Label("Personas", systemImage: "person.3.fill")
             }
-            .tag(1)
+            .tag(2)
 
             NavigationStack {
                 ConfigurationView()
@@ -47,7 +55,7 @@ struct ContentView: View {
             .tabItem {
                 Label("Config", systemImage: "gear")
             }
-            .tag(2)
+            .tag(3)
         }
     }
 }
