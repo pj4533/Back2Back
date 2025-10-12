@@ -279,6 +279,16 @@ final class AISongCoordinator {
         // Check if song has already been played
         if sessionService.hasSongBeenPlayed(artist: recommendation.artist, title: recommendation.song) {
             B2BLog.ai.warning("AI tried to select already-played song, retrying")
+
+            // Log error for debugging
+            SongErrorLoggerService.shared.logError(
+                artistName: recommendation.artist,
+                songTitle: recommendation.song,
+                personaName: currentPersona.name,
+                errorType: .alreadyPlayed,
+                errorReason: "Song was already played in current session"
+            )
+
             // Try once more with emphasis on no repeats
             let retryPersona = sessionService.currentPersonaStyleGuide + "\n\nIMPORTANT: Never select a song that has already been played in this session."
             let retryRecommendation = try await openAIClient.selectNextSong(
@@ -315,6 +325,17 @@ final class AISongCoordinator {
 
             // Show toast if no match found
             if song == nil {
+                let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
+
+                // Log error for debugging
+                SongErrorLoggerService.shared.logError(
+                    artistName: recommendation.artist,
+                    songTitle: recommendation.song,
+                    personaName: personaName,
+                    errorType: .notFoundInAppleMusic,
+                    errorReason: "No search results found in Apple Music"
+                )
+
                 toastService.error(
                     "Song not found in Apple Music: '\(recommendation.song)' by '\(recommendation.artist)'",
                     duration: 5.0
@@ -329,6 +350,18 @@ final class AISongCoordinator {
 
                 if !isValid {
                     B2BLog.ai.warning("🚫 Validation rejected: '\(matchedSong.title)' by \(matchedSong.artistName)")
+
+                    let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
+
+                    // Log error for debugging
+                    SongErrorLoggerService.shared.logError(
+                        artistName: matchedSong.artistName,
+                        songTitle: matchedSong.title,
+                        personaName: personaName,
+                        errorType: .validationFailed,
+                        errorReason: "Song didn't match persona genre/style"
+                    )
+
                     toastService.warning(
                         "Song didn't match persona style - selecting alternative",
                         duration: 3.0
@@ -340,6 +373,18 @@ final class AISongCoordinator {
             return song
         } catch {
             B2BLog.musicKit.error("Search and match failed: \(error)")
+
+            let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
+
+            // Log error for debugging
+            SongErrorLoggerService.shared.logError(
+                artistName: recommendation.artist,
+                songTitle: recommendation.song,
+                personaName: personaName,
+                errorType: .searchError,
+                errorReason: error.localizedDescription
+            )
+
             toastService.error(
                 "Failed to search Apple Music: \(error.localizedDescription)",
                 duration: 4.0

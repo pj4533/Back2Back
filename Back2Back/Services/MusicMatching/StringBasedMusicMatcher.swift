@@ -69,6 +69,19 @@ final class StringBasedMusicMatcher: MusicMatchingProtocol {
         // This allows the AI to retry with a different recommendation
         B2BLog.musicKit.warning("❌ No good match found for: '\(recommendation.song)' by '\(recommendation.artist)' after searching \(searchResults.count) results")
         B2BLog.musicKit.debug("First result was: '\(searchResults.first?.song.title ?? "none")' by '\(searchResults.first?.song.artistName ?? "none")'")
+
+        let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
+
+        // Log error for debugging
+        SongErrorLoggerService.shared.logError(
+            artistName: recommendation.artist,
+            songTitle: recommendation.song,
+            personaName: personaName,
+            errorType: .noGoodMatch,
+            errorReason: "Best match had confidence \(String(format: "%.2f", fullMatchResult.confidence))",
+            matchDetails: fullMatchResult.matchDetails
+        )
+
         return nil
     }
 
