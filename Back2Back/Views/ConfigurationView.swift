@@ -21,6 +21,7 @@ struct ConfigurationView: View {
                         .foregroundStyle(.primary)
 
                     Picker("Model", selection: $config.songSelectionModel) {
+                        Text("Automatic").tag("automatic")
                         Text("GPT-5").tag("gpt-5")
                         Text("GPT-5 Mini").tag("gpt-5-mini")
                         Text("GPT-5 Nano").tag("gpt-5-nano")
@@ -45,6 +46,7 @@ struct ConfigurationView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("These settings control the AI model behavior when selecting songs during your DJ session.")
+                    Text("• Automatic: Fast first song (Nano), thoughtful picks after (GPT-5)")
                     Text("• Higher reasoning levels provide better song selections but take longer")
                     Text("• Smaller models (Mini, Nano) are faster and more cost-effective but may be less creative")
                 }

@@ -7,25 +7,44 @@
 
 import Foundation
 import SwiftUI
+import OSLog
 
 /// Configuration for AI model behavior in song selection
 /// Note: These settings only apply to song selection, not style guide generation
 struct AIModelConfig: Codable, Equatable {
-    /// Model to use for song selection (gpt-5, gpt-5-mini, gpt-5-nano)
+    /// Model to use for song selection: "gpt-5", "gpt-5-mini", "gpt-5-nano", or "automatic"
     var songSelectionModel: String
-    
+
     /// Reasoning effort level for song selection
     var songSelectionReasoningLevel: ReasoningEffort
-    
-    /// Default configuration
+
+    /// Default configuration now uses automatic mode
     static let `default` = AIModelConfig(
-        songSelectionModel: "gpt-5",
+        songSelectionModel: "automatic",
         songSelectionReasoningLevel: .low
     )
-    
-    init(songSelectionModel: String = "gpt-5", songSelectionReasoningLevel: ReasoningEffort = .low) {
+
+    init(songSelectionModel: String = "automatic", songSelectionReasoningLevel: ReasoningEffort = .low) {
         self.songSelectionModel = songSelectionModel
         self.songSelectionReasoningLevel = songSelectionReasoningLevel
+    }
+
+    /// Determines the actual model to use when "automatic" is selected
+    /// - Parameter isFirstSong: Whether this is the first song of the session
+    /// - Returns: The concrete model string to use ("gpt-5", "gpt-5-mini", or "gpt-5-nano")
+    func resolveModel(isFirstSong: Bool) -> String {
+        guard songSelectionModel == "automatic" else {
+            return songSelectionModel
+        }
+
+        // Automatic logic: fast for first song, thoughtful for subsequent songs
+        if isFirstSong {
+            B2BLog.ai.info("🚀 Automatic mode: Using gpt-5-nano for first song (fast start)")
+            return "gpt-5-nano"
+        } else {
+            B2BLog.ai.info("🎵 Automatic mode: Using gpt-5 for subsequent song (thoughtful selection)")
+            return "gpt-5"
+        }
     }
 }
 
