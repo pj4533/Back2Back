@@ -29,21 +29,21 @@ struct AIModelConfig: Codable, Equatable {
         self.songSelectionReasoningLevel = songSelectionReasoningLevel
     }
 
-    /// Determines the actual model to use when "automatic" is selected
+    /// Determines the actual configuration to use when "automatic" is selected
     /// - Parameter isFirstSong: Whether this is the first song of the session
-    /// - Returns: The concrete model string to use ("gpt-5", "gpt-5-mini", or "gpt-5-nano")
-    func resolveModel(isFirstSong: Bool) -> String {
+    /// - Returns: The resolved AIModelConfig with concrete model and reasoning level
+    func resolveConfiguration(isFirstSong: Bool) -> AIModelConfig {
         guard songSelectionModel == "automatic" else {
-            return songSelectionModel
+            return self
         }
 
         // Automatic logic: fast for first song, thoughtful for subsequent songs
         if isFirstSong {
-            B2BLog.ai.info("🚀 Automatic mode: Using gpt-5-nano for first song (fast start)")
-            return "gpt-5-nano"
+            B2BLog.ai.info("🚀 Automatic mode: Using gpt-5-nano with minimal reasoning for first song (fast start)")
+            return AIModelConfig(songSelectionModel: "gpt-5-nano", songSelectionReasoningLevel: .minimal)
         } else {
-            B2BLog.ai.info("🎵 Automatic mode: Using gpt-5 for subsequent song (thoughtful selection)")
-            return "gpt-5"
+            B2BLog.ai.info("🎵 Automatic mode: Using gpt-5 with low reasoning for subsequent songs (thoughtful selection)")
+            return AIModelConfig(songSelectionModel: "gpt-5", songSelectionReasoningLevel: .low)
         }
     }
 }
