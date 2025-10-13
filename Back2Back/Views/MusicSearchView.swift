@@ -2,46 +2,56 @@ import SwiftUI
 import MusicKit
 
 struct MusicSearchView: View {
-    @State private var viewModel = MusicSearchViewModel()
+    @Environment(\.services) private var services
+    @State private var viewModel: MusicSearchViewModel?
     @FocusState private var isSearchFieldFocused: Bool
 
     // Optional callback for when a song is selected (for modal usage)
     var onSongSelected: ((Song) -> Void)?
 
     var body: some View {
-        VStack(spacing: 0) {
-            searchBar
+        if let viewModel = viewModel {
+            VStack(spacing: 0) {
+                searchBar(viewModel: viewModel)
 
-            if viewModel.isSearching {
-                loadingView
-            } else if viewModel.searchResults.isEmpty && !viewModel.searchText.isEmpty {
-                emptyStateView
-            } else if !viewModel.searchResults.isEmpty {
-                searchResultsList
-            } else {
-                instructionView
-            }
+                if viewModel.isSearching {
+                    loadingView
+                } else if viewModel.searchResults.isEmpty && !viewModel.searchText.isEmpty {
+                    emptyStateView
+                } else if !viewModel.searchResults.isEmpty {
+                    searchResultsList(viewModel: viewModel)
+                } else {
+                    instructionView
+                }
 
-            if let errorMessage = viewModel.errorMessage {
-                errorView(message: errorMessage)
+                if let errorMessage = viewModel.errorMessage {
+                    errorView(message: errorMessage)
+                }
             }
-        }
-        .navigationTitle("Search Music")
-        .navigationBarTitleDisplayMode(.large)
-        .onDisappear {
-            // Clean up any pending operations when view disappears
-            viewModel.cancelAllOperations()
+            .navigationTitle("Search Music")
+            .navigationBarTitleDisplayMode(.large)
+            .onDisappear {
+                // Clean up any pending operations when view disappears
+                viewModel.cancelAllOperations()
+            }
+        } else {
+            Text("Loading...")
+                .onAppear {
+                    if let services = services {
+                        self.viewModel = MusicSearchViewModel(musicService: services.musicService)
+                    }
+                }
         }
     }
 
-    private var searchBar: some View {
+    private func searchBar(viewModel: MusicSearchViewModel) -> some View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
 
             // Bind directly to ViewModel for single source of truth
             TextField("Search for songs, artists, or albums",
-                     text: $viewModel.searchText)
+                     text: Binding(get: { viewModel.searchText }, set: { viewModel.searchText = $0 }))
                 .onChange(of: viewModel.searchText) { _, newValue in
                     viewModel.updateSearchText(newValue)
                 }
@@ -67,7 +77,7 @@ struct MusicSearchView: View {
         .background(Color(.systemBackground))
     }
 
-    private var searchResultsList: some View {
+    private func searchResultsList(viewModel: MusicSearchViewModel) -> some View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(viewModel.searchResults) { result in

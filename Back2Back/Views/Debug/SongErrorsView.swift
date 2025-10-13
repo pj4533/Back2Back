@@ -10,11 +10,17 @@ import SwiftUI
 /// Debug view displaying failed song selection attempts
 struct SongErrorsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var errorService = SongErrorLoggerService.shared
+    @Environment(\.services) private var services
     @State private var showingClearAlert = false
 
     var body: some View {
-        List {
+        guard let services = services else {
+            return AnyView(Text("Loading..."))
+        }
+
+        let errorService = services.songErrorLoggerService
+
+        return AnyView(List {
             if errorService.errors.isEmpty {
                 ContentUnavailableView(
                     "No Song Errors",
@@ -45,7 +51,7 @@ struct SongErrorsView: View {
             }
         } message: {
             Text("This will remove all logged song errors. This action cannot be undone.")
-        }
+        })
     }
 }
 

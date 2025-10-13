@@ -37,9 +37,22 @@ struct ToastModifier: ViewModifier {
 // MARK: - View Extension
 
 extension View {
-    /// Attach toast notification support to any view
-    /// - Parameter toastService: The toast service to use (defaults to shared instance)
-    func toastNotifications(toastService: ToastService = .shared) -> some View {
-        modifier(ToastModifier(toastService: toastService))
+    /// Attach toast notification support to any view using environment services
+    func toastNotifications() -> some View {
+        ToastNotificationsView(content: self)
+    }
+}
+
+/// Helper view to access environment and apply toast modifier
+private struct ToastNotificationsView<Content: View>: View {
+    @Environment(\.services) private var services
+    let content: Content
+
+    var body: some View {
+        if let services = services {
+            content.modifier(ToastModifier(toastService: services.toastService))
+        } else {
+            content
+        }
     }
 }

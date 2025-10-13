@@ -15,10 +15,12 @@ import OSLog
 @MainActor
 @Observable
 final class TurnManager {
-    private let sessionService = SessionService.shared
-    private let musicService = MusicService.shared
+    private let sessionService: SessionService
+    private let musicService: MusicService
 
-    init() {
+    init(sessionService: SessionService, musicService: MusicService) {
+        self.sessionService = sessionService
+        self.musicService = musicService
         B2BLog.session.debug("TurnManager initialized")
     }
 

@@ -6,11 +6,12 @@ import OSLog
 @MainActor
 @Observable
 final class PersonasViewModel {
-    private let personaService = PersonaService.shared
+    private let personaService: PersonaService
     // Use concrete @Observable type for SwiftUI observation to work
     private let aiService: OpenAIClient
 
-    init(aiService: OpenAIClient = OpenAIClient.shared) {
+    init(personaService: PersonaService, aiService: OpenAIClient) {
+        self.personaService = personaService
         self.aiService = aiService
     }
 

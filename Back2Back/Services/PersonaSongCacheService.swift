@@ -10,13 +10,11 @@ import OSLog
 
 @MainActor
 final class PersonaSongCacheService {
-    static let shared = PersonaSongCacheService()
-
     private let userDefaults = UserDefaults.standard
     private let cacheKey = "com.back2back.personaSongCache"
     private var caches: [UUID: PersonaSongCache] = [:]
 
-    private init() {
+    init() {
         B2BLog.ai.info("PersonaSongCacheService initialized")
         loadCaches()
         cleanupExpiredSongs()

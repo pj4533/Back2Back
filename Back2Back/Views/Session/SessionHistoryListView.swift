@@ -9,23 +9,36 @@
 import SwiftUI
 
 struct SessionHistoryListView: View {
-    private let sessionService = SessionService.shared
+    @Environment(\.services) private var services
 
     var body: some View {
+        guard let services = services else {
+            return AnyView(EmptyView())
+        }
+
+        let sessionService = services.sessionService
+
         if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty && !sessionService.isAIThinking {
+            return AnyView(
             ContentUnavailableView(
                 "No Songs Yet",
                 systemImage: "music.note.list",
                 description: Text("Start your DJ session by selecting the first track")
             )
-            .frame(maxHeight: .infinity)
+            .frame(maxHeight: .infinity))
         } else {
+            return AnyView(
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         // Show history (played songs)
                         ForEach(sessionService.sessionHistory) { sessionSong in
-                            SessionSongRow(sessionSong: sessionSong)
+                            SessionSongRow(
+                                sessionSong: sessionSong,
+                                sessionViewModel: services.sessionViewModel,
+                                favoritesService: services.favoritesService,
+                                personaService: services.personaService
+                            )
                                 // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
                                 // SwiftUI needs to know when status changes on same song
                                 .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
@@ -47,7 +60,12 @@ struct SessionHistoryListView: View {
 
                         // Show queue (upcoming songs)
                         ForEach(sessionService.songQueue) { sessionSong in
-                            SessionSongRow(sessionSong: sessionSong)
+                            SessionSongRow(
+                                sessionSong: sessionSong,
+                                sessionViewModel: services.sessionViewModel,
+                                favoritesService: services.favoritesService,
+                                personaService: services.personaService
+                            )
                                 // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
                                 // SwiftUI needs to know when status changes on same song
                                 .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
@@ -72,7 +90,7 @@ struct SessionHistoryListView: View {
                         }
                     }
                 }
-            }
+            })
         }
     }
 }

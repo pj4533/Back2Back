@@ -14,11 +14,10 @@ import OSLog
 @MainActor
 @Observable
 final class SessionService: SessionStateManagerProtocol {
-    static let shared = SessionService()
-
     // Delegated services
     private let historyService = SessionHistoryService()
     private let queueManager = QueueManager()
+    private let personaService: PersonaService
 
     // Core session state
     private(set) var currentTurn: TurnType = .user
@@ -40,7 +39,7 @@ final class SessionService: SessionStateManagerProtocol {
 
     // Dynamic persona from PersonaService
     var currentPersonaStyleGuide: String {
-        if let selectedPersona = PersonaService.shared.selectedPersona {
+        if let selectedPersona = personaService.selectedPersona {
             return selectedPersona.styleGuide
         }
         // Fallback to a basic persona if none selected
@@ -48,10 +47,11 @@ final class SessionService: SessionStateManagerProtocol {
     }
 
     var currentPersonaName: String {
-        PersonaService.shared.selectedPersona?.name ?? "Default DJ"
+        personaService.selectedPersona?.name ?? "Default DJ"
     }
 
-    private init() {
+    init(personaService: PersonaService) {
+        self.personaService = personaService
         B2BLog.session.info("SessionService initialized")
     }
 

@@ -16,15 +16,13 @@ import OSLog
 @MainActor
 @Observable
 final class FavoritesService {
-    static let shared = FavoritesService()
-
     private let userDefaults = UserDefaults.standard
     private let favoritesKey = "com.back2back.favorites"
 
     /// Published array of favorited songs - views observe this directly
     private(set) var favorites: [FavoritedSong] = []
 
-    private init() {
+    init() {
         B2BLog.general.info("FavoritesService initialized")
         loadFavorites()
     }

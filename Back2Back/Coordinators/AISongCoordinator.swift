@@ -15,12 +15,15 @@ import OSLog
 @MainActor
 @Observable
 final class AISongCoordinator {
-    private let openAIClient = OpenAIClient.shared
-    private let sessionService = SessionService.shared
-    private let environmentService = EnvironmentService.shared
+    private let openAIClient: OpenAIClient
+    private let sessionService: SessionService
+    private let environmentService: EnvironmentService
     private let musicMatcher: MusicMatchingProtocol
-    private let toastService = ToastService.shared
+    private let toastService: ToastService
     private let validator = SongPersonaValidator()
+    private let personaService: PersonaService
+    private let personaSongCacheService: PersonaSongCacheService
+    private let songErrorLoggerService: SongErrorLoggerService
 
     private(set) var prefetchTask: Task<Void, Never>?
     private var prefetchTaskId: UUID?
@@ -34,27 +37,63 @@ final class AISongCoordinator {
         return config
     }
 
-    init(musicMatcher: MusicMatchingProtocol? = nil) {
+    init(
+        openAIClient: OpenAIClient,
+        sessionService: SessionService,
+        environmentService: EnvironmentService,
+        musicService: MusicService,
+        musicMatcher: MusicMatchingProtocol? = nil,
+        toastService: ToastService,
+        personaService: PersonaService,
+        personaSongCacheService: PersonaSongCacheService,
+        songErrorLoggerService: SongErrorLoggerService
+    ) {
+        self.openAIClient = openAIClient
+        self.sessionService = sessionService
+        self.environmentService = environmentService
+        self.toastService = toastService
+        self.personaService = personaService
+        self.personaSongCacheService = personaSongCacheService
+        self.songErrorLoggerService = songErrorLoggerService
+
         // Use provided matcher, or select based on configuration
         if let matcher = musicMatcher {
             self.musicMatcher = matcher
         } else {
             // Read configuration to determine which matcher to use
             let config = Self.loadAIModelConfig()
-            self.musicMatcher = Self.createMatcher(for: config.musicMatcher)
+            self.musicMatcher = Self.createMatcher(
+                for: config.musicMatcher,
+                musicService: musicService,
+                personaService: personaService,
+                songErrorLoggerService: songErrorLoggerService
+            )
         }
         B2BLog.session.debug("AISongCoordinator initialized with \(type(of: self.musicMatcher)) matcher")
     }
 
     /// Factory method to create appropriate music matcher based on configuration
-    private static func createMatcher(for type: MusicMatcherType) -> MusicMatchingProtocol {
+    private static func createMatcher(
+        for type: MusicMatcherType,
+        musicService: MusicService,
+        personaService: PersonaService,
+        songErrorLoggerService: SongErrorLoggerService
+    ) -> MusicMatchingProtocol {
         switch type {
         case .stringBased:
             B2BLog.session.info("Using String-Based music matcher")
-            return StringBasedMusicMatcher()
+            return StringBasedMusicMatcher(
+                musicService: musicService,
+                personaService: personaService,
+                songErrorLoggerService: songErrorLoggerService
+            )
         case .llmBased:
             B2BLog.session.info("Using LLM-Based music matcher (Apple Intelligence)")
-            return LLMBasedMusicMatcher()
+            return LLMBasedMusicMatcher(
+                musicService: musicService,
+                personaService: personaService,
+                songErrorLoggerService: songErrorLoggerService
+            )
         }
     }
 
@@ -257,7 +296,7 @@ final class AISongCoordinator {
         }
 
         // Get current persona ID
-        guard let currentPersona = PersonaService.shared.selectedPersona else {
+        guard let currentPersona = personaService.selectedPersona else {
             throw OpenAIError.decodingError(NSError(domain: "Back2Back", code: -1, userInfo: [NSLocalizedDescriptionKey: "No persona selected"]))
         }
 
@@ -281,7 +320,7 @@ final class AISongCoordinator {
             B2BLog.ai.warning("AI tried to select already-played song, retrying")
 
             // Log error for debugging
-            SongErrorLoggerService.shared.logError(
+            songErrorLoggerService.logError(
                 artistName: recommendation.artist,
                 songTitle: recommendation.song,
                 personaName: currentPersona.name,
@@ -300,7 +339,7 @@ final class AISongCoordinator {
             )
 
             // Record the retry recommendation in cache
-            PersonaSongCacheService.shared.recordSong(
+            personaSongCacheService.recordSong(
                 personaId: currentPersona.id,
                 artist: retryRecommendation.artist,
                 songTitle: retryRecommendation.song
@@ -310,7 +349,7 @@ final class AISongCoordinator {
         }
 
         // Record the recommendation in cache
-        PersonaSongCacheService.shared.recordSong(
+        personaSongCacheService.recordSong(
             personaId: currentPersona.id,
             artist: recommendation.artist,
             songTitle: recommendation.song
@@ -325,10 +364,10 @@ final class AISongCoordinator {
 
             // Show toast if no match found
             if song == nil {
-                let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
+                let personaName = personaService.selectedPersona?.name ?? "Unknown"
 
                 // Log error for debugging
-                SongErrorLoggerService.shared.logError(
+                songErrorLoggerService.logError(
                     artistName: recommendation.artist,
                     songTitle: recommendation.song,
                     personaName: personaName,
@@ -345,17 +384,17 @@ final class AISongCoordinator {
 
             // ✨ NEW: Validate song matches persona before accepting
             if let matchedSong = song {
-                let personaDesc = PersonaService.shared.selectedPersona?.description ?? ""
+                let personaDesc = personaService.selectedPersona?.description ?? ""
                 let validationResult = await validator.validate(song: matchedSong, personaDescription: personaDesc)
 
                 // Fail open: if validationResult is nil (model unavailable/error), accept the song
                 if let validation = validationResult, !validation.isValid {
                     B2BLog.ai.warning("🚫 Validation rejected: '\(matchedSong.title)' by \(matchedSong.artistName)")
 
-                    let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
+                    let personaName = personaService.selectedPersona?.name ?? "Unknown"
 
                     // Log error for debugging with both short and detailed reasons
-                    SongErrorLoggerService.shared.logError(
+                    songErrorLoggerService.logError(
                         artistName: matchedSong.artistName,
                         songTitle: matchedSong.title,
                         personaName: personaName,
@@ -376,10 +415,10 @@ final class AISongCoordinator {
         } catch {
             B2BLog.musicKit.error("Search and match failed: \(error)")
 
-            let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
+            let personaName = personaService.selectedPersona?.name ?? "Unknown"
 
             // Log error for debugging
-            SongErrorLoggerService.shared.logError(
+            songErrorLoggerService.logError(
                 artistName: recommendation.artist,
                 songTitle: recommendation.song,
                 personaName: personaName,

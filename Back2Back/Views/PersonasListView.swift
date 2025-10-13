@@ -1,14 +1,20 @@
 import SwiftUI
 
 struct PersonasListView: View {
-    @State private var viewModel = PersonasViewModel()
+    @Environment(\.services) private var services
     @State private var showingAddPersona = false
     @State private var showingDetailView: Persona?
     @State private var personaToDelete: Persona?
     @State private var showingDeleteAlert = false
 
     var body: some View {
-        List {
+        guard let services = services else {
+            return AnyView(Text("Loading..."))
+        }
+
+        let viewModel = services.personasViewModel
+
+        return AnyView(List {
             ForEach(viewModel.personas) { persona in
                 PersonaRow(persona: persona,
                           isSelected: persona.isSelected)
@@ -66,7 +72,7 @@ struct PersonasListView: View {
         }
         .onAppear {
             viewModel.loadPersonas()
-        }
+        })
     }
 }
 

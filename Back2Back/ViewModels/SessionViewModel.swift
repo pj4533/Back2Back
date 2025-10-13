@@ -15,12 +15,11 @@ import OSLog
 @MainActor
 @Observable
 final class SessionViewModel {
-    static let shared = SessionViewModel()
-
     // Use concrete @Observable types for SwiftUI observation to work
     // Protocols break observation chain since they can't be @Observable
     private let musicService: MusicService
     private let sessionService: SessionService
+    private let openAIClient: OpenAIClient
 
     // Coordinators handle specific responsibilities
     private let playbackCoordinator: PlaybackCoordinator
@@ -33,17 +32,19 @@ final class SessionViewModel {
     private var lastDirectionGenerationSongId: String?
 
     init(
-        musicService: MusicService = MusicService.shared,
-        sessionService: SessionService = SessionService.shared,
-        playbackCoordinator: PlaybackCoordinator? = nil,
-        aiSongCoordinator: AISongCoordinator? = nil,
-        turnManager: TurnManager? = nil
+        musicService: MusicService,
+        sessionService: SessionService,
+        playbackCoordinator: PlaybackCoordinator,
+        aiSongCoordinator: AISongCoordinator,
+        turnManager: TurnManager,
+        openAIClient: OpenAIClient
     ) {
         self.musicService = musicService
         self.sessionService = sessionService
-        self.playbackCoordinator = playbackCoordinator ?? PlaybackCoordinator()
-        self.aiSongCoordinator = aiSongCoordinator ?? AISongCoordinator()
-        self.turnManager = turnManager ?? TurnManager()
+        self.playbackCoordinator = playbackCoordinator
+        self.aiSongCoordinator = aiSongCoordinator
+        self.turnManager = turnManager
+        self.openAIClient = openAIClient
 
         B2BLog.session.info("SessionViewModel initialized")
 
@@ -161,7 +162,7 @@ final class SessionViewModel {
                 B2BLog.ai.info("Generating direction change suggestions (2 options)")
 
                 // Pass the previously cached direction to avoid repetition
-                let directionChange = try await OpenAIClient.shared.generateDirectionChange(
+                let directionChange = try await openAIClient.generateDirectionChange(
                     persona: self.sessionService.currentPersonaStyleGuide,
                     sessionHistory: self.sessionService.sessionHistory,
                     previousDirection: self.cachedDirectionChange
