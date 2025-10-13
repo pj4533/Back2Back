@@ -13,12 +13,23 @@ import MusicKit
 @Suite("SessionService Tests")
 struct SessionServiceTests {
     @MainActor
+    private func makeSessionDependencies() -> (SessionService, PersonaService) {
+        let statusMessageService = StatusMessageService()
+        let personaService = PersonaService(statusMessageService: statusMessageService)
+        let historyService = SessionHistoryService()
+        let queueManager = QueueManager()
+        let sessionService = SessionService(
+            personaService: personaService,
+            historyService: historyService,
+            queueManager: queueManager
+        )
+        return (sessionService, personaService)
+    }
+
+    @MainActor
     @Test("Initial state")
     func testInitialState() {
-        let service = SessionService.shared
-
-        // Reset to known state since we're using a singleton
-        service.resetSession()
+        let (service, _) = makeSessionDependencies()
 
         // Test initial values after reset
         #expect(service.sessionHistory.isEmpty)
@@ -58,7 +69,7 @@ struct SessionServiceTests {
     @MainActor
     @Test("AI thinking state")
     func testAIThinkingState() {
-        let service = SessionService.shared
+        let (service, _) = makeSessionDependencies()
 
         // Initial state
         #expect(service.isAIThinking == false)
@@ -84,7 +95,7 @@ struct SessionServiceTests {
     @MainActor
     @Test("Session reset")
     func testSessionReset() {
-        let service = SessionService.shared
+        let (service, _) = makeSessionDependencies()
 
         // Set some state
         service.setAIThinking(true)
@@ -102,21 +113,16 @@ struct SessionServiceTests {
     @MainActor
     @Test("Has song been played - case insensitive")
     func testHasSongBeenPlayed() {
-        let service = SessionService.shared
+        let (service, _) = makeSessionDependencies()
 
-        // Test the method logic (without actual songs)
         #expect(service.hasSongBeenPlayed(artist: "Test Artist", title: "Test Song") == false)
-
-        // After reset, no songs should have been played
-        service.resetSession()
         #expect(service.hasSongBeenPlayed(artist: "Any Artist", title: "Any Song") == false)
     }
 
     @MainActor
     @Test("Current persona integration")
     func testCurrentPersonaIntegration() {
-        let service = SessionService.shared
-        let personaService = PersonaService.shared
+        let (service, personaService) = makeSessionDependencies()
 
         // Should have a default persona
         #expect(personaService.selectedPersona != nil)

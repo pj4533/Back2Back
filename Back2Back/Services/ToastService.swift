@@ -15,8 +15,6 @@ import OSLog
 @MainActor
 @Observable
 final class ToastService {
-    static let shared = ToastService()
-
     /// Currently displayed toast (nil if none showing)
     private(set) var currentToast: Toast?
 
@@ -26,7 +24,7 @@ final class ToastService {
     /// Timer for auto-dismiss
     private var dismissTask: Task<Void, Never>?
 
-    private init() {
+    init() {
         B2BLog.ui.debug("ToastService initialized")
     }
 

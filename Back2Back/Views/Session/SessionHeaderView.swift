@@ -7,12 +7,23 @@
 //
 
 import SwiftUI
+import Observation
 
 struct SessionHeaderView: View {
-    private let sessionService = SessionService.shared
-    private let musicService = MusicService.shared
+    @Bindable private var sessionService: SessionService
+    @Bindable private var musicService: MusicService
 
     let onNowPlayingTapped: () -> Void
+
+    init(
+        sessionService: SessionService,
+        musicService: MusicService,
+        onNowPlayingTapped: @escaping () -> Void
+    ) {
+        self._sessionService = Bindable(wrappedValue: sessionService)
+        self._musicService = Bindable(wrappedValue: musicService)
+        self.onNowPlayingTapped = onNowPlayingTapped
+    }
 
     var body: some View {
         VStack(spacing: 8) {

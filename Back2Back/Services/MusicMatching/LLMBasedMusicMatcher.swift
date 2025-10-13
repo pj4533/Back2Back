@@ -38,14 +38,21 @@ struct MatchResponse {
 /// - Offline: Works without internet connectivity
 @MainActor
 final class LLMBasedMusicMatcher: MusicMatchingProtocol {
-    private let musicService = MusicService.shared
-    private let fallbackMatcher = StringBasedMusicMatcher()
+    private let musicService: MusicService
+    private let fallbackMatcher: StringBasedMusicMatcher
 
     // Foundation Models components
-    private let model = SystemLanguageModel.default
+    private let model: SystemLanguageModel
     private var session: LanguageModelSession?
 
-    init() {
+    init(
+        musicService: MusicService,
+        fallbackMatcher: StringBasedMusicMatcher,
+        model: SystemLanguageModel = .default
+    ) {
+        self.musicService = musicService
+        self.fallbackMatcher = fallbackMatcher
+        self.model = model
         // Configure session with instructions if model is available
         if model.availability == .available {
             let instructions = """

@@ -1,11 +1,16 @@
 import SwiftUI
+import Observation
 
 struct PersonasListView: View {
-    @State private var viewModel = PersonasViewModel()
+    @Bindable private var viewModel: PersonasViewModel
     @State private var showingAddPersona = false
     @State private var showingDetailView: Persona?
     @State private var personaToDelete: Persona?
     @State private var showingDeleteAlert = false
+
+    init(viewModel: PersonasViewModel) {
+        self._viewModel = Bindable(wrappedValue: viewModel)
+    }
 
     var body: some View {
         List {
@@ -109,6 +114,7 @@ struct PersonaRow: View {
 
 #Preview {
     NavigationStack {
-        PersonasListView()
+        let dependencies = AppDependencies()
+        PersonasListView(viewModel: dependencies.personasViewModel)
     }
 }

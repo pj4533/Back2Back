@@ -1,12 +1,21 @@
 import SwiftUI
 import MusicKit
+import Observation
 
 struct MusicSearchView: View {
-    @State private var viewModel = MusicSearchViewModel()
+    @Bindable private var viewModel: MusicSearchViewModel
     @FocusState private var isSearchFieldFocused: Bool
 
     // Optional callback for when a song is selected (for modal usage)
     var onSongSelected: ((Song) -> Void)?
+
+    init(
+        viewModel: MusicSearchViewModel,
+        onSongSelected: ((Song) -> Void)? = nil
+    ) {
+        self._viewModel = Bindable(wrappedValue: viewModel)
+        self.onSongSelected = onSongSelected
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -246,4 +255,13 @@ struct SearchResultRow: View {
             }
         }
     }
+}
+
+#Preview {
+    let musicService = MusicService(
+        authService: MusicAuthService(),
+        searchService: MusicSearchService(),
+        playbackService: MusicPlaybackService()
+    )
+    return MusicSearchView(viewModel: MusicSearchViewModel(musicService: musicService))
 }

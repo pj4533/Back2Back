@@ -15,12 +15,10 @@ import OSLog
 @MainActor
 @Observable
 class MusicService: MusicServiceProtocol {
-    static let shared = MusicService()
-
     // Delegated services
-    private let authService = MusicAuthService()
-    private let searchService = MusicSearchService()
-    private let playbackService = MusicPlaybackService()
+    private let authService: MusicAuthService
+    private let searchService: MusicSearchService
+    private let playbackService: MusicPlaybackService
 
     // MARK: - Exposed Properties (delegated)
 
@@ -52,7 +50,14 @@ class MusicService: MusicServiceProtocol {
         playbackService.currentSongId
     }
 
-    private init() {
+    init(
+        authService: MusicAuthService,
+        searchService: MusicSearchService,
+        playbackService: MusicPlaybackService
+    ) {
+        self.authService = authService
+        self.searchService = searchService
+        self.playbackService = playbackService
         B2BLog.musicKit.info("🎵 Initializing MusicService (facade)")
     }
 

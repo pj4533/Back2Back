@@ -5,8 +5,7 @@ import OSLog
 @MainActor
 @Observable
 final class PersonaService {
-    static let shared = PersonaService()
-
+    private let statusMessageService: StatusMessageService
     private let userDefaults = UserDefaults.standard
     private let personasKey = "com.back2back.personas"
     private let selectedPersonaIdKey = "com.back2back.selectedPersonaId"
@@ -16,7 +15,8 @@ final class PersonaService {
         personas.first { $0.isSelected }
     }
 
-    private init() {
+    init(statusMessageService: StatusMessageService) {
+        self.statusMessageService = statusMessageService
         loadPersonas()
         if personas.isEmpty {
             createDefaultPersonas()
@@ -135,7 +135,7 @@ final class PersonaService {
             B2BLog.general.info("✅ Selected persona: \(persona.name)")
 
             // Pregenerate status messages for the newly selected persona
-            StatusMessageService.shared.pregenerateMessages(for: persona)
+            statusMessageService.pregenerateMessages(for: persona)
         } else {
             B2BLog.general.error("❌ Failed to find persona for selection: \(persona.id)")
         }

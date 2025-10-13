@@ -2,9 +2,8 @@ import Foundation
 import OSLog
 
 @MainActor
-class OpenAIStreaming {
-    static let shared = OpenAIStreaming()
-    private init() {}
+final class OpenAIStreaming {
+    init() {}
 
     func streamingResponses(
         request: ResponsesRequest,

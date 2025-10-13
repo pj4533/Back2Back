@@ -1,8 +1,13 @@
 import SwiftUI
 import MusicKit
+import Observation
 
 struct MusicAuthorizationView: View {
-    @State private var viewModel = MusicAuthViewModel()
+    @Bindable private var viewModel: MusicAuthViewModel
+
+    init(viewModel: MusicAuthViewModel) {
+        self._viewModel = Bindable(wrappedValue: viewModel)
+    }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -83,4 +88,13 @@ struct MusicAuthorizationView: View {
             viewModel.checkCurrentAuthorizationStatus()
         }
     }
+}
+
+#Preview {
+    let musicService = MusicService(
+        authService: MusicAuthService(),
+        searchService: MusicSearchService(),
+        playbackService: MusicPlaybackService()
+    )
+    return MusicAuthorizationView(viewModel: MusicAuthViewModel(musicService: musicService))
 }

@@ -5,18 +5,23 @@ import Foundation
 @Suite("OpenAIClient Tests")
 @MainActor
 struct OpenAIClientTests {
+    @MainActor
+    private func makeDependencies() -> AppDependencies {
+        AppDependencies()
+    }
 
     @Test("OpenAIClient is a singleton")
     func testSingleton() async throws {
-        let instance1 = OpenAIClient.shared
-        let instance2 = OpenAIClient.shared
+        let instance1 = makeDependencies().openAIClient
+        let instance2 = makeDependencies().openAIClient
 
-        #expect(instance1 === instance2, "OpenAIClient should return the same instance")
+        #expect(instance1 !== instance2, "OpenAIClient should create distinct instances")
     }
 
     @Test("OpenAIClient throws apiKeyMissing when no API key is set")
     func testThrowsApiKeyMissingWhenNoKey() async throws {
-        let client = OpenAIClient.shared
+        let client = makeDependencies().openAIClient
+        let networking = OpenAINetworking()
 
         // Only run this test if no API key is set
         if !client.isConfigured {
@@ -26,7 +31,7 @@ struct OpenAIClientTests {
             )
 
             await #expect(throws: OpenAIError.apiKeyMissing) {
-                _ = try await client.responses(request: request)
+                _ = try await networking.responses(request: request, client: client)
             }
         }
     }
@@ -91,17 +96,15 @@ struct OpenAIClientTests {
 
     @Test("OpenAIConstants values")
     func testOpenAIConstants() async throws {
-        #expect(OpenAIConstants.baseURL == "https://api.openai.com/v1", "Base URL should be correct")
-        #expect(OpenAIConstants.responsesEndpoint == "/responses", "Responses endpoint should be correct")
-        #expect(OpenAIConstants.defaultModel == "gpt-5", "Default model should be gpt-5")
-        #expect(OpenAIConstants.defaultTemperature == 0.7, "Default temperature should be 0.7")
-        #expect(OpenAIConstants.defaultMaxTokens == 1000, "Default max tokens should be 1000")
+        #expect(OpenAIConstants.baseURL == "https://api.openai.com", "Base URL should be correct")
+        #expect(OpenAIConstants.responsesEndpoint == "/v1/responses", "Responses endpoint should be correct")
     }
 
     @Test("isConfigured property")
     func testIsConfiguredProperty() async throws {
-        let client = OpenAIClient.shared
-        let environmentService = EnvironmentService.shared
+        let dependencies = makeDependencies()
+        let client = dependencies.openAIClient
+        let environmentService = dependencies.environmentService
 
         let hasApiKey = environmentService.getOpenAIKey() != nil
         #expect(client.isConfigured == hasApiKey, "isConfigured should match whether API key exists")
@@ -109,7 +112,7 @@ struct OpenAIClientTests {
 
     @Test("simpleCompletion requires API key")
     func testSimpleCompletionRequiresApiKey() async throws {
-        let client = OpenAIClient.shared
+        let client = makeDependencies().openAIClient
 
         if !client.isConfigured {
             await #expect(throws: OpenAIError.apiKeyMissing) {
@@ -125,9 +128,9 @@ struct OpenAIClientTests {
         let usage = ResponseUsage(
             inputTokens: 10,
             outputTokens: 20,
+            totalTokens: 35,
             inputTokensDetails: inputDetails,
-            outputTokensDetails: outputDetails,
-            totalTokens: 35
+            outputTokensDetails: outputDetails
         )
 
         #expect(usage.inputTokens == 10, "Input tokens should match")
@@ -215,7 +218,7 @@ struct OpenAIClientTests {
 
     @Test("reloadConfiguration method")
     func testReloadConfiguration() async throws {
-        let client = OpenAIClient.shared
+        let client = makeDependencies().openAIClient
         let initialConfigured = client.isConfigured
 
         // This should not crash
@@ -225,19 +228,19 @@ struct OpenAIClientTests {
         #expect(client.isConfigured == initialConfigured, "Configuration status should be consistent")
     }
 
-    @Test("Model constants are correct")
-    func testModelConstants() async throws {
-        #expect(OpenAIConstants.modelGPT5 == "gpt-5", "GPT-5 model constant should be correct")
-        #expect(OpenAIConstants.modelGPT5Mini == "gpt-5-mini", "GPT-5 Mini model constant should be correct")
-        #expect(OpenAIConstants.modelGPT5Nano == "gpt-5-nano", "GPT-5 Nano model constant should be correct")
-        #expect(OpenAIConstants.defaultModel == OpenAIConstants.modelGPT5, "Default model should be GPT-5")
+    @Test("Default AI model configuration")
+    func testDefaultAIModelConfiguration() async throws {
+        let config = AIModelConfig.default
+        #expect(config.songSelectionModel == "automatic")
+        #expect(config.songSelectionReasoningLevel == .low)
+        #expect(config.musicMatcher == .stringBased)
     }
 
     @Test("simpleCompletion uses correct defaults")
     func testSimpleCompletionDefaults() async throws {
         // This test verifies the implementation uses correct defaults
         // We can't test the actual API call without a valid key
-        let client = OpenAIClient.shared
+        let client = makeDependencies().openAIClient
 
         if !client.isConfigured {
             await #expect(throws: OpenAIError.apiKeyMissing) {

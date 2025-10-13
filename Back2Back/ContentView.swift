@@ -8,27 +8,43 @@
 import SwiftUI
 import MusicKit
 import OSLog
+import Observation
 
 struct ContentView: View {
-    private let musicService = MusicService.shared
+    private let dependencies: AppDependencies
+    @Bindable private var musicService: MusicService
     @State private var selectedTab = 0
+
+    init(dependencies: AppDependencies) {
+        self.dependencies = dependencies
+        self._musicService = Bindable(wrappedValue: dependencies.musicService)
+    }
 
     var body: some View {
         if musicService.isAuthorized {
             mainContent
-                .toastNotifications()
+                .toastNotifications(toastService: dependencies.toastService)
         } else {
             NavigationStack {
-                MusicAuthorizationView()
+                MusicAuthorizationView(viewModel: dependencies.musicAuthViewModel)
             }
-            .toastNotifications()
+            .toastNotifications(toastService: dependencies.toastService)
         }
     }
 
     private var mainContent: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                SessionView()
+                SessionView(
+                    sessionViewModel: dependencies.sessionViewModel,
+                    sessionService: dependencies.sessionService,
+                    musicService: dependencies.musicService,
+                    favoritesService: dependencies.favoritesService,
+                    personaService: dependencies.personaService,
+                    statusMessageService: dependencies.statusMessageService,
+                    makeMusicSearchViewModel: { MusicSearchViewModel(musicService: dependencies.musicService) },
+                    makeNowPlayingViewModel: { NowPlayingViewModel(musicService: dependencies.musicService) }
+                )
             }
             .tabItem {
                 Label("Session", systemImage: "music.note.list")
@@ -36,7 +52,7 @@ struct ContentView: View {
             .tag(0)
 
             NavigationStack {
-                FavoritesListView()
+                FavoritesListView(favoritesService: dependencies.favoritesService)
             }
             .tabItem {
                 Label("Favorites", systemImage: "heart.fill")
@@ -44,7 +60,7 @@ struct ContentView: View {
             .tag(1)
 
             NavigationStack {
-                PersonasListView()
+                PersonasListView(viewModel: dependencies.personasViewModel)
             }
             .tabItem {
                 Label("Personas", systemImage: "person.3.fill")
@@ -52,7 +68,10 @@ struct ContentView: View {
             .tag(2)
 
             NavigationStack {
-                ConfigurationView()
+                ConfigurationView(
+                    errorService: dependencies.songErrorLoggerService,
+                    personaSongCacheService: dependencies.personaSongCacheService
+                )
             }
             .tabItem {
                 Label("Config", systemImage: "gear")
@@ -63,5 +82,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(dependencies: AppDependencies())
 }

@@ -13,13 +13,11 @@ import OSLog
 @MainActor
 @Observable
 final class SongErrorLoggerService {
-    static let shared = SongErrorLoggerService()
-
     private(set) var errors: [SongError] = []
     private let maxErrors = 100  // Keep last 100 errors
     private let storageKey = "com.saygoodnight.back2back.songErrors"
 
-    private init() {
+    init() {
         loadErrors()
     }
 

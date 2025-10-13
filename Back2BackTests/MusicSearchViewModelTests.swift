@@ -11,34 +11,42 @@ import MusicKit
 
 @MainActor
 struct MusicSearchViewModelTests {
+    private func makeViewModel() -> MusicSearchViewModel {
+        let musicService = MusicService(
+            authService: MusicAuthService(),
+            searchService: MusicSearchService(),
+            playbackService: MusicPlaybackService()
+        )
+        return MusicSearchViewModel(musicService: musicService)
+    }
 
     @Test func viewModelInitializesWithEmptySearchText() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         #expect(viewModel.searchText.isEmpty)
     }
 
     @Test func viewModelInitializesWithEmptySearchResults() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         #expect(viewModel.searchResults.isEmpty)
     }
 
     @Test func isSearchingInitiallyFalse() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         #expect(!viewModel.isSearching)
     }
 
     @Test func errorMessageInitiallyNil() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         #expect(viewModel.errorMessage == nil)
     }
 
     @Test func currentlyPlayingInitiallyNil() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         #expect(viewModel.currentlyPlaying == nil)
     }
 
     @Test func playbackStateInitiallyStopped() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         #expect(viewModel.playbackState == .stopped)
     }
 
@@ -58,17 +66,17 @@ struct MusicSearchViewModelTests {
     */
 
     @Test func canSkipToNextWhenCurrentlyPlayingExists() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         #expect(!viewModel.canSkipToNext)
     }
 
     @Test func canSkipToPreviousWhenCurrentlyPlayingExists() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         #expect(!viewModel.canSkipToPrevious)
     }
 
     @Test func clearSearchResetsAllFields() async throws {
-        let viewModel = MusicSearchViewModel()
+        let viewModel = makeViewModel()
         viewModel.searchText = "test"
         viewModel.errorMessage = "error"
 

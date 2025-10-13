@@ -20,11 +20,22 @@ struct TurnManagerTests {
     @MainActor
     func testDetermineNextQueueStatusDuringUserTurn() async {
         // Setup: Ensure it's user's turn
-        let sessionService = SessionService.shared
+        let statusMessageService = StatusMessageService()
+        let personaService = PersonaService(statusMessageService: statusMessageService)
+        let sessionService = SessionService(
+            personaService: personaService,
+            historyService: SessionHistoryService(),
+            queueManager: QueueManager()
+        )
+        let musicService = MusicService(
+            authService: MusicAuthService(),
+            searchService: MusicSearchService(),
+            playbackService: MusicPlaybackService()
+        )
         sessionService.resetSession()
         // currentTurn defaults to .user
 
-        let turnManager = TurnManager()
+        let turnManager = TurnManager(sessionService: sessionService, musicService: musicService)
         let queueStatus = turnManager.determineNextQueueStatus()
 
         // When it's user's turn, AI should queue as backup (.queuedIfUserSkips)
@@ -34,10 +45,21 @@ struct TurnManagerTests {
     @Test("Advance to next song returns nil when no queued song")
     @MainActor
     func testAdvanceToNextSongNoQueue() async {
-        let sessionService = SessionService.shared
+        let statusMessageService = StatusMessageService()
+        let personaService = PersonaService(statusMessageService: statusMessageService)
+        let sessionService = SessionService(
+            personaService: personaService,
+            historyService: SessionHistoryService(),
+            queueManager: QueueManager()
+        )
+        let musicService = MusicService(
+            authService: MusicAuthService(),
+            searchService: MusicSearchService(),
+            playbackService: MusicPlaybackService()
+        )
         sessionService.resetSession()
 
-        let turnManager = TurnManager()
+        let turnManager = TurnManager(sessionService: sessionService, musicService: musicService)
         let result = await turnManager.advanceToNextSong()
 
         #expect(result == nil)

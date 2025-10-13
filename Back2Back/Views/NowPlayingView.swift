@@ -1,9 +1,14 @@
 import SwiftUI
 import MusicKit
+import Observation
 
 struct NowPlayingView: View {
-    @State private var viewModel = NowPlayingViewModel()
+    @Bindable private var viewModel: NowPlayingViewModel
     @Environment(\.dismiss) private var dismiss
+
+    init(viewModel: NowPlayingViewModel) {
+        self._viewModel = Bindable(wrappedValue: viewModel)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -214,4 +219,13 @@ struct NowPlayingView: View {
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
+}
+
+#Preview {
+    let musicService = MusicService(
+        authService: MusicAuthService(),
+        searchService: MusicSearchService(),
+        playbackService: MusicPlaybackService()
+    )
+    return NowPlayingView(viewModel: NowPlayingViewModel(musicService: musicService))
 }

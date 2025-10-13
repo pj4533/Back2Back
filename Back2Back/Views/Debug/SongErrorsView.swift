@@ -6,12 +6,17 @@
 //
 
 import SwiftUI
+import Observation
 
 /// Debug view displaying failed song selection attempts
 struct SongErrorsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var errorService = SongErrorLoggerService.shared
+    @Bindable private var errorService: SongErrorLoggerService
     @State private var showingClearAlert = false
+
+    init(errorService: SongErrorLoggerService) {
+        self._errorService = Bindable(wrappedValue: errorService)
+    }
 
     var body: some View {
         List {
@@ -122,12 +127,12 @@ struct SongErrorRow: View {
 // MARK: - Preview
 #Preview("With Errors") {
     NavigationStack {
-        SongErrorsView()
+        SongErrorsView(errorService: SongErrorLoggerService())
     }
 }
 
 #Preview("Empty State") {
     NavigationStack {
-        SongErrorsView()
+        SongErrorsView(errorService: SongErrorLoggerService())
     }
 }

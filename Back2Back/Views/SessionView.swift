@@ -9,20 +9,60 @@
 import SwiftUI
 import MusicKit
 import OSLog
+import Observation
 
 struct SessionView: View {
-    private let sessionViewModel = SessionViewModel.shared
+    @Bindable private var sessionViewModel: SessionViewModel
+    @Bindable private var sessionService: SessionService
+    @Bindable private var musicService: MusicService
+    private let favoritesService: FavoritesService
+    private let personaService: PersonaService
+    private let statusMessageService: StatusMessageService
+    private let makeMusicSearchViewModel: () -> MusicSearchViewModel
+    private let makeNowPlayingViewModel: () -> NowPlayingViewModel
 
     @State private var showSongPicker = false
     @State private var showNowPlaying = false
 
+    init(
+        sessionViewModel: SessionViewModel,
+        sessionService: SessionService,
+        musicService: MusicService,
+        favoritesService: FavoritesService,
+        personaService: PersonaService,
+        statusMessageService: StatusMessageService,
+        makeMusicSearchViewModel: @escaping () -> MusicSearchViewModel,
+        makeNowPlayingViewModel: @escaping () -> NowPlayingViewModel
+    ) {
+        self._sessionViewModel = Bindable(wrappedValue: sessionViewModel)
+        self._sessionService = Bindable(wrappedValue: sessionService)
+        self._musicService = Bindable(wrappedValue: musicService)
+        self.favoritesService = favoritesService
+        self.personaService = personaService
+        self.statusMessageService = statusMessageService
+        self.makeMusicSearchViewModel = makeMusicSearchViewModel
+        self.makeNowPlayingViewModel = makeNowPlayingViewModel
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            SessionHeaderView(onNowPlayingTapped: { showNowPlaying = true })
+            SessionHeaderView(
+                sessionService: sessionService,
+                musicService: musicService,
+                onNowPlayingTapped: { showNowPlaying = true }
+            )
 
-            SessionHistoryListView()
+            SessionHistoryListView(
+                sessionService: sessionService,
+                sessionViewModel: sessionViewModel,
+                favoritesService: favoritesService,
+                personaService: personaService,
+                statusMessageService: statusMessageService
+            )
 
             SessionActionButtons(
+                sessionService: sessionService,
+                sessionViewModel: sessionViewModel,
                 onUserSelectTapped: { showSongPicker = true },
                 onAIStartTapped: {
                     Task { await handleAIStartFirst() }
@@ -35,6 +75,7 @@ struct SessionView: View {
         .sheet(isPresented: $showSongPicker) {
             NavigationStack {
                 MusicSearchView(
+                    viewModel: makeMusicSearchViewModel(),
                     onSongSelected: { song in
                         Task {
                             await handleUserSongSelection(song)
@@ -54,7 +95,7 @@ struct SessionView: View {
             }
         }
         .fullScreenCover(isPresented: $showNowPlaying) {
-            NowPlayingView()
+            NowPlayingView(viewModel: makeNowPlayingViewModel())
         }
     }
 
@@ -78,5 +119,15 @@ struct SessionView: View {
 }
 
 #Preview {
-    SessionView()
+    let dependencies = AppDependencies()
+    return SessionView(
+        sessionViewModel: dependencies.sessionViewModel,
+        sessionService: dependencies.sessionService,
+        musicService: dependencies.musicService,
+        favoritesService: dependencies.favoritesService,
+        personaService: dependencies.personaService,
+        statusMessageService: dependencies.statusMessageService,
+        makeMusicSearchViewModel: { MusicSearchViewModel(musicService: dependencies.musicService) },
+        makeNowPlayingViewModel: { NowPlayingViewModel(musicService: dependencies.musicService) }
+    )
 }

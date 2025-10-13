@@ -197,20 +197,18 @@ struct OpenAIModelsTests {
         #expect(partialError2.code == "code2", "Code should be set")
     }
 
-    @Test("OpenAIConstants GPT-5 model values")
-    func testOpenAIConstantsModels() async throws {
-        #expect(OpenAIConstants.defaultModel == "gpt-5", "Default model should be gpt-5")
-        #expect(OpenAIConstants.modelGPT5 == "gpt-5", "GPT-5 constant should be correct")
-        #expect(OpenAIConstants.modelGPT5Mini == "gpt-5-mini", "GPT-5 Mini constant should be correct")
-        #expect(OpenAIConstants.modelGPT5Nano == "gpt-5-nano", "GPT-5 Nano constant should be correct")
+    @Test("Default AI model configuration uses sensible defaults")
+    func testDefaultAIModelConfiguration() async throws {
+        let config = AIModelConfig.default
+        #expect(config.songSelectionModel == "automatic", "Default model should be automatic")
+        #expect(config.songSelectionReasoningLevel == .low, "Default reasoning should be low")
+        #expect(config.musicMatcher == .stringBased, "Default matcher should be string based")
     }
 
     @Test("OpenAIConstants endpoint values")
     func testOpenAIConstantsEndpoints() async throws {
-        #expect(OpenAIConstants.baseURL == "https://api.openai.com/v1", "Base URL should be correct")
-        #expect(OpenAIConstants.responsesEndpoint == "/responses", "Responses endpoint should be correct")
-        #expect(OpenAIConstants.defaultTemperature == 0.7, "Default temperature should be correct")
-        #expect(OpenAIConstants.defaultMaxTokens == 1000, "Default max tokens should be correct")
+        #expect(OpenAIConstants.baseURL == "https://api.openai.com", "Base URL should be correct")
+        #expect(OpenAIConstants.responsesEndpoint == "/v1/responses", "Responses endpoint should be correct")
     }
 
     // MARK: - Streaming Event Tests

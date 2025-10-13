@@ -2,9 +2,8 @@ import Foundation
 import OSLog
 
 @MainActor
-class OpenAINetworking {
-    static let shared = OpenAINetworking()
-    private init() {}
+final class OpenAINetworking {
+    init() {}
 
     func responses(request: ResponsesRequest, client: OpenAIClient) async throws -> ResponsesResponse {
         guard let apiKey = client.apiKey, !apiKey.isEmpty else {

@@ -16,8 +16,8 @@ import OSLog
 @MainActor
 @Observable
 final class PlaybackCoordinator {
-    private let musicService = MusicService.shared
-    private let sessionService = SessionService.shared
+    private let musicService: MusicService
+    private let sessionService: SessionService
 
     private var playbackObserverTask: Task<Void, Never>?
     private var stateSubscription: AnyCancellable?
@@ -31,7 +31,12 @@ final class PlaybackCoordinator {
     // Track if we've queued the next song at 95%
     private var hasQueuedNextSongAt95: Bool = false
 
-    init() {
+    init(
+        musicService: MusicService,
+        sessionService: SessionService
+    ) {
+        self.musicService = musicService
+        self.sessionService = sessionService
         B2BLog.session.debug("PlaybackCoordinator initialized")
         startPlaybackMonitoring()
         setupStateObserver()

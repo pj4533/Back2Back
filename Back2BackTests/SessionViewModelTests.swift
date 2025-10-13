@@ -13,9 +13,15 @@ import MusicKit
 @Suite("SessionViewModel Tests")
 struct SessionViewModelTests {
     @MainActor
+    private func makeDependencies() -> AppDependencies {
+        AppDependencies()
+    }
+
+    @MainActor
     @Test("ViewModel initialization")
     func testViewModelInitialization() {
-        let viewModel = SessionViewModel.shared
+        let dependencies = makeDependencies()
+        let viewModel = dependencies.sessionViewModel
 
         // Verify the view model is properly initialized
         // Note: We can't create new instances due to singleton pattern
@@ -99,7 +105,8 @@ struct SessionViewModelTests {
     @MainActor
     @Test("AI thinking state management")
     func testAIThinkingStateManagement() async {
-        let sessionService = SessionService.shared
+        let dependencies = makeDependencies()
+        let sessionService = dependencies.sessionService
 
         // Initial state
         #expect(sessionService.isAIThinking == false)
@@ -116,7 +123,8 @@ struct SessionViewModelTests {
     @MainActor
     @Test("Session Service turn management")
     func testSessionServiceTurnManagement() {
-        let sessionService = SessionService.shared
+        let dependencies = makeDependencies()
+        let sessionService = dependencies.sessionService
 
         // Reset to known state
         sessionService.resetSession()
@@ -363,7 +371,7 @@ struct SessionViewModelTests {
     @MainActor
     @Test("Direction change initial state")
     func testDirectionChangeInitialState() {
-        let viewModel = SessionViewModel.shared
+        let viewModel = makeDependencies().sessionViewModel
 
         // Initial state should have no cached direction
         #expect(viewModel.cachedDirectionChange == nil)
@@ -406,7 +414,7 @@ struct SessionViewModelTests {
     @MainActor
     @Test("Direction change generation state management")
     func testDirectionChangeGenerationStateManagement() {
-        let viewModel = SessionViewModel.shared
+        let viewModel = makeDependencies().sessionViewModel
 
         // Initial state
         #expect(viewModel.isGeneratingDirection == false)

@@ -4,11 +4,31 @@ import Foundation
 
 @MainActor
 struct PersonasViewModelTests {
+    @MainActor
+    private func makeViewModel() -> PersonasViewModel {
+        let statusMessageService = StatusMessageService()
+        let personaService = PersonaService(statusMessageService: statusMessageService)
+        let environmentService = EnvironmentService()
+        let networking = OpenAINetworking()
+        let personaSongCacheService = PersonaSongCacheService()
+        let streaming = OpenAIStreaming()
+        let songSelectionService = SongSelectionService(
+            networking: networking,
+            personaSongCacheService: personaSongCacheService
+        )
+        let personaGenerationService = PersonaGenerationService(streaming: streaming)
+        let openAIClient = OpenAIClient(
+            config: OpenAIConfig(environmentService: environmentService),
+            songSelectionService: songSelectionService,
+            personaGenerationService: personaGenerationService
+        )
+        return PersonasViewModel(personaService: personaService, aiService: openAIClient)
+    }
 
     @Test("PersonasViewModel loads personas on initialization")
     func testLoadPersonas() {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = makeViewModel()
 
         // When
         viewModel.loadPersonas()
@@ -21,7 +41,7 @@ struct PersonasViewModelTests {
     @Test("Create persona through ViewModel")
     func testCreatePersona() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = makeViewModel()
         let initialCount = viewModel.personas.count
 
         // When
@@ -38,7 +58,7 @@ struct PersonasViewModelTests {
     @Test("Update persona through ViewModel")
     func testUpdatePersona() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = makeViewModel()
         await viewModel.createPersona(
             name: "Original DJ",
             description: "Original description"
@@ -63,7 +83,7 @@ struct PersonasViewModelTests {
     @Test("Delete persona through ViewModel")
     func testDeletePersona() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = makeViewModel()
         await viewModel.createPersona(
             name: "To Delete",
             description: "Will be deleted"
@@ -87,7 +107,7 @@ struct PersonasViewModelTests {
     @Test("Select persona through ViewModel")
     func testSelectPersona() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = makeViewModel()
         await viewModel.createPersona(
             name: "Persona A",
             description: "First persona"
@@ -113,7 +133,7 @@ struct PersonasViewModelTests {
     @Test("Generation state flags")
     func testGenerationStateFlags() {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = makeViewModel()
 
         // Initial state
         #expect(viewModel.isGeneratingStyleGuide == false)
@@ -124,7 +144,7 @@ struct PersonasViewModelTests {
     @Test("Regenerate style guide for existing persona")
     func testRegenerateStyleGuide() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = makeViewModel()
         let persona = Persona(
             name: "Test Persona",
             description: "Test description",
@@ -133,7 +153,11 @@ struct PersonasViewModelTests {
 
         // This test would need mocking of OpenAIClient to properly test
         // For now, we just verify the method exists and can be called
-        await viewModel.regenerateStyleGuide(for: persona)
+        do {
+            _ = try await viewModel.regenerateStyleGuide(for: persona)
+        } catch {
+            // Expected in test environment without API key
+        }
 
         // In a real test with mocking, we would verify:
         // - isGeneratingStyleGuide becomes true then false

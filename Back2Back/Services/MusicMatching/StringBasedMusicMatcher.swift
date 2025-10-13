@@ -18,7 +18,19 @@ import OSLog
 /// logic is isolated to this class.
 @MainActor
 final class StringBasedMusicMatcher: MusicMatchingProtocol {
-    private let musicService = MusicService.shared
+    private let musicService: MusicService
+    private let personaService: PersonaService
+    private let songErrorLoggerService: SongErrorLoggerService
+
+    init(
+        musicService: MusicService,
+        personaService: PersonaService,
+        songErrorLoggerService: SongErrorLoggerService
+    ) {
+        self.musicService = musicService
+        self.personaService = personaService
+        self.songErrorLoggerService = songErrorLoggerService
+    }
 
     func searchAndMatch(recommendation: SongRecommendation) async throws -> Song? {
         B2BLog.musicKit.info("Searching for: \(recommendation.song) by \(recommendation.artist)")
@@ -70,10 +82,10 @@ final class StringBasedMusicMatcher: MusicMatchingProtocol {
         B2BLog.musicKit.warning("❌ No good match found for: '\(recommendation.song)' by '\(recommendation.artist)' after searching \(searchResults.count) results")
         B2BLog.musicKit.debug("First result was: '\(searchResults.first?.song.title ?? "none")' by '\(searchResults.first?.song.artistName ?? "none")'")
 
-        let personaName = PersonaService.shared.selectedPersona?.name ?? "Unknown"
+        let personaName = personaService.selectedPersona?.name ?? "Unknown"
 
         // Log error for debugging
-        SongErrorLoggerService.shared.logError(
+        songErrorLoggerService.logError(
             artistName: recommendation.artist,
             songTitle: recommendation.song,
             personaName: personaName,

@@ -10,6 +10,8 @@ import OSLog
 
 @main
 struct Back2BackApp: App {
+    private let dependencies = AppDependencies()
+
     init() {
         B2BLog.general.info("🎶 Back2Back App Launched")
         B2BLog.general.info("Bundle ID: \(Bundle.main.bundleIdentifier ?? "Unknown")")
@@ -26,7 +28,7 @@ struct Back2BackApp: App {
     private func checkOpenAIConfiguration() {
         // Only check configuration without forcing initialization
         Task { @MainActor in
-            if OpenAIClient.shared.isConfigured {
+            if dependencies.openAIClient.isConfigured {
                 B2BLog.ai.info("✅ OpenAI API key configured")
             } else {
                 B2BLog.ai.warning("⚠️ OpenAI API key not configured")
@@ -38,9 +40,9 @@ struct Back2BackApp: App {
     private func pregenerateStatusMessages() {
         Task { @MainActor in
             // Get the currently selected persona
-            if let selectedPersona = PersonaService.shared.selectedPersona {
+            if let selectedPersona = dependencies.personaService.selectedPersona {
                 B2BLog.ai.info("Pregenerating status messages for selected persona: \(selectedPersona.name)")
-                StatusMessageService.shared.pregenerateMessages(for: selectedPersona)
+                dependencies.statusMessageService.pregenerateMessages(for: selectedPersona)
             } else {
                 B2BLog.ai.debug("No persona selected, skipping status message pregeneration")
             }
@@ -49,7 +51,7 @@ struct Back2BackApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(dependencies: dependencies)
                 .onAppear {
                     B2BLog.ui.debug("Main ContentView appeared")
                 }

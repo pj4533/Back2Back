@@ -8,9 +8,14 @@
 import SwiftUI
 import MusicKit
 import OSLog
+import Observation
 
 struct FavoritesListView: View {
-    private let favoritesService = FavoritesService.shared
+    @Bindable private var favoritesService: FavoritesService
+
+    init(favoritesService: FavoritesService) {
+        self._favoritesService = Bindable(wrappedValue: favoritesService)
+    }
 
     var body: some View {
         Group {
@@ -57,6 +62,6 @@ struct FavoritesListView: View {
 
 #Preview {
     NavigationStack {
-        FavoritesListView()
+        FavoritesListView(favoritesService: FavoritesService())
     }
 }

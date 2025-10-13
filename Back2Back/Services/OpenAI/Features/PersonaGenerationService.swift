@@ -2,9 +2,12 @@ import Foundation
 import OSLog
 
 @MainActor
-class PersonaGenerationService {
-    static let shared = PersonaGenerationService()
-    private init() {}
+final class PersonaGenerationService {
+    private let streaming: OpenAIStreaming
+
+    init(streaming: OpenAIStreaming) {
+        self.streaming = streaming
+    }
 
     func generatePersonaStyleGuide(
         name: String,
@@ -70,7 +73,7 @@ class PersonaGenerationService {
             var reasoningStartTime = Date()
             var totalSourcesFound = 0
 
-            let response = try await OpenAIStreaming.shared.streamingResponses(request: request, client: client) { event in
+            let response = try await streaming.streamingResponses(request: request, client: client) { event in
                 await self.handlePersonaGenerationEvent(
                     event: event,
                     sources: &sources,

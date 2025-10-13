@@ -5,25 +5,29 @@ import OSLog
 @Observable
 @MainActor
 final class OpenAIClient: AIRecommendationServiceProtocol {
-    static let shared = OpenAIClient()
-
     private(set) var config: OpenAIConfig
     let session: URLSession
-    private static var isInitialized = false
+    private let songSelectionService: SongSelectionService
+    private let personaGenerationService: PersonaGenerationService
 
-    private init() {
-        let configuration = URLSessionConfiguration.default
-        // Disable timeouts for AI generation - web search can take very long
-        configuration.timeoutIntervalForRequest = 0  // No timeout
-        configuration.timeoutIntervalForResource = 0  // No timeout
-        self.session = URLSession(configuration: configuration)
-        self.config = OpenAIConfig()
-
-        // Prevent duplicate initialization logs
-        if !Self.isInitialized {
-            B2BLog.ai.debug("OpenAIClient initialized (singleton)")
-            Self.isInitialized = true
+    init(
+        config: OpenAIConfig,
+        session: URLSession? = nil,
+        songSelectionService: SongSelectionService,
+        personaGenerationService: PersonaGenerationService
+    ) {
+        if let providedSession = session {
+            self.session = providedSession
+        } else {
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 0
+            configuration.timeoutIntervalForResource = 0
+            self.session = URLSession(configuration: configuration)
         }
+        self.config = config
+        self.songSelectionService = songSelectionService
+        self.personaGenerationService = personaGenerationService
+        B2BLog.ai.debug("OpenAIClient initialized")
     }
 
     // MARK: - Configuration
@@ -43,7 +47,7 @@ final class OpenAIClient: AIRecommendationServiceProtocol {
     // MARK: - Feature Services
 
     func selectNextSong(persona: String, personaId: UUID, sessionHistory: [SessionSong], directionChange: DirectionChange? = nil, config: AIModelConfig = .default) async throws -> SongRecommendation {
-        try await SongSelectionService.shared.selectNextSong(
+        try await songSelectionService.selectNextSong(
             persona: persona,
             personaId: personaId,
             sessionHistory: sessionHistory,
@@ -54,7 +58,7 @@ final class OpenAIClient: AIRecommendationServiceProtocol {
     }
 
     func generateDirectionChange(persona: String, sessionHistory: [SessionSong], previousDirection: DirectionChange? = nil) async throws -> DirectionChange {
-        try await SongSelectionService.shared.generateDirectionChange(
+        try await songSelectionService.generateDirectionChange(
             persona: persona,
             sessionHistory: sessionHistory,
             previousDirection: previousDirection,
@@ -67,7 +71,7 @@ final class OpenAIClient: AIRecommendationServiceProtocol {
         description: String,
         onStatusUpdate: ((String) async -> Void)? = nil
     ) async throws -> PersonaGenerationResult {
-        try await PersonaGenerationService.shared.generatePersonaStyleGuide(
+        try await personaGenerationService.generatePersonaStyleGuide(
             name: name,
             description: description,
             onStatusUpdate: onStatusUpdate,
@@ -76,7 +80,7 @@ final class OpenAIClient: AIRecommendationServiceProtocol {
     }
 
     func simpleCompletion(prompt: String, model: String = "gpt-5") async throws -> String {
-        try await SongSelectionService.shared.simpleCompletion(
+        try await songSelectionService.simpleCompletion(
             prompt: prompt,
             model: model,
             client: self

@@ -264,6 +264,7 @@ struct PersonaDetailView: View {
 
 #Preview {
     NavigationStack {
-        PersonaDetailView(persona: nil, personasViewModel: PersonasViewModel())
+        let dependencies = AppDependencies()
+        PersonaDetailView(persona: nil, personasViewModel: dependencies.personasViewModel)
     }
 }

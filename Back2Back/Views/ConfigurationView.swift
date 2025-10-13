@@ -8,11 +8,21 @@
 import SwiftUI
 import OSLog
 import FoundationModels
+import Observation
 
 struct ConfigurationView: View {
     @AIModelConfigStorage private var config
     @State private var showingClearCacheAlert = false
-    @State private var errorService = SongErrorLoggerService.shared
+    @Bindable private var errorService: SongErrorLoggerService
+    private let personaSongCacheService: PersonaSongCacheService
+
+    init(
+        errorService: SongErrorLoggerService,
+        personaSongCacheService: PersonaSongCacheService
+    ) {
+        self._errorService = Bindable(wrappedValue: errorService)
+        self.personaSongCacheService = personaSongCacheService
+    }
 
     // Check if Apple Intelligence LLM is available
     private var isLLMAvailable: Bool {
@@ -124,7 +134,7 @@ struct ConfigurationView: View {
 
             Section {
                 NavigationLink {
-                    SongErrorsView()
+                    SongErrorsView(errorService: errorService)
                 } label: {
                     HStack {
                         Image(systemName: "exclamationmark.triangle")
@@ -167,7 +177,7 @@ struct ConfigurationView: View {
         .alert("Clear Song Cache?", isPresented: $showingClearCacheAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Clear", role: .destructive) {
-                PersonaSongCacheService.shared.clearAllCaches()
+                personaSongCacheService.clearAllCaches()
                 B2BLog.general.info("User cleared persona song cache from config view")
             }
         } message: {
@@ -178,6 +188,9 @@ struct ConfigurationView: View {
 
 #Preview {
     NavigationStack {
-        ConfigurationView()
+        ConfigurationView(
+            errorService: SongErrorLoggerService(),
+            personaSongCacheService: PersonaSongCacheService()
+        )
     }
 }

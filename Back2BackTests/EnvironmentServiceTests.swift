@@ -6,12 +6,12 @@ import Foundation
 @MainActor
 struct EnvironmentServiceTests {
 
-    @Test("EnvironmentService is a singleton")
-    func testSingleton() async throws {
-        let instance1 = EnvironmentService.shared
-        let instance2 = EnvironmentService.shared
+    @Test("EnvironmentService instances are independent")
+    func testIndependentInstances() async throws {
+        let instance1 = EnvironmentService()
+        let instance2 = EnvironmentService()
 
-        #expect(instance1 === instance2, "EnvironmentService should return the same instance")
+        #expect(instance1 !== instance2, "EnvironmentService should create distinct instances")
     }
 
     @Test("getOpenAIKey returns nil when environment variable is not set")
@@ -19,7 +19,7 @@ struct EnvironmentServiceTests {
         // This test assumes OPENAI_API_KEY is not set in the test environment
         // In a real scenario, we'd need to mock ProcessInfo or use dependency injection
 
-        let service = EnvironmentService.shared
+        let service = EnvironmentService()
 
         // If the key is set in test environment, this test would need adjustment
         // For now, we're testing the actual behavior
@@ -36,7 +36,7 @@ struct EnvironmentServiceTests {
 
     @Test("getValue returns correct value for existing environment variable")
     func testGetValueForExistingVariable() async throws {
-        let service = EnvironmentService.shared
+        let service = EnvironmentService()
 
         // PATH should always exist
         let path = service.getValue(for: "PATH")
@@ -46,7 +46,7 @@ struct EnvironmentServiceTests {
 
     @Test("getValue returns nil for non-existent environment variable")
     func testGetValueForNonExistentVariable() async throws {
-        let service = EnvironmentService.shared
+        let service = EnvironmentService()
 
         let value = service.getValue(for: "DEFINITELY_DOES_NOT_EXIST_VARIABLE_12345")
         #expect(value == nil, "Should return nil for non-existent variable")
@@ -54,7 +54,7 @@ struct EnvironmentServiceTests {
 
     @Test("isConfiguredForOpenAI returns false when API key is not set")
     func testIsConfiguredForOpenAIWhenNotSet() async throws {
-        let service = EnvironmentService.shared
+        let service = EnvironmentService()
 
         // This depends on whether OPENAI_API_KEY is set in test environment
         if ProcessInfo.processInfo.environment["OPENAI_API_KEY"] == nil {
@@ -66,7 +66,7 @@ struct EnvironmentServiceTests {
 
     @Test("getValue handles empty string keys")
     func testGetValueWithEmptyKey() async throws {
-        let service = EnvironmentService.shared
+        let service = EnvironmentService()
 
         let value = service.getValue(for: "")
         #expect(value == nil, "Should return nil for empty key")
@@ -74,7 +74,7 @@ struct EnvironmentServiceTests {
 
     @Test("Multiple getValue calls work correctly")
     func testMultipleGetValueCalls() async throws {
-        let service = EnvironmentService.shared
+        let service = EnvironmentService()
 
         // Test multiple calls with different keys
         let path = service.getValue(for: "PATH")
@@ -96,7 +96,7 @@ struct EnvironmentServiceTests {
 
     @Test("getOpenAIKey consistency")
     func testGetOpenAIKeyConsistency() async throws {
-        let service = EnvironmentService.shared
+        let service = EnvironmentService()
 
         // Multiple calls should return the same result
         let key1 = service.getOpenAIKey()

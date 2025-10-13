@@ -8,14 +8,29 @@
 
 import SwiftUI
 import OSLog
+import Observation
 
 struct SessionActionButtons: View {
-    private let sessionService = SessionService.shared
-    private let sessionViewModel = SessionViewModel.shared
+    @Bindable private var sessionService: SessionService
+    @Bindable private var sessionViewModel: SessionViewModel
 
     let onUserSelectTapped: () -> Void
     let onAIStartTapped: () -> Void
     let onDirectionOptionSelected: (DirectionOption) -> Void
+
+    init(
+        sessionService: SessionService,
+        sessionViewModel: SessionViewModel,
+        onUserSelectTapped: @escaping () -> Void,
+        onAIStartTapped: @escaping () -> Void,
+        onDirectionOptionSelected: @escaping (DirectionOption) -> Void
+    ) {
+        self._sessionService = Bindable(wrappedValue: sessionService)
+        self._sessionViewModel = Bindable(wrappedValue: sessionViewModel)
+        self.onUserSelectTapped = onUserSelectTapped
+        self.onAIStartTapped = onAIStartTapped
+        self.onDirectionOptionSelected = onDirectionOptionSelected
+    }
 
     // Check if user has already selected a song in the queue
     private var hasUserSelectedSong: Bool {

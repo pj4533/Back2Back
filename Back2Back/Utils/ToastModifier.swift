@@ -39,7 +39,7 @@ struct ToastModifier: ViewModifier {
 extension View {
     /// Attach toast notification support to any view
     /// - Parameter toastService: The toast service to use (defaults to shared instance)
-    func toastNotifications(toastService: ToastService = .shared) -> some View {
+    func toastNotifications(toastService: ToastService) -> some View {
         modifier(ToastModifier(toastService: toastService))
     }
 }

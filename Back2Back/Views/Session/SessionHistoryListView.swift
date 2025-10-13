@@ -7,9 +7,28 @@
 //
 
 import SwiftUI
+import Observation
 
 struct SessionHistoryListView: View {
-    private let sessionService = SessionService.shared
+    @Bindable private var sessionService: SessionService
+    private let sessionViewModel: SessionViewModel
+    private let favoritesService: FavoritesService
+    private let personaService: PersonaService
+    private let statusMessageService: StatusMessageService
+
+    init(
+        sessionService: SessionService,
+        sessionViewModel: SessionViewModel,
+        favoritesService: FavoritesService,
+        personaService: PersonaService,
+        statusMessageService: StatusMessageService
+    ) {
+        self._sessionService = Bindable(wrappedValue: sessionService)
+        self.sessionViewModel = sessionViewModel
+        self.favoritesService = favoritesService
+        self.personaService = personaService
+        self.statusMessageService = statusMessageService
+    }
 
     var body: some View {
         if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty && !sessionService.isAIThinking {
@@ -25,7 +44,12 @@ struct SessionHistoryListView: View {
                     LazyVStack(spacing: 8) {
                         // Show history (played songs)
                         ForEach(sessionService.sessionHistory) { sessionSong in
-                            SessionSongRow(sessionSong: sessionSong)
+                            SessionSongRow(
+                                sessionSong: sessionSong,
+                                sessionViewModel: sessionViewModel,
+                                favoritesService: favoritesService,
+                                personaService: personaService
+                            )
                                 // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
                                 // SwiftUI needs to know when status changes on same song
                                 .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
@@ -37,7 +61,11 @@ struct SessionHistoryListView: View {
 
                         // Show AI loading cell if AI is thinking
                         if sessionService.isAIThinking {
-                            AILoadingCell()
+                            AILoadingCell(
+                                sessionService: sessionService,
+                                statusMessageService: statusMessageService,
+                                personaService: personaService
+                            )
                                 .id("ai-loading")
                                 .transition(.asymmetric(
                                     insertion: .scale.combined(with: .opacity),
@@ -47,7 +75,12 @@ struct SessionHistoryListView: View {
 
                         // Show queue (upcoming songs)
                         ForEach(sessionService.songQueue) { sessionSong in
-                            SessionSongRow(sessionSong: sessionSong)
+                            SessionSongRow(
+                                sessionSong: sessionSong,
+                                sessionViewModel: sessionViewModel,
+                                favoritesService: favoritesService,
+                                personaService: personaService
+                            )
                                 // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
                                 // SwiftUI needs to know when status changes on same song
                                 .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")

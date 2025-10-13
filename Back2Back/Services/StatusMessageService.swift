@@ -12,14 +12,12 @@ import OSLog
 
 @MainActor
 final class StatusMessageService {
-    static let shared = StatusMessageService()
-
     private let userDefaults = UserDefaults.standard
     private let cacheKey = "com.back2back.statusMessagesCache"
     private var cachedMessages: [UUID: CachedStatusMessages] = [:]
     private var isGenerating = false
 
-    private init() {
+    init() {
         B2BLog.ai.info("StatusMessageService initialized")
         loadCache()
     }

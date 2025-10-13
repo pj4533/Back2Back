@@ -9,11 +9,25 @@
 import SwiftUI
 import MusicKit
 import OSLog
+import Observation
 
 struct SessionSongRow: View {
     let sessionSong: SessionSong
-    private let sessionViewModel = SessionViewModel.shared
-    private let favoritesService = FavoritesService.shared
+    @Bindable private var sessionViewModel: SessionViewModel
+    @Bindable private var favoritesService: FavoritesService
+    @Bindable private var personaService: PersonaService
+
+    init(
+        sessionSong: SessionSong,
+        sessionViewModel: SessionViewModel,
+        favoritesService: FavoritesService,
+        personaService: PersonaService
+    ) {
+        self.sessionSong = sessionSong
+        self._sessionViewModel = Bindable(wrappedValue: sessionViewModel)
+        self._favoritesService = Bindable(wrappedValue: favoritesService)
+        self._personaService = Bindable(wrappedValue: personaService)
+    }
 
     // Add computed property to force view updates when queue status changes
     private var statusId: String {
@@ -129,7 +143,6 @@ struct SessionSongRow: View {
                     // Favorite button - fixed 44x44 hit area
                     Button(action: {
                         B2BLog.ui.info("User tapped favorite button for: \(sessionSong.song.title)")
-                        let personaService = PersonaService.shared
                         favoritesService.toggleFavorite(
                             sessionSong: sessionSong,
                             personaName: personaService.selectedPersona?.name ?? "Unknown",

@@ -5,7 +5,7 @@ struct OpenAIConfig {
     let environmentService: EnvironmentService
     private(set) var apiKey: String?
 
-    init(environmentService: EnvironmentService = .shared) {
+    init(environmentService: EnvironmentService) {
         self.environmentService = environmentService
         self.apiKey = environmentService.getOpenAIKey()
 
