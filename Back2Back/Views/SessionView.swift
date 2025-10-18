@@ -4,6 +4,7 @@
 //
 //  Created on 2025-09-27.
 //  Refactored as part of Phase 1 architecture improvements (#20)
+//  Refactored to use ViewModel only (Issue #56, 2025-10-18)
 //
 
 import SwiftUI
@@ -11,6 +12,8 @@ import MusicKit
 import OSLog
 
 struct SessionView: View {
+    let viewModel: SessionViewModel
+
     @Environment(\.services) private var services
 
     @State private var showSongPicker = false
@@ -21,25 +24,33 @@ struct SessionView: View {
             return AnyView(Text("Loading..."))
         }
 
-        let sessionViewModel = services.sessionViewModel
-
         return AnyView(VStack(spacing: 0) {
-            SessionHeaderView(onNowPlayingTapped: { showNowPlaying = true })
+            SessionHeaderView(
+                viewModel: services.sessionHeaderViewModel,
+                onNowPlayingTapped: { showNowPlaying = true }
+            )
 
-            SessionHistoryListView()
+            SessionHistoryListView(
+                viewModel: services.sessionHistoryViewModel,
+                sessionViewModel: viewModel,
+                favoritesService: services.favoritesService,
+                personaService: services.personaService
+            )
 
             SessionActionButtons(
+                viewModel: services.sessionActionButtonsViewModel,
+                sessionViewModel: viewModel,
                 onUserSelectTapped: { showSongPicker = true },
                 onAIStartTapped: {
                     Task {
                         B2BLog.session.info("User requested AI to start first")
-                        await sessionViewModel.handleAIStartFirst()
+                        await viewModel.handleAIStartFirst()
                     }
                 },
                 onDirectionOptionSelected: { option in
                     Task {
                         B2BLog.session.info("User selected direction option: \(option.buttonLabel)")
-                        await sessionViewModel.handleDirectionChange(option: option)
+                        await viewModel.handleDirectionChange(option: option)
                     }
                 }
             )
@@ -50,7 +61,7 @@ struct SessionView: View {
                     onSongSelected: { song in
                         Task {
                             B2BLog.session.info("User selected song: \(song.title)")
-                            await sessionViewModel.handleUserSongSelection(song)
+                            await viewModel.handleUserSongSelection(song)
                         }
                         showSongPicker = false
                     }
@@ -73,5 +84,7 @@ struct SessionView: View {
 }
 
 #Preview {
-    SessionView()
+    let services = ServiceContainer()
+    SessionView(viewModel: services.sessionViewModel)
+        .withServices(services)
 }

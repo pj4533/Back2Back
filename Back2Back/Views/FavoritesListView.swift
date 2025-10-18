@@ -3,6 +3,7 @@
 //  Back2Back
 //
 //  Created on 2025-10-12.
+//  Refactored to use ViewModel only (Issue #56, 2025-10-18)
 //
 
 import SwiftUI
@@ -10,24 +11,18 @@ import MusicKit
 import OSLog
 
 struct FavoritesListView: View {
-    @Environment(\.services) private var services
+    let viewModel: FavoritesViewModel
 
     var body: some View {
-        guard let services = services else {
-            return AnyView(Text("Loading..."))
-        }
-
-        let favoritesService = services.favoritesService
-
-        return AnyView(Group {
-            if favoritesService.favorites.isEmpty {
+        Group {
+            if viewModel.isEmpty {
                 emptyStateView
             } else {
-                favoritesListView(favoritesService: favoritesService)
+                favoritesListView
             }
         }
         .navigationTitle("Favorites")
-        .navigationBarTitleDisplayMode(.large))
+        .navigationBarTitleDisplayMode(.large)
     }
 
     private var emptyStateView: some View {
@@ -38,10 +33,10 @@ struct FavoritesListView: View {
         )
     }
 
-    private func favoritesListView(favoritesService: FavoritesService) -> some View {
+    private var favoritesListView: some View {
         List {
-            // Sort directly in the ForEach for proper observation
-            ForEach(favoritesService.favorites.sorted { $0.favoritedAt > $1.favoritedAt }) { favoritedSong in
+            // Use ViewModel's sorted favorites
+            ForEach(viewModel.sortedFavorites) { favoritedSong in
                 FavoriteSongRow(favoritedSong: favoritedSong)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .listRowSeparator(.hidden)
@@ -49,7 +44,7 @@ struct FavoritesListView: View {
                         Button(role: .destructive) {
                             withAnimation {
                                 B2BLog.ui.info("User swiped to remove favorite: \(favoritedSong.title)")
-                                favoritesService.removeFavorite(songId: favoritedSong.songId)
+                                viewModel.removeFavorite(songId: favoritedSong.songId)
                             }
                         } label: {
                             Label("Remove", systemImage: "heart.slash.fill")
@@ -63,6 +58,8 @@ struct FavoritesListView: View {
 
 #Preview {
     NavigationStack {
-        FavoritesListView()
+        FavoritesListView(
+            viewModel: FavoritesViewModel(favoritesService: FavoritesService())
+        )
     }
 }

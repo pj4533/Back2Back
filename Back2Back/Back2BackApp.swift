@@ -31,7 +31,11 @@ struct Back2BackApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(
+                viewModel: services.contentViewModel,
+                sessionViewModel: services.sessionViewModel,
+                favoritesViewModel: services.favoritesViewModel
+            )
                 .withServices(services)
                 .onAppear {
                     B2BLog.ui.debug("Main ContentView appeared")

@@ -3,6 +3,7 @@
 //  Back2Back
 //
 //  Created by PJ Gray on 9/25/25.
+//  Refactored to use ViewModel only (Issue #56, 2025-10-18)
 //
 
 import SwiftUI
@@ -10,30 +11,28 @@ import MusicKit
 import OSLog
 
 struct ContentView: View {
-    @Environment(\.services) private var services
+    let viewModel: ContentViewModel
+    let sessionViewModel: SessionViewModel
+    let favoritesViewModel: FavoritesViewModel
+
     @State private var selectedTab = 0
 
     var body: some View {
-        // Ensure services are available
-        guard let services = services else {
-            return AnyView(Text("Loading..."))
-        }
-
-        if services.musicService.isAuthorized {
-            return AnyView(mainContent
-                .toastNotifications())
+        if viewModel.isAuthorized {
+            mainContent
+                .toastNotifications()
         } else {
-            return AnyView(NavigationStack {
+            NavigationStack {
                 MusicAuthorizationView()
             }
-            .toastNotifications())
+            .toastNotifications()
         }
     }
 
     private var mainContent: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                SessionView()
+                SessionView(viewModel: sessionViewModel)
             }
             .tabItem {
                 Label("Session", systemImage: "music.note.list")
@@ -41,7 +40,7 @@ struct ContentView: View {
             .tag(0)
 
             NavigationStack {
-                FavoritesListView()
+                FavoritesListView(viewModel: favoritesViewModel)
             }
             .tabItem {
                 Label("Favorites", systemImage: "heart.fill")
@@ -68,5 +67,11 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    let services = ServiceContainer()
+    ContentView(
+        viewModel: services.contentViewModel,
+        sessionViewModel: services.sessionViewModel,
+        favoritesViewModel: services.favoritesViewModel
+    )
+        .withServices(services)
 }
