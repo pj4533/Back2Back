@@ -5,10 +5,18 @@ import Foundation
 @MainActor
 struct PersonaServiceTests {
 
+    func createTestService() -> PersonaService {
+        let environmentService = EnvironmentService()
+        let personaSongCacheService = PersonaSongCacheService()
+        let openAIClient = OpenAIClient(environmentService: environmentService, personaSongCacheService: personaSongCacheService)
+        let statusMessageService = StatusMessageService(openAIClient: openAIClient)
+        return PersonaService(statusMessageService: statusMessageService)
+    }
+
     @Test("PersonaService initializes with default personas")
     func testInitializationWithDefaultPersonas() {
         // Given
-        let service = PersonaService()
+        let service = createTestService()
 
         // Then - Check that personas exist (but don't assume default count due to test interference)
         #expect(!service.personas.isEmpty)
@@ -20,7 +28,7 @@ struct PersonaServiceTests {
     @Test("Create new persona")
     func testCreatePersona() {
         // Given
-        let service = PersonaService()
+        let service = createTestService()
         let initialCount = service.personas.count
 
         // When
@@ -41,7 +49,7 @@ struct PersonaServiceTests {
     @Test("Update existing persona")
     func testUpdatePersona() {
         // Given
-        let service = PersonaService()
+        let service = createTestService()
         let persona = service.createPersona(
             name: "Original Name",
             description: "Original Description",
@@ -68,7 +76,7 @@ struct PersonaServiceTests {
     @Test("Delete persona")
     func testDeletePersona() {
         // Given
-        let service = PersonaService()
+        let service = createTestService()
         let persona = service.createPersona(
             name: "To Delete",
             description: "Will be deleted",
@@ -87,7 +95,7 @@ struct PersonaServiceTests {
     @Test("Select persona")
     func testSelectPersona() {
         // Given
-        let service = PersonaService()
+        let service = createTestService()
         let persona1 = service.createPersona(
             name: "Persona 1",
             description: "First",
@@ -114,7 +122,7 @@ struct PersonaServiceTests {
     @Test("Delete selected persona selects first available")
     func testDeleteSelectedPersona() {
         // Given
-        let service = PersonaService()
+        let service = createTestService()
         // Clear existing personas for clean test
         service.personas.forEach { service.deletePersona($0) }
 
@@ -144,7 +152,7 @@ struct PersonaServiceTests {
     @Test("Get all personas returns current list")
     func testGetAllPersonas() {
         // Given
-        let service = PersonaService()
+        let service = createTestService()
 
         // When
         let allPersonas = service.getAllPersonas()

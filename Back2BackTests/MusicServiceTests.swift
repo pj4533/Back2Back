@@ -12,11 +12,7 @@ import MusicKit
 @MainActor
 struct MusicServiceTests {
 
-    @Test func musicServiceIsSingleton() async throws {
-        let instance1 = MusicService()
-        let instance2 = MusicService()
-        #expect(instance1 === instance2)
-    }
+    // Note: MusicService is no longer a singleton after refactoring to use dependency injection
 
     @Test func initialAuthorizationStatusIsNotDetermined() async throws {
         let service = MusicService()

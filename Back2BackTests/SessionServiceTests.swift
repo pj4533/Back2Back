@@ -126,12 +126,13 @@ struct SessionServiceTests {
     func testCurrentPersonaIntegration() {
         let service = createTestService()
 
-        // Should have a fallback if no persona selected
+        // PersonaService creates default personas if none exist
+        // First default persona is "Rare Groove Collector" which is selected
         #expect(!service.currentPersonaStyleGuide.isEmpty)
         #expect(!service.currentPersonaName.isEmpty)
 
-        // Default should provide fallback values
-        #expect(service.currentPersonaName == "Default DJ")
+        // Default persona should be "Rare Groove Collector" (first default)
+        #expect(service.currentPersonaName == "Rare Groove Collector")
     }
 
     @MainActor

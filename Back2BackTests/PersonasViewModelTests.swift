@@ -5,10 +5,19 @@ import Foundation
 @MainActor
 struct PersonasViewModelTests {
 
+    func createTestViewModel() -> PersonasViewModel {
+        let environmentService = EnvironmentService()
+        let personaSongCacheService = PersonaSongCacheService()
+        let openAIClient = OpenAIClient(environmentService: environmentService, personaSongCacheService: personaSongCacheService)
+        let statusMessageService = StatusMessageService(openAIClient: openAIClient)
+        let personaService = PersonaService(statusMessageService: statusMessageService)
+        return PersonasViewModel(personaService: personaService, aiService: openAIClient)
+    }
+
     @Test("PersonasViewModel loads personas on initialization")
     func testLoadPersonas() {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = createTestViewModel()
 
         // When
         viewModel.loadPersonas()
@@ -21,7 +30,7 @@ struct PersonasViewModelTests {
     @Test("Create persona through ViewModel")
     func testCreatePersona() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = createTestViewModel()
         let initialCount = viewModel.personas.count
 
         // When
@@ -38,7 +47,7 @@ struct PersonasViewModelTests {
     @Test("Update persona through ViewModel")
     func testUpdatePersona() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = createTestViewModel()
         await viewModel.createPersona(
             name: "Original DJ",
             description: "Original description"
@@ -63,7 +72,7 @@ struct PersonasViewModelTests {
     @Test("Delete persona through ViewModel")
     func testDeletePersona() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = createTestViewModel()
         await viewModel.createPersona(
             name: "To Delete",
             description: "Will be deleted"
@@ -87,7 +96,7 @@ struct PersonasViewModelTests {
     @Test("Select persona through ViewModel")
     func testSelectPersona() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = createTestViewModel()
         await viewModel.createPersona(
             name: "Persona A",
             description: "First persona"
@@ -113,7 +122,7 @@ struct PersonasViewModelTests {
     @Test("Generation state flags")
     func testGenerationStateFlags() {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = createTestViewModel()
 
         // Initial state
         #expect(viewModel.isGeneratingStyleGuide == false)
@@ -124,7 +133,7 @@ struct PersonasViewModelTests {
     @Test("Regenerate style guide for existing persona")
     func testRegenerateStyleGuide() async {
         // Given
-        let viewModel = PersonasViewModel()
+        let viewModel = createTestViewModel()
         let persona = Persona(
             name: "Test Persona",
             description: "Test description",

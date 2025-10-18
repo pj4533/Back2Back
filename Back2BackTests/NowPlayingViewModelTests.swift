@@ -15,22 +15,27 @@ import CoreGraphics
 @MainActor
 struct NowPlayingViewModelTests {
 
+    func createTestViewModel() -> NowPlayingViewModel {
+        let musicService = MockMusicService()
+        return NowPlayingViewModel(musicService: musicService)
+    }
+
     // MARK: - Initialization Tests
 
     @Test func viewModelInitializesWithZeroBaseTime() async throws {
-        let viewModel = NowPlayingViewModel()
+        let viewModel = createTestViewModel()
         #expect(viewModel.basePlaybackTime == 0)
     }
 
     @Test func viewModelInitializesWithNilAnimationStartTime() async throws {
-        let viewModel = NowPlayingViewModel()
+        let viewModel = createTestViewModel()
         #expect(viewModel.animationStartTime == nil)
     }
 
     // MARK: - Animation-Based Time Calculation Tests
 
     @Test func getCurrentPlaybackTimeReturnsBaseTimeWhenNotPlaying() async throws {
-        let viewModel = NowPlayingViewModel()
+        let viewModel = createTestViewModel()
         viewModel.basePlaybackTime = 42.0
         viewModel.animationStartTime = Date()
 
@@ -40,7 +45,7 @@ struct NowPlayingViewModelTests {
     }
 
     @Test func getCurrentPlaybackTimeReturnsBaseTimeWhenAnimationStartTimeIsNil() async throws {
-        let viewModel = NowPlayingViewModel()
+        let viewModel = createTestViewModel()
         viewModel.basePlaybackTime = 30.0
         viewModel.animationStartTime = nil
 
@@ -49,7 +54,7 @@ struct NowPlayingViewModelTests {
     }
 
     @Test func getCurrentPlaybackTimeCalculatesElapsedTime() async throws {
-        let viewModel = NowPlayingViewModel()
+        let viewModel = createTestViewModel()
 
         // Set base time to 10 seconds
         viewModel.basePlaybackTime = 10.0
@@ -70,7 +75,7 @@ struct NowPlayingViewModelTests {
     // MARK: - Update Base Time Tests
 
     @Test func updateBasePlaybackTimeSetsAnimationStartTime() async throws {
-        let viewModel = NowPlayingViewModel()
+        let viewModel = createTestViewModel()
 
         #expect(viewModel.animationStartTime == nil)
 
@@ -80,7 +85,7 @@ struct NowPlayingViewModelTests {
     }
 
     @Test func updateBasePlaybackTimeUpdatesBaseTime() async throws {
-        let viewModel = NowPlayingViewModel()
+        let viewModel = createTestViewModel()
 
         let initialBase = viewModel.basePlaybackTime
         viewModel.updateBasePlaybackTime()

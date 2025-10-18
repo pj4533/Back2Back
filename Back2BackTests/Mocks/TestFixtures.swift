@@ -50,8 +50,7 @@ enum TestFixtures {
             id: UUID(),
             name: "Test DJ",
             description: "A test persona for unit testing",
-            styleGuide: "You are a test DJ. Select songs that match the test criteria.",
-            sources: ["https://test.example.com"]
+            styleGuide: "You are a test DJ. Select songs that match the test criteria."
         )
     }
 
@@ -61,15 +60,13 @@ enum TestFixtures {
                 id: UUID(),
                 name: "Test DJ 1",
                 description: "First test persona",
-                styleGuide: "Test style guide 1",
-                sources: ["https://test1.example.com"]
+                styleGuide: "Test style guide 1"
             ),
             Persona(
                 id: UUID(),
                 name: "Test DJ 2",
                 description: "Second test persona",
-                styleGuide: "Test style guide 2",
-                sources: ["https://test2.example.com"]
+                styleGuide: "Test style guide 2"
             )
         ]
     }
@@ -103,8 +100,7 @@ enum TestFixtures {
         AIModelConfig(
             songSelectionModel: "gpt-5",
             songSelectionReasoningLevel: .low,
-            musicMatcher: .stringBased,
-            songCacheSize: 50
+            musicMatcher: .stringBased
         )
     }
 
@@ -112,8 +108,7 @@ enum TestFixtures {
         AIModelConfig(
             songSelectionModel: "gpt-5",
             songSelectionReasoningLevel: .high,
-            musicMatcher: .stringBased,
-            songCacheSize: 50
+            musicMatcher: .stringBased
         )
     }
 

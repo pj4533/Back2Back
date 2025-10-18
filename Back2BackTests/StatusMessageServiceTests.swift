@@ -11,9 +11,13 @@ import Foundation
 
 @MainActor
 struct StatusMessageServiceTests {
-    let service = StatusMessageService()
+    let service: StatusMessageService
 
     init() async {
+        let environmentService = EnvironmentService()
+        let personaSongCacheService = PersonaSongCacheService()
+        let openAIClient = OpenAIClient(environmentService: environmentService, personaSongCacheService: personaSongCacheService)
+        service = StatusMessageService(openAIClient: openAIClient)
         // Clear all caches before each test
         service.clearAllCaches()
     }

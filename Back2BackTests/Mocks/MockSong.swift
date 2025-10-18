@@ -182,6 +182,7 @@ extension MockSong: Hashable {
 
 // MARK: - Helper Extensions
 
+@MainActor
 extension Array where Element == MockSong {
     /// Create an array of mock songs for testing queue/history scenarios
     static func mockQueue(count: Int = 3) -> [MockSong] {

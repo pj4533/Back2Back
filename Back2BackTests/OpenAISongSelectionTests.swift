@@ -35,7 +35,9 @@ struct OpenAISongSelectionTests {
     @MainActor
     @Test("Build DJ prompt with no history")
     func testBuildDJPromptNoHistory() {
-        let client = OpenAIClient.shared
+        let environmentService = EnvironmentService()
+        let personaSongCacheService = PersonaSongCacheService()
+        let client = OpenAIClient(environmentService: environmentService, personaSongCacheService: personaSongCacheService)
         let persona = "You are a funk DJ specializing in 70s grooves"
         let history: [SessionSong] = []
 
@@ -150,7 +152,9 @@ struct OpenAISongSelectionTests {
     @MainActor
     @Test("OpenAI client configuration check")
     func testOpenAIClientConfiguration() {
-        let client = OpenAIClient.shared
+        let environmentService = EnvironmentService()
+        let personaSongCacheService = PersonaSongCacheService()
+        let client = OpenAIClient(environmentService: environmentService, personaSongCacheService: personaSongCacheService)
 
         // This will be false in tests unless API key is set in environment
         // We're just testing that the property exists and returns a boolean
