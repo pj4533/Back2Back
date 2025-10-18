@@ -30,7 +30,7 @@ class MusicSearchViewModel: ViewModelError {
     private let debounceDuration: TimeInterval = 0.75
 
     // MARK: - Initialization
-    init(musicService: MusicService = MusicService.shared) {
+    init(musicService: MusicService) {
         self.musicService = musicService
         // Use debug level for initialization logs to reduce noise
         B2BLog.search.debug("Initializing MusicSearchViewModel")

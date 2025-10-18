@@ -12,9 +12,10 @@ class MusicAuthViewModel: ViewModelError {
     var errorMessage: String?
     var isRequestingAuthorization: Bool = false
 
-    private let musicService = MusicService.shared
+    private let musicService: MusicService
 
-    init() {
+    init(musicService: MusicService) {
+        self.musicService = musicService
         B2BLog.auth.info("🔐 Initializing MusicAuthViewModel")
         checkCurrentAuthorizationStatus()
     }

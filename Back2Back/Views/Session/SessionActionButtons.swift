@@ -10,20 +10,24 @@ import SwiftUI
 import OSLog
 
 struct SessionActionButtons: View {
-    private let sessionService = SessionService.shared
-    private let sessionViewModel = SessionViewModel.shared
+    @Environment(\.services) private var services
 
     let onUserSelectTapped: () -> Void
     let onAIStartTapped: () -> Void
     let onDirectionOptionSelected: (DirectionOption) -> Void
 
-    // Check if user has already selected a song in the queue
-    private var hasUserSelectedSong: Bool {
-        sessionService.songQueue.contains { $0.selectedBy == .user }
-    }
-
     var body: some View {
-        VStack(spacing: 12) {
+        guard let services = services else {
+            return AnyView(EmptyView())
+        }
+
+        let sessionService = services.sessionService
+        let sessionViewModel = services.sessionViewModel
+
+        // Check if user has already selected a song in the queue
+        let hasUserSelectedSong = sessionService.songQueue.contains { $0.selectedBy == .user }
+
+        return AnyView(VStack(spacing: 12) {
             // Show both buttons only at the very start (no history and no queue)
             if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty {
                 HStack(spacing: 12) {
@@ -110,6 +114,6 @@ struct SessionActionButtons: View {
             }
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(Color(UIColor.systemBackground)))
     }
 }

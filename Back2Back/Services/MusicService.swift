@@ -15,8 +15,6 @@ import OSLog
 @MainActor
 @Observable
 class MusicService: MusicServiceProtocol {
-    static let shared = MusicService()
-
     // Delegated services
     private let authService = MusicAuthService()
     private let searchService = MusicSearchService()
@@ -52,7 +50,7 @@ class MusicService: MusicServiceProtocol {
         playbackService.currentSongId
     }
 
-    private init() {
+    init() {
         B2BLog.musicKit.info("🎵 Initializing MusicService (facade)")
     }
 

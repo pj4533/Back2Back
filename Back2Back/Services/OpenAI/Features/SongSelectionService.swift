@@ -10,8 +10,11 @@ struct SongRecommendation: Codable {
 
 @MainActor
 class SongSelectionService {
-    static let shared = SongSelectionService()
-    private init() {}
+    private let personaSongCacheService: PersonaSongCacheService
+
+    init(personaSongCacheService: PersonaSongCacheService) {
+        self.personaSongCacheService = personaSongCacheService
+    }
 
     func selectNextSong(
         persona: String,
@@ -37,7 +40,7 @@ class SongSelectionService {
         )
 
         do {
-            let response = try await OpenAINetworking.shared.responses(request: request, client: client)
+            let response = try await client.performNetworkRequest(request)
 
             guard let jsonData = response.outputText.data(using: .utf8) else {
                 throw OpenAIError.decodingError(NSError(domain: "OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not convert output to data"]))
@@ -63,7 +66,7 @@ class SongSelectionService {
             reasoningEffort: .medium
         )
 
-        let response = try await OpenAINetworking.shared.responses(request: request, client: client)
+        let response = try await client.performNetworkRequest(request)
         return response.outputText
     }
 
@@ -103,7 +106,7 @@ class SongSelectionService {
         )
 
         do {
-            let response = try await OpenAINetworking.shared.responses(request: request, client: client)
+            let response = try await client.performNetworkRequest(request)
 
             guard let jsonData = response.outputText.data(using: .utf8) else {
                 B2BLog.ai.error("Failed to convert direction change response to data")
@@ -136,7 +139,7 @@ class SongSelectionService {
         }
 
         // Get recent songs from cache (24-hour exclusion list)
-        let recentSongs = PersonaSongCacheService.shared.getRecentSongs(for: personaId)
+        let recentSongs = personaSongCacheService.getRecentSongs(for: personaId)
         var recentSongsText = ""
         if !recentSongs.isEmpty {
             recentSongsText = """

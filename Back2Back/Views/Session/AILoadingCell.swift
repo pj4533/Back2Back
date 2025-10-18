@@ -11,6 +11,7 @@ import SwiftUI
 import OSLog
 
 struct AILoadingCell: View {
+    @Environment(\.services) private var services
     @State private var loadingStates: [(String, String)] = [
         ("brain.head.profile", "Analyzing the vibe..."),
         ("music.note.list", "Searching the catalog..."),
@@ -103,7 +104,13 @@ struct AILoadingCell: View {
     /// Load status messages for the current persona using Foundation Models
     /// Uses fire-and-forget pattern from StatusMessageService for non-blocking generation
     private func loadStatusMessages() async {
-        guard let persona = PersonaService.shared.selectedPersona else {
+        guard let services = services else {
+            B2BLog.ai.debug("Services not available, using default status messages")
+            setDefaultMessages()
+            return
+        }
+
+        guard let persona = services.personaService.selectedPersona else {
             B2BLog.ai.debug("No persona selected, using default status messages")
             setDefaultMessages()
             return
@@ -112,7 +119,7 @@ struct AILoadingCell: View {
         B2BLog.ai.debug("Loading status messages for persona: \(persona.name)")
 
         // Get messages (will use cache or generate in background)
-        let messages = StatusMessageService.shared.getStatusMessages(for: persona)
+        let messages = services.statusMessageService.getStatusMessages(for: persona)
 
         // Update loading states with persona-specific messages
         loadingStates = [
@@ -124,7 +131,7 @@ struct AILoadingCell: View {
         B2BLog.ai.debug("Status messages loaded: '\(messages.message1)', '\(messages.message2)', '\(messages.message3)'")
 
         // Increment usage count for regeneration tracking
-        StatusMessageService.shared.incrementUsageCount(for: persona.id)
+        services.statusMessageService.incrementUsageCount(for: persona.id)
     }
 
     private func setDefaultMessages() {

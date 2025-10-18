@@ -11,13 +11,19 @@ import MusicKit
 import OSLog
 
 struct SessionView: View {
-    private let sessionViewModel = SessionViewModel.shared
+    @Environment(\.services) private var services
 
     @State private var showSongPicker = false
     @State private var showNowPlaying = false
 
     var body: some View {
-        VStack(spacing: 0) {
+        guard let services = services else {
+            return AnyView(Text("Loading..."))
+        }
+
+        let sessionViewModel = services.sessionViewModel
+
+        return AnyView(VStack(spacing: 0) {
             SessionHeaderView(onNowPlayingTapped: { showNowPlaying = true })
 
             SessionHistoryListView()
@@ -25,10 +31,16 @@ struct SessionView: View {
             SessionActionButtons(
                 onUserSelectTapped: { showSongPicker = true },
                 onAIStartTapped: {
-                    Task { await handleAIStartFirst() }
+                    Task {
+                        B2BLog.session.info("User requested AI to start first")
+                        await sessionViewModel.handleAIStartFirst()
+                    }
                 },
                 onDirectionOptionSelected: { option in
-                    Task { await handleDirectionChange(option: option) }
+                    Task {
+                        B2BLog.session.info("User selected direction option: \(option.buttonLabel)")
+                        await sessionViewModel.handleDirectionChange(option: option)
+                    }
                 }
             )
         }
@@ -37,7 +49,8 @@ struct SessionView: View {
                 MusicSearchView(
                     onSongSelected: { song in
                         Task {
-                            await handleUserSongSelection(song)
+                            B2BLog.session.info("User selected song: \(song.title)")
+                            await sessionViewModel.handleUserSongSelection(song)
                         }
                         showSongPicker = false
                     }
@@ -55,25 +68,7 @@ struct SessionView: View {
         }
         .fullScreenCover(isPresented: $showNowPlaying) {
             NowPlayingView()
-        }
-    }
-
-    @MainActor
-    private func handleUserSongSelection(_ song: Song) async {
-        B2BLog.session.info("User selected song: \(song.title)")
-        await sessionViewModel.handleUserSongSelection(song)
-    }
-
-    @MainActor
-    private func handleAIStartFirst() async {
-        B2BLog.session.info("User requested AI to start first")
-        await sessionViewModel.handleAIStartFirst()
-    }
-
-    @MainActor
-    private func handleDirectionChange(option: DirectionOption) async {
-        B2BLog.session.info("User selected direction option: \(option.buttonLabel)")
-        await sessionViewModel.handleDirectionChange(option: option)
+        })
     }
 }
 

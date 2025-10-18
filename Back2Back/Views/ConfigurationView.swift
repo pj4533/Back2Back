@@ -10,9 +10,9 @@ import OSLog
 import FoundationModels
 
 struct ConfigurationView: View {
+    @Environment(\.services) private var services
     @AIModelConfigStorage private var config
     @State private var showingClearCacheAlert = false
-    @State private var errorService = SongErrorLoggerService.shared
 
     // Check if Apple Intelligence LLM is available
     private var isLLMAvailable: Bool {
@@ -20,7 +20,13 @@ struct ConfigurationView: View {
     }
 
     var body: some View {
-        Form {
+        guard let services = services else {
+            return AnyView(Text("Loading..."))
+        }
+
+        let errorService = services.songErrorLoggerService
+
+        return AnyView(Form {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Song Selection Model Configuration")
@@ -167,12 +173,12 @@ struct ConfigurationView: View {
         .alert("Clear Song Cache?", isPresented: $showingClearCacheAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Clear", role: .destructive) {
-                PersonaSongCacheService.shared.clearAllCaches()
+                services.personaSongCacheService.clearAllCaches()
                 B2BLog.general.info("User cleared persona song cache from config view")
             }
         } message: {
             Text("This will clear the 24-hour song repetition prevention cache for all personas. AI will be able to select recently played songs immediately.")
-        }
+        })
     }
 }
 

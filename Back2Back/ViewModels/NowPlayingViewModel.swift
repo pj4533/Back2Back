@@ -26,7 +26,7 @@ class NowPlayingViewModel {
     var animationStartTime: Date?
 
     // MARK: - Initialization
-    init(musicService: MusicService = MusicService.shared) {
+    init(musicService: MusicService) {
         self.musicService = musicService
         B2BLog.ui.debug("Initializing NowPlayingViewModel with animation-based tracking")
     }

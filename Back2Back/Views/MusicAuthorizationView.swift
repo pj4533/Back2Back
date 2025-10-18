@@ -2,10 +2,16 @@ import SwiftUI
 import MusicKit
 
 struct MusicAuthorizationView: View {
-    @State private var viewModel = MusicAuthViewModel()
+    @Environment(\.services) private var services
 
     var body: some View {
-        VStack(spacing: 20) {
+        guard let services = services else {
+            return AnyView(Text("Loading..."))
+        }
+
+        let viewModel = MusicAuthViewModel(musicService: services.musicService)
+
+        return AnyView(VStack(spacing: 20) {
             Image(systemName: "music.note.house")
                 .font(.system(size: 80))
                 .foregroundColor(.accentColor)
@@ -81,6 +87,6 @@ struct MusicAuthorizationView: View {
         .padding()
         .onAppear {
             viewModel.checkCurrentAuthorizationStatus()
-        }
+        })
     }
 }

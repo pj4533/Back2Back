@@ -262,8 +262,9 @@ struct PersonaDetailView: View {
     }
 }
 
-#Preview {
-    NavigationStack {
-        PersonaDetailView(persona: nil, personasViewModel: PersonasViewModel())
-    }
-}
+// Preview disabled - requires service container
+// #Preview {
+//     NavigationStack {
+//         PersonaDetailView(persona: nil, personasViewModel: PersonasViewModel())
+//     }
+// }

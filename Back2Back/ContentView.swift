@@ -10,18 +10,23 @@ import MusicKit
 import OSLog
 
 struct ContentView: View {
-    private let musicService = MusicService.shared
+    @Environment(\.services) private var services
     @State private var selectedTab = 0
 
     var body: some View {
-        if musicService.isAuthorized {
-            mainContent
-                .toastNotifications()
+        // Ensure services are available
+        guard let services = services else {
+            return AnyView(Text("Loading..."))
+        }
+
+        if services.musicService.isAuthorized {
+            return AnyView(mainContent
+                .toastNotifications())
         } else {
-            NavigationStack {
+            return AnyView(NavigationStack {
                 MusicAuthorizationView()
             }
-            .toastNotifications()
+            .toastNotifications())
         }
     }
 

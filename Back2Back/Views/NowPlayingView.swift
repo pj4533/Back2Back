@@ -2,19 +2,25 @@ import SwiftUI
 import MusicKit
 
 struct NowPlayingView: View {
-    @State private var viewModel = NowPlayingViewModel()
+    @Environment(\.services) private var services
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
+        guard let services = services else {
+            return AnyView(Text("Loading..."))
+        }
+
+        let viewModel = NowPlayingViewModel(musicService: services.musicService)
+
+        return AnyView(VStack(spacing: 0) {
             if let nowPlaying = viewModel.currentlyPlaying {
-                expandedView(nowPlaying: nowPlaying)
+                expandedView(nowPlaying: nowPlaying, viewModel: viewModel)
             }
         }
-        .background(Color(.secondarySystemBackground))
+        .background(Color(.secondarySystemBackground)))
     }
 
-    private func expandedView(nowPlaying: NowPlayingItem) -> some View {
+    private func expandedView(nowPlaying: NowPlayingItem, viewModel: NowPlayingViewModel) -> some View {
         VStack(spacing: 20) {
             HStack {
                 Button(action: { dismiss() }) {
@@ -47,7 +53,7 @@ struct NowPlayingView: View {
             }
             .padding(.horizontal)
 
-            progressBar(nowPlaying: nowPlaying)
+            progressBar(nowPlaying: nowPlaying, viewModel: viewModel)
 
             HStack(spacing: 30) {
                 // -15s button
@@ -124,7 +130,7 @@ struct NowPlayingView: View {
     // Uses TimelineView for smooth, GPU-accelerated updates
     // This approach is recommended by Apple engineers instead of polling
     // See: https://forums.developer.apple.com/forums/thread/687487
-    private func progressBar(nowPlaying: NowPlayingItem) -> some View {
+    private func progressBar(nowPlaying: NowPlayingItem, viewModel: NowPlayingViewModel) -> some View {
         VStack(spacing: 4) {
             GeometryReader { geometry in
                 // 60fps updates for buttery-smooth progress bar animation

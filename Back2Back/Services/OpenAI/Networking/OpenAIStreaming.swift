@@ -3,8 +3,7 @@ import OSLog
 
 @MainActor
 class OpenAIStreaming {
-    static let shared = OpenAIStreaming()
-    private init() {}
+    init() {}
 
     func streamingResponses(
         request: ResponsesRequest,

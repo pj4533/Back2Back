@@ -10,18 +10,24 @@ import MusicKit
 import OSLog
 
 struct FavoritesListView: View {
-    private let favoritesService = FavoritesService.shared
+    @Environment(\.services) private var services
 
     var body: some View {
-        Group {
+        guard let services = services else {
+            return AnyView(Text("Loading..."))
+        }
+
+        let favoritesService = services.favoritesService
+
+        return AnyView(Group {
             if favoritesService.favorites.isEmpty {
                 emptyStateView
             } else {
-                favoritesListView
+                favoritesListView(favoritesService: favoritesService)
             }
         }
         .navigationTitle("Favorites")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.large))
     }
 
     private var emptyStateView: some View {
@@ -32,7 +38,7 @@ struct FavoritesListView: View {
         )
     }
 
-    private var favoritesListView: some View {
+    private func favoritesListView(favoritesService: FavoritesService) -> some View {
         List {
             // Sort directly in the ForEach for proper observation
             ForEach(favoritesService.favorites.sorted { $0.favoritedAt > $1.favoritedAt }) { favoritedSong in
