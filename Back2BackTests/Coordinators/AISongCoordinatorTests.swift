@@ -32,6 +32,18 @@ struct AISongCoordinatorTests {
         let songErrorLoggerService = SongErrorLoggerService()
         _ = FavoritesService()  // Not used yet but needed for initialization
 
+        let musicMatcher = StringBasedMusicMatcher(
+            musicService: musicService,
+            personaService: personaService,
+            songErrorLoggerService: songErrorLoggerService
+        )
+        let firstSongCacheService = FirstSongCacheService(
+            personaService: personaService,
+            musicService: musicService,
+            openAIClient: openAIClient,
+            musicMatcher: musicMatcher
+        )
+
         let coordinator = AISongCoordinator(
             openAIClient: openAIClient,
             sessionService: sessionService,
@@ -41,7 +53,8 @@ struct AISongCoordinatorTests {
             toastService: toastService,
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
-            songErrorLoggerService: songErrorLoggerService
+            songErrorLoggerService: songErrorLoggerService,
+            firstSongCacheService: firstSongCacheService
         )
 
         return (coordinator, openAIClient, sessionService, musicService)
