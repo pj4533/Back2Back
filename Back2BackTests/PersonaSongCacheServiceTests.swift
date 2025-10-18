@@ -11,7 +11,7 @@ import Foundation
 
 @MainActor
 struct PersonaSongCacheServiceTests {
-    let service = PersonaSongCacheService.shared
+    let service = PersonaSongCacheService()
 
     init() async {
         // Clear all caches before each test

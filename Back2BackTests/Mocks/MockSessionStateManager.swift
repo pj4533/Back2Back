@@ -10,12 +10,14 @@ class MockSessionStateManager: SessionStateManagerProtocol {
     var nextAISong: Song?
     var currentPersonaStyleGuide: String = "Mock style guide"
     var currentPersonaName: String = "Mock Persona"
+    var currentTurn: TurnType = .user
 
     var addSongToHistoryCalled = false
     var queueSongCalled = false
     var updateSongStatusCalled = false
     var moveQueuedSongToHistoryCalled = false
     var clearAIQueuedSongsCalled = false
+    var determineNextQueueStatusCalled = false
 
     func addSongToHistory(_ song: Song, selectedBy: TurnType, rationale: String? = nil, queueStatus: QueueStatus = .played) -> SessionSong {
         addSongToHistoryCalled = true
@@ -99,6 +101,16 @@ class MockSessionStateManager: SessionStateManagerProtocol {
         songQueue.removeAll()
         isAIThinking = false
         nextAISong = nil
+        currentTurn = .user
+    }
+
+    func determineNextQueueStatus() -> QueueStatus {
+        determineNextQueueStatusCalled = true
+        if currentTurn == .user {
+            return .queuedIfUserSkips
+        } else {
+            return .upNext
+        }
     }
 
     func hasSongBeenPlayed(artist: String, title: String) -> Bool {
