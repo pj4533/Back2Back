@@ -4,6 +4,7 @@ struct PersonasListView: View {
     @Environment(\.services) private var services
     @State private var showingAddPersona = false
     @State private var showingDetailView: Persona?
+    @State private var showingCacheView: Persona?
     @State private var personaToDelete: Persona?
     @State private var showingDeleteAlert = false
 
@@ -39,6 +40,13 @@ struct PersonasListView: View {
                             Label("Edit", systemImage: "pencil")
                         }
                         .tint(.orange)
+
+                        Button {
+                            showingCacheView = persona
+                        } label: {
+                            Label("Cache", systemImage: "tray.full.fill")
+                        }
+                        .tint(.blue)
                     }
             }
         }
@@ -58,6 +66,11 @@ struct PersonasListView: View {
         .sheet(isPresented: $showingAddPersona) {
             NavigationStack {
                 PersonaDetailView(persona: nil, personasViewModel: viewModel)
+            }
+        }
+        .sheet(item: $showingCacheView) { persona in
+            NavigationStack {
+                PersonaCacheView(persona: persona, cacheService: services.personaSongCacheService)
             }
         }
         .alert("Delete Persona", isPresented: $showingDeleteAlert, presenting: personaToDelete) { persona in

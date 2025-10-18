@@ -69,6 +69,28 @@ final class PersonaSongCacheService {
         return cache.songs
     }
 
+    /// Removes a specific song from a persona's cache
+    func removeSong(personaId: UUID, artist: String, songTitle: String) {
+        guard var cache = caches[personaId] else {
+            B2BLog.ai.debug("No cache found for persona \(personaId), cannot remove song")
+            return
+        }
+
+        let beforeCount = cache.songs.count
+        cache.songs.removeAll { song in
+            song.artist == artist && song.songTitle == songTitle
+        }
+
+        if cache.songs.count < beforeCount {
+            caches[personaId] = cache
+            saveCaches()
+            B2BLog.ai.info("Removed song from cache: '\(songTitle)' by '\(artist)' (persona: \(personaId))")
+            B2BLog.ai.debug("Cache now has \(cache.songs.count) songs for persona \(personaId)")
+        } else {
+            B2BLog.ai.debug("Song not found in cache: '\(songTitle)' by '\(artist)' (persona: \(personaId))")
+        }
+    }
+
     /// Clears all cached songs for a specific persona
     func clearCache(for personaId: UUID) {
         if caches[personaId] != nil {

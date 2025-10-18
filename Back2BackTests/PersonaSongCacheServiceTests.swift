@@ -250,4 +250,103 @@ struct PersonaSongCacheServiceTests {
         #expect(cache.songs[0].artist == "Old Artist")
         #expect(cache.songs[1].artist == "New Artist")
     }
+
+    // MARK: - Remove Song Tests
+
+    @Test("Removing a song that exists in cache")
+    func removeSongFromCache() async {
+        let personaId = UUID()
+
+        service.recordSong(personaId: personaId, artist: "The Beatles", songTitle: "Hey Jude")
+        service.recordSong(personaId: personaId, artist: "Queen", songTitle: "Bohemian Rhapsody")
+        service.recordSong(personaId: personaId, artist: "Pink Floyd", songTitle: "Comfortably Numb")
+
+        #expect(service.getRecentSongs(for: personaId).count == 3)
+
+        service.removeSong(personaId: personaId, artist: "Queen", songTitle: "Bohemian Rhapsody")
+
+        let remainingSongs = service.getRecentSongs(for: personaId)
+        #expect(remainingSongs.count == 2)
+        #expect(remainingSongs.contains { $0.artist == "Queen" && $0.songTitle == "Bohemian Rhapsody" } == false)
+        #expect(remainingSongs.contains { $0.artist == "The Beatles" && $0.songTitle == "Hey Jude" } == true)
+        #expect(remainingSongs.contains { $0.artist == "Pink Floyd" && $0.songTitle == "Comfortably Numb" } == true)
+    }
+
+    @Test("Removing a song that doesn't exist in cache")
+    func removeSongNotInCache() async {
+        let personaId = UUID()
+
+        service.recordSong(personaId: personaId, artist: "The Beatles", songTitle: "Hey Jude")
+        #expect(service.getRecentSongs(for: personaId).count == 1)
+
+        // Try to remove a song that doesn't exist
+        service.removeSong(personaId: personaId, artist: "Queen", songTitle: "Bohemian Rhapsody")
+
+        // Cache should remain unchanged
+        let songs = service.getRecentSongs(for: personaId)
+        #expect(songs.count == 1)
+        #expect(songs.first?.artist == "The Beatles")
+    }
+
+    @Test("Removing song from unknown persona")
+    func removeSongFromUnknownPersona() async {
+        let unknownPersonaId = UUID()
+
+        // Try to remove from a persona that has no cache
+        service.removeSong(personaId: unknownPersonaId, artist: "The Beatles", songTitle: "Hey Jude")
+
+        // Should not crash and cache should remain empty
+        #expect(service.getRecentSongs(for: unknownPersonaId).isEmpty)
+    }
+
+    @Test("Removing all songs one by one")
+    func removeAllSongsOneByOne() async {
+        let personaId = UUID()
+
+        service.recordSong(personaId: personaId, artist: "Artist 1", songTitle: "Song 1")
+        service.recordSong(personaId: personaId, artist: "Artist 2", songTitle: "Song 2")
+        service.recordSong(personaId: personaId, artist: "Artist 3", songTitle: "Song 3")
+
+        #expect(service.getRecentSongs(for: personaId).count == 3)
+
+        service.removeSong(personaId: personaId, artist: "Artist 1", songTitle: "Song 1")
+        #expect(service.getRecentSongs(for: personaId).count == 2)
+
+        service.removeSong(personaId: personaId, artist: "Artist 2", songTitle: "Song 2")
+        #expect(service.getRecentSongs(for: personaId).count == 1)
+
+        service.removeSong(personaId: personaId, artist: "Artist 3", songTitle: "Song 3")
+        #expect(service.getRecentSongs(for: personaId).isEmpty)
+    }
+
+    @Test("Remove song is case-sensitive")
+    func removeSongCaseSensitive() async {
+        let personaId = UUID()
+
+        service.recordSong(personaId: personaId, artist: "The Beatles", songTitle: "Hey Jude")
+
+        // Try to remove with different case - should not match
+        service.removeSong(personaId: personaId, artist: "the beatles", songTitle: "hey jude")
+
+        // Song should still be in cache
+        let songs = service.getRecentSongs(for: personaId)
+        #expect(songs.count == 1)
+        #expect(songs.first?.artist == "The Beatles")
+        #expect(songs.first?.songTitle == "Hey Jude")
+    }
+
+    @Test("Remove song with exact match on both artist and title")
+    func removeSongExactMatch() async {
+        let personaId = UUID()
+
+        service.recordSong(personaId: personaId, artist: "David Bowie", songTitle: "Heroes")
+        service.recordSong(personaId: personaId, artist: "David Bowie", songTitle: "Space Oddity")
+
+        // Remove one song by same artist
+        service.removeSong(personaId: personaId, artist: "David Bowie", songTitle: "Heroes")
+
+        let remainingSongs = service.getRecentSongs(for: personaId)
+        #expect(remainingSongs.count == 1)
+        #expect(remainingSongs.first?.songTitle == "Space Oddity")
+    }
 }
