@@ -12,17 +12,23 @@ import OSLog
 final class PersonaSongCacheService {
     private let userDefaults = UserDefaults.standard
     private let cacheKey = "com.back2back.personaSongCache"
+    private let cacheSizeKey = "com.back2back.personaSongCacheSize"
     private var caches: [UUID: PersonaSongCache] = [:]
 
+    /// Current cache size limit per persona
+    private var cacheSize: Int {
+        let size = userDefaults.integer(forKey: cacheSizeKey)
+        return size > 0 ? size : 50  // Default to 50 if not set
+    }
+
     init() {
-        B2BLog.ai.info("PersonaSongCacheService initialized")
+        B2BLog.ai.info("PersonaSongCacheService initialized with LRU cache (size: \(self.cacheSize))")
         loadCaches()
-        cleanupExpiredSongs()
     }
 
     // MARK: - Public API
 
-    /// Records a song selection for a specific persona
+    /// Records a song selection for a specific persona using LRU eviction
     func recordSong(personaId: UUID, artist: String, songTitle: String) {
         let cachedSong = CachedSong(
             artist: artist,
@@ -31,9 +37,15 @@ final class PersonaSongCacheService {
         )
 
         if var cache = caches[personaId] {
-            // Add to existing cache
-            cache.songs.append(cachedSong)
+            // Add to existing cache with LRU eviction
+            let beforeCount = cache.songs.count
+            cache.addSong(cachedSong, maxSize: cacheSize)
             caches[personaId] = cache
+
+            if cache.songs.count < beforeCount + 1 {
+                B2BLog.ai.debug("Evicted oldest song from cache (LRU)")
+            }
+
             B2BLog.ai.info("Cached song for persona: '\(songTitle)' by '\(artist)'")
             B2BLog.ai.debug("Cache now has \(cache.songs.count) songs for persona \(personaId)")
         } else {
@@ -46,38 +58,15 @@ final class PersonaSongCacheService {
         saveCaches()
     }
 
-    /// Returns all recent (non-expired) songs for a specific persona
+    /// Returns all recent songs for a specific persona (up to cache size limit)
     func getRecentSongs(for personaId: UUID) -> [CachedSong] {
         guard let cache = caches[personaId] else {
             B2BLog.ai.debug("No cache found for persona \(personaId)")
             return []
         }
 
-        let recentSongs = cache.activeSongs
-        B2BLog.ai.debug("Found \(recentSongs.count) recent songs for persona \(personaId)")
-        return recentSongs
-    }
-
-    /// Removes all expired songs from all caches
-    func clearExpiredSongs() {
-        B2BLog.ai.info("Clearing expired songs from all persona caches")
-        var removedCount = 0
-
-        for (personaId, var cache) in caches {
-            let beforeCount = cache.songs.count
-            cache.removeExpiredSongs()
-            let afterCount = cache.songs.count
-
-            caches[personaId] = cache
-            removedCount += (beforeCount - afterCount)
-        }
-
-        if removedCount > 0 {
-            B2BLog.ai.info("Removed \(removedCount) expired songs from caches")
-            saveCaches()
-        } else {
-            B2BLog.ai.debug("No expired songs to remove")
-        }
+        B2BLog.ai.debug("Found \(cache.songs.count) recent songs for persona \(personaId)")
+        return cache.songs
     }
 
     /// Clears all cached songs for a specific persona
@@ -109,6 +98,22 @@ final class PersonaSongCacheService {
             caches = Dictionary(uniqueKeysWithValues: decodedCaches.map { ($0.personaId, $0) })
             B2BLog.ai.info("Loaded \(self.caches.count) persona song caches")
 
+            // Migration: Trim caches to new size limit on first load
+            let currentCacheSize = cacheSize
+            var trimmed = false
+            for (personaId, var cache) in caches {
+                if cache.songs.count > currentCacheSize {
+                    cache.songs = Array(cache.songs.suffix(currentCacheSize))
+                    caches[personaId] = cache
+                    trimmed = true
+                    B2BLog.ai.info("Trimmed cache for persona \(personaId) to \(currentCacheSize) songs")
+                }
+            }
+
+            if trimmed {
+                saveCaches()
+            }
+
             let totalSongs = self.caches.values.reduce(0) { $0 + $1.songs.count }
             B2BLog.ai.debug("Total cached songs: \(totalSongs)")
         } catch {
@@ -126,9 +131,5 @@ final class PersonaSongCacheService {
         } catch {
             B2BLog.ai.error("Failed to save persona song caches: \(error)")
         }
-    }
-
-    private func cleanupExpiredSongs() {
-        clearExpiredSongs()
     }
 }

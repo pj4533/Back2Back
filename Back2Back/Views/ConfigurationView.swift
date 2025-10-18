@@ -129,6 +129,38 @@ struct ConfigurationView: View {
             }
 
             Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Song Repetition Prevention")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    HStack {
+                        Text("Cache Size")
+                        Spacer()
+                        TextField("50", value: $config.songCacheSize, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 60)
+                            .textFieldStyle(.roundedBorder)
+                        Text("songs")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text("Personas won't repeat their most recent \(config.songCacheSize) songs")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+                }
+                .padding(.vertical, 8)
+            } header: {
+                Text("Song Cache")
+            } footer: {
+                Text("Controls how many recent songs each persona remembers. Higher values provide more variety but may limit song pool in long sessions. Recommended: 50-100 songs.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 NavigationLink {
                     SongErrorsView()
                 } label: {
@@ -160,7 +192,7 @@ struct ConfigurationView: View {
             } header: {
                 Text("Debug")
             } footer: {
-                Text("View failed song selections and clear the 24-hour song repetition cache.")
+                Text("View failed song selections and clear the song repetition cache.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -168,7 +200,10 @@ struct ConfigurationView: View {
         .navigationTitle("Configuration")
         .navigationBarTitleDisplayMode(.large)
         .onChange(of: config) { oldValue, newValue in
-            B2BLog.general.info("AI config changed - Model: \(newValue.songSelectionModel), Reasoning: \(newValue.songSelectionReasoningLevel.rawValue), Matcher: \(newValue.musicMatcher.displayName)")
+            B2BLog.general.info("AI config changed - Model: \(newValue.songSelectionModel), Reasoning: \(newValue.songSelectionReasoningLevel.rawValue), Matcher: \(newValue.musicMatcher.displayName), Cache Size: \(newValue.songCacheSize)")
+
+            // Sync cache size to UserDefaults for PersonaSongCacheService
+            UserDefaults.standard.set(newValue.songCacheSize, forKey: "com.back2back.personaSongCacheSize")
         }
         .alert("Clear Song Cache?", isPresented: $showingClearCacheAlert) {
             Button("Cancel", role: .cancel) { }
@@ -177,7 +212,7 @@ struct ConfigurationView: View {
                 B2BLog.general.info("User cleared persona song cache from config view")
             }
         } message: {
-            Text("This will clear the 24-hour song repetition prevention cache for all personas. AI will be able to select recently played songs immediately.")
+            Text("This will clear the song repetition prevention cache for all personas. AI will be able to select recently played songs immediately.")
         })
     }
 }

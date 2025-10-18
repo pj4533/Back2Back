@@ -11,26 +11,23 @@ import Foundation
 struct CachedSong: Codable, Equatable {
     let artist: String
     let songTitle: String
-    let selectedAt: Date
-
-    /// Returns true if this song was selected more than 24 hours ago
-    var isExpired: Bool {
-        Date().timeIntervalSince(selectedAt) > 24 * 60 * 60 // 24 hours in seconds
-    }
+    let selectedAt: Date  // Used for ordering in LRU cache
 }
 
-/// Stores the cache of recently selected songs for a specific persona
+/// Stores the cache of recently selected songs for a specific persona using LRU (Least Recently Used) eviction
 struct PersonaSongCache: Codable {
     let personaId: UUID
     var songs: [CachedSong]
 
-    /// Returns only songs that have not expired (selected within last 24 hours)
-    var activeSongs: [CachedSong] {
-        songs.filter { !$0.isExpired }
-    }
-
-    /// Removes all expired songs from the cache
-    mutating func removeExpiredSongs() {
-        songs.removeAll { $0.isExpired }
+    /// Adds a song to the cache with LRU eviction
+    /// When the cache reaches maxSize, the oldest song is automatically removed
+    /// - Parameters:
+    ///   - song: The song to add to the cache
+    ///   - maxSize: The maximum number of songs to keep in the cache
+    mutating func addSong(_ song: CachedSong, maxSize: Int) {
+        songs.append(song)
+        if songs.count > maxSize {
+            songs.removeFirst()  // Remove oldest (FIFO for LRU)
+        }
     }
 }

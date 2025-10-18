@@ -16,6 +16,9 @@ struct PersonaSongCacheServiceTests {
     init() async {
         // Clear all caches before each test
         service.clearAllCaches()
+
+        // Set cache size to 50 for tests
+        UserDefaults.standard.set(50, forKey: "com.back2back.personaSongCacheSize")
     }
 
     @Test("Recording a song creates a cache entry")
@@ -68,30 +71,6 @@ struct PersonaSongCacheServiceTests {
         #expect(recentSongs.isEmpty)
     }
 
-    @Test("Expired songs are filtered from results")
-    func expiredSongsFiltered() async {
-        let personaId = UUID()
-
-        // Create a song that was selected 25 hours ago (expired)
-        let expiredDate = Date().addingTimeInterval(-25 * 60 * 60) // 25 hours ago
-        let expiredSong = CachedSong(
-            artist: "Old Artist",
-            songTitle: "Old Song",
-            selectedAt: expiredDate
-        )
-
-        // We can't directly inject the expired song through the service,
-        // so we'll test the CachedSong.isExpired property instead
-        #expect(expiredSong.isExpired == true)
-
-        // Add a recent song
-        service.recordSong(personaId: personaId, artist: "New Artist", songTitle: "New Song")
-
-        let recentSongs = service.getRecentSongs(for: personaId)
-        #expect(recentSongs.count == 1)
-        #expect(recentSongs.first?.artist == "New Artist")
-    }
-
     @Test("Clear cache removes all songs for persona")
     func clearCacheRemovesSongs() async {
         let personaId = UUID()
@@ -123,72 +102,152 @@ struct PersonaSongCacheServiceTests {
         #expect(service.getRecentSongs(for: persona2).isEmpty)
     }
 
-    @Test("CachedSong isExpired returns false for recent songs")
-    func recentSongNotExpired() async {
-        let recentSong = CachedSong(
-            artist: "Artist",
-            songTitle: "Song",
-            selectedAt: Date() // Just now
-        )
-        #expect(recentSong.isExpired == false)
+    // MARK: - LRU Cache Tests
+
+    @Test("LRU eviction when cache reaches size limit")
+    func lruEvictionAtLimit() async {
+        let personaId = UUID()
+
+        // Set cache size to 3 for this test
+        UserDefaults.standard.set(3, forKey: "com.back2back.personaSongCacheSize")
+
+        service.recordSong(personaId: personaId, artist: "Artist 1", songTitle: "Song 1")
+        service.recordSong(personaId: personaId, artist: "Artist 2", songTitle: "Song 2")
+        service.recordSong(personaId: personaId, artist: "Artist 3", songTitle: "Song 3")
+
+        let beforeEviction = service.getRecentSongs(for: personaId)
+        #expect(beforeEviction.count == 3)
+
+        // Add a 4th song - should evict the oldest (Song 1)
+        service.recordSong(personaId: personaId, artist: "Artist 4", songTitle: "Song 4")
+
+        let afterEviction = service.getRecentSongs(for: personaId)
+        #expect(afterEviction.count == 3)
+        #expect(afterEviction.contains { $0.songTitle == "Song 1" } == false)
+        #expect(afterEviction.contains { $0.songTitle == "Song 2" } == true)
+        #expect(afterEviction.contains { $0.songTitle == "Song 3" } == true)
+        #expect(afterEviction.contains { $0.songTitle == "Song 4" } == true)
+
+        // Reset cache size
+        UserDefaults.standard.set(50, forKey: "com.back2back.personaSongCacheSize")
     }
 
-    @Test("CachedSong isExpired returns true for old songs")
-    func oldSongIsExpired() async {
-        let oldDate = Date().addingTimeInterval(-25 * 60 * 60) // 25 hours ago
+    @Test("LRU eviction maintains correct order")
+    func lruEvictionOrder() async {
+        let personaId = UUID()
+
+        // Set cache size to 5
+        UserDefaults.standard.set(5, forKey: "com.back2back.personaSongCacheSize")
+
+        // Add 7 songs
+        for i in 1...7 {
+            service.recordSong(personaId: personaId, artist: "Artist \(i)", songTitle: "Song \(i)")
+        }
+
+        let songs = service.getRecentSongs(for: personaId)
+        #expect(songs.count == 5)
+
+        // Should have songs 3, 4, 5, 6, 7 (first 2 evicted)
+        #expect(songs[0].songTitle == "Song 3")
+        #expect(songs[1].songTitle == "Song 4")
+        #expect(songs[2].songTitle == "Song 5")
+        #expect(songs[3].songTitle == "Song 6")
+        #expect(songs[4].songTitle == "Song 7")
+
+        // Reset cache size
+        UserDefaults.standard.set(50, forKey: "com.back2back.personaSongCacheSize")
+    }
+
+    @Test("Cache size of 1 works correctly")
+    func cacheSizeOne() async {
+        let personaId = UUID()
+
+        // Set cache size to 1
+        UserDefaults.standard.set(1, forKey: "com.back2back.personaSongCacheSize")
+
+        service.recordSong(personaId: personaId, artist: "Artist 1", songTitle: "Song 1")
+        #expect(service.getRecentSongs(for: personaId).count == 1)
+
+        service.recordSong(personaId: personaId, artist: "Artist 2", songTitle: "Song 2")
+        let songs = service.getRecentSongs(for: personaId)
+        #expect(songs.count == 1)
+        #expect(songs.first?.songTitle == "Song 2")
+
+        // Reset cache size
+        UserDefaults.standard.set(50, forKey: "com.back2back.personaSongCacheSize")
+    }
+
+    @Test("PersonaSongCache addSong method")
+    func addSongMethod() async {
+        let personaId = UUID()
+        var cache = PersonaSongCache(personaId: personaId, songs: [])
+
+        // Add 3 songs with limit 3
+        cache.addSong(CachedSong(artist: "Artist 1", songTitle: "Song 1", selectedAt: Date()), maxSize: 3)
+        cache.addSong(CachedSong(artist: "Artist 2", songTitle: "Song 2", selectedAt: Date()), maxSize: 3)
+        cache.addSong(CachedSong(artist: "Artist 3", songTitle: "Song 3", selectedAt: Date()), maxSize: 3)
+        #expect(cache.songs.count == 3)
+
+        // Add 4th song - should evict first
+        cache.addSong(CachedSong(artist: "Artist 4", songTitle: "Song 4", selectedAt: Date()), maxSize: 3)
+        #expect(cache.songs.count == 3)
+        #expect(cache.songs[0].songTitle == "Song 2")
+        #expect(cache.songs[1].songTitle == "Song 3")
+        #expect(cache.songs[2].songTitle == "Song 4")
+    }
+
+    @Test("Cache size configuration changes apply to new songs")
+    func cacheSizeConfigChanges() async {
+        let personaId = UUID()
+
+        // Start with cache size 3
+        UserDefaults.standard.set(3, forKey: "com.back2back.personaSongCacheSize")
+
+        service.recordSong(personaId: personaId, artist: "Artist 1", songTitle: "Song 1")
+        service.recordSong(personaId: personaId, artist: "Artist 2", songTitle: "Song 2")
+        service.recordSong(personaId: personaId, artist: "Artist 3", songTitle: "Song 3")
+
+        #expect(service.getRecentSongs(for: personaId).count == 3)
+
+        // Change cache size to 5
+        UserDefaults.standard.set(5, forKey: "com.back2back.personaSongCacheSize")
+
+        // Add 2 more songs
+        service.recordSong(personaId: personaId, artist: "Artist 4", songTitle: "Song 4")
+        service.recordSong(personaId: personaId, artist: "Artist 5", songTitle: "Song 5")
+
+        // Should have 5 songs now
+        #expect(service.getRecentSongs(for: personaId).count == 5)
+
+        // Reset cache size
+        UserDefaults.standard.set(50, forKey: "com.back2back.personaSongCacheSize")
+    }
+
+    @Test("Empty cache returns empty array")
+    func emptyCache() async {
+        let personaId = UUID()
+        let songs = service.getRecentSongs(for: personaId)
+        #expect(songs.isEmpty)
+    }
+
+    @Test("Backwards compatibility with existing cache data")
+    func backwardsCompatibility() async {
+        let personaId = UUID()
+
+        // Create a cache with old format (would have had isExpired field, but that's computed so it doesn't affect persistence)
         let oldSong = CachedSong(
-            artist: "Artist",
-            songTitle: "Song",
-            selectedAt: oldDate
-        )
-        #expect(oldSong.isExpired == true)
-    }
-
-    @Test("PersonaSongCache activeSongs filters expired songs")
-    func activeSongsFiltersExpired() async {
-        let personaId = UUID()
-
-        let recentSong = CachedSong(
-            artist: "Recent Artist",
-            songTitle: "Recent Song",
-            selectedAt: Date()
-        )
-
-        let expiredSong = CachedSong(
             artist: "Old Artist",
             songTitle: "Old Song",
-            selectedAt: Date().addingTimeInterval(-25 * 60 * 60)
+            selectedAt: Date().addingTimeInterval(-48 * 60 * 60) // 2 days ago
         )
 
-        var cache = PersonaSongCache(personaId: personaId, songs: [recentSong, expiredSong])
+        var cache = PersonaSongCache(personaId: personaId, songs: [oldSong])
 
-        let activeSongs = cache.activeSongs
-        #expect(activeSongs.count == 1)
-        #expect(activeSongs.first?.artist == "Recent Artist")
-    }
+        // Add a new song using the new LRU method
+        cache.addSong(CachedSong(artist: "New Artist", songTitle: "New Song", selectedAt: Date()), maxSize: 50)
 
-    @Test("PersonaSongCache removeExpiredSongs removes old entries")
-    func removeExpiredSongsWorks() async {
-        let personaId = UUID()
-
-        let recentSong = CachedSong(
-            artist: "Recent Artist",
-            songTitle: "Recent Song",
-            selectedAt: Date()
-        )
-
-        let expiredSong = CachedSong(
-            artist: "Old Artist",
-            songTitle: "Old Song",
-            selectedAt: Date().addingTimeInterval(-25 * 60 * 60)
-        )
-
-        var cache = PersonaSongCache(personaId: personaId, songs: [recentSong, expiredSong])
         #expect(cache.songs.count == 2)
-
-        cache.removeExpiredSongs()
-
-        #expect(cache.songs.count == 1)
-        #expect(cache.songs.first?.artist == "Recent Artist")
+        #expect(cache.songs[0].artist == "Old Artist")
+        #expect(cache.songs[1].artist == "New Artist")
     }
 }

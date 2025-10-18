@@ -138,13 +138,13 @@ class SongSelectionService {
             """
         }
 
-        // Get recent songs from cache (24-hour exclusion list)
+        // Get recent songs from cache (LRU exclusion list)
         let recentSongs = personaSongCacheService.getRecentSongs(for: personaId)
         var recentSongsText = ""
         if !recentSongs.isEmpty {
             recentSongsText = """
 
-            Songs you've recently selected (within last 24 hours) - do NOT choose these:
+            Songs you've recently selected (your most recent N picks) - do NOT choose these:
             \(formatRecentSongs(recentSongs))
 
             """
