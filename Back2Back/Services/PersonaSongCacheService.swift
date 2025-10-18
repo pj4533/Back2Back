@@ -29,11 +29,12 @@ final class PersonaSongCacheService {
     // MARK: - Public API
 
     /// Records a song selection for a specific persona using LRU eviction
-    func recordSong(personaId: UUID, artist: String, songTitle: String) {
+    func recordSong(personaId: UUID, artist: String, songTitle: String, artworkURL: URL? = nil) {
         let cachedSong = CachedSong(
             artist: artist,
             songTitle: songTitle,
-            selectedAt: Date()
+            selectedAt: Date(),
+            artworkURL: artworkURL
         )
 
         if var cache = caches[personaId] {

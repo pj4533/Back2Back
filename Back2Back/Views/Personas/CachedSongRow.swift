@@ -12,15 +12,29 @@ struct CachedSongRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Placeholder artwork icon
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 60, height: 60)
+            // Artwork (with AsyncImage for URL or placeholder)
+            if let artworkURL = cachedSong.artworkURL {
+                AsyncImage(url: artworkURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                }
+                .frame(width: 60, height: 60)
+                .cornerRadius(8)
+            } else {
+                // Fallback placeholder for songs without artwork
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 60, height: 60)
 
-                Image(systemName: "music.note")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
+                    Image(systemName: "music.note")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             // Song details
@@ -85,35 +99,40 @@ struct CachedSongRow: View {
             cachedSong: CachedSong(
                 artist: "The Beatles",
                 songTitle: "Come Together",
-                selectedAt: Date().addingTimeInterval(-30) // 30 seconds ago
+                selectedAt: Date().addingTimeInterval(-30), // 30 seconds ago
+                artworkURL: URL(string: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/d5/3a/6f/d53a6f7e-6f3e-2b9a-3b0a-9e5f5e5f5e5f/source/300x300bb.jpg")
             )
         )
         CachedSongRow(
             cachedSong: CachedSong(
                 artist: "David Bowie",
                 songTitle: "Heroes",
-                selectedAt: Date().addingTimeInterval(-300) // 5 minutes ago
+                selectedAt: Date().addingTimeInterval(-300), // 5 minutes ago
+                artworkURL: nil // Test backward compatibility
             )
         )
         CachedSongRow(
             cachedSong: CachedSong(
                 artist: "Queen",
                 songTitle: "Bohemian Rhapsody",
-                selectedAt: Date().addingTimeInterval(-7200) // 2 hours ago
+                selectedAt: Date().addingTimeInterval(-7200), // 2 hours ago
+                artworkURL: URL(string: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/d5/3a/6f/d53a6f7e-6f3e-2b9a-3b0a-9e5f5e5f5e5f/source/300x300bb.jpg")
             )
         )
         CachedSongRow(
             cachedSong: CachedSong(
                 artist: "Pink Floyd",
                 songTitle: "Comfortably Numb",
-                selectedAt: Date().addingTimeInterval(-172800) // 2 days ago
+                selectedAt: Date().addingTimeInterval(-172800), // 2 days ago
+                artworkURL: nil
             )
         )
         CachedSongRow(
             cachedSong: CachedSong(
                 artist: "Led Zeppelin",
                 songTitle: "Stairway to Heaven",
-                selectedAt: Date().addingTimeInterval(-864000) // 10 days ago
+                selectedAt: Date().addingTimeInterval(-864000), // 10 days ago
+                artworkURL: URL(string: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/d5/3a/6f/d53a6f7e-6f3e-2b9a-3b0a-9e5f5e5f5e5f/source/300x300bb.jpg")
             )
         )
     }

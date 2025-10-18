@@ -183,13 +183,13 @@ struct PersonaSongCacheServiceTests {
         var cache = PersonaSongCache(personaId: personaId, songs: [])
 
         // Add 3 songs with limit 3
-        cache.addSong(CachedSong(artist: "Artist 1", songTitle: "Song 1", selectedAt: Date()), maxSize: 3)
-        cache.addSong(CachedSong(artist: "Artist 2", songTitle: "Song 2", selectedAt: Date()), maxSize: 3)
-        cache.addSong(CachedSong(artist: "Artist 3", songTitle: "Song 3", selectedAt: Date()), maxSize: 3)
+        cache.addSong(CachedSong(artist: "Artist 1", songTitle: "Song 1", selectedAt: Date(), artworkURL: nil), maxSize: 3)
+        cache.addSong(CachedSong(artist: "Artist 2", songTitle: "Song 2", selectedAt: Date(), artworkURL: nil), maxSize: 3)
+        cache.addSong(CachedSong(artist: "Artist 3", songTitle: "Song 3", selectedAt: Date(), artworkURL: nil), maxSize: 3)
         #expect(cache.songs.count == 3)
 
         // Add 4th song - should evict first
-        cache.addSong(CachedSong(artist: "Artist 4", songTitle: "Song 4", selectedAt: Date()), maxSize: 3)
+        cache.addSong(CachedSong(artist: "Artist 4", songTitle: "Song 4", selectedAt: Date(), artworkURL: nil), maxSize: 3)
         #expect(cache.songs.count == 3)
         #expect(cache.songs[0].songTitle == "Song 2")
         #expect(cache.songs[1].songTitle == "Song 3")
@@ -238,13 +238,14 @@ struct PersonaSongCacheServiceTests {
         let oldSong = CachedSong(
             artist: "Old Artist",
             songTitle: "Old Song",
-            selectedAt: Date().addingTimeInterval(-48 * 60 * 60) // 2 days ago
+            selectedAt: Date().addingTimeInterval(-48 * 60 * 60), // 2 days ago
+            artworkURL: nil
         )
 
         var cache = PersonaSongCache(personaId: personaId, songs: [oldSong])
 
         // Add a new song using the new LRU method
-        cache.addSong(CachedSong(artist: "New Artist", songTitle: "New Song", selectedAt: Date()), maxSize: 50)
+        cache.addSong(CachedSong(artist: "New Artist", songTitle: "New Song", selectedAt: Date(), artworkURL: nil), maxSize: 50)
 
         #expect(cache.songs.count == 2)
         #expect(cache.songs[0].artist == "Old Artist")
