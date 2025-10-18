@@ -24,6 +24,7 @@ final class AISongCoordinator {
     private let personaService: PersonaService
     private let personaSongCacheService: PersonaSongCacheService
     private let songErrorLoggerService: SongErrorLoggerService
+    private let firstSongCacheService: FirstSongCacheService
 
     private(set) var prefetchTask: Task<Void, Never>?
 
@@ -45,7 +46,8 @@ final class AISongCoordinator {
         toastService: ToastService,
         personaService: PersonaService,
         personaSongCacheService: PersonaSongCacheService,
-        songErrorLoggerService: SongErrorLoggerService
+        songErrorLoggerService: SongErrorLoggerService,
+        firstSongCacheService: FirstSongCacheService
     ) {
         self.openAIClient = openAIClient
         self.sessionService = sessionService
@@ -54,6 +56,7 @@ final class AISongCoordinator {
         self.personaService = personaService
         self.personaSongCacheService = personaSongCacheService
         self.songErrorLoggerService = songErrorLoggerService
+        self.firstSongCacheService = firstSongCacheService
 
         // Use provided matcher, or select based on configuration
         if let matcher = musicMatcher {
@@ -108,9 +111,47 @@ final class AISongCoordinator {
     // MARK: - Public Methods
 
     /// Start AI first - select and play initial song
+    /// Checks for cached first selection for instant playback
     func handleAIStartFirst() async throws -> Song? {
         B2BLog.session.info("🤖 AI starting session first")
 
+        // Check for cached first selection
+        guard let currentPersona = personaService.selectedPersona else {
+            throw OpenAIError.decodingError(NSError(domain: "Back2Back", code: -1, userInfo: [NSLocalizedDescriptionKey: "No persona selected"]))
+        }
+
+        if let cached = currentPersona.firstSelection, let appleMusicSong = cached.appleMusicSong {
+            B2BLog.session.info("✨ Using cached first selection for instant playback")
+
+            // Convert SimplifiedSong back to MusicKit Song
+            let songId = MusicItemID(appleMusicSong.id)
+            guard let song = try? await MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: songId).response().items.first else {
+                B2BLog.session.warning("Failed to fetch cached song from MusicKit, falling back to AI selection")
+
+                // Clear invalid cache
+                personaService.clearFirstSelection(for: currentPersona.id)
+
+                // Fall through to normal AI selection
+                return try await performAISelection()
+            }
+
+            // Clear the cache immediately
+            personaService.clearFirstSelection(for: currentPersona.id)
+
+            // Trigger immediate background regeneration (non-blocking)
+            firstSongCacheService.regenerateAfterUse(for: currentPersona.id)
+
+            B2BLog.session.info("🎵 Instant playback with cached selection: \(song.title) by \(song.artistName)")
+            return song
+        }
+
+        // No cache available - fall back to normal AI selection
+        B2BLog.session.info("No cached first selection available, proceeding with AI selection")
+        return try await performAISelection()
+    }
+
+    /// Performs standard AI selection with retry logic
+    private func performAISelection() async throws -> Song? {
         sessionService.setAIThinking(true)
         defer { sessionService.setAIThinking(false) }
 
@@ -260,19 +301,15 @@ final class AISongCoordinator {
             throw OpenAIError.decodingError(NSError(domain: "Back2Back", code: -1, userInfo: [NSLocalizedDescriptionKey: "No persona selected"]))
         }
 
-        // Determine if this is the first song
-        let isFirstSong = sessionService.sessionHistory.isEmpty
-
-        // Get config and resolve for automatic mode (handles both model and reasoning level)
+        // Get config (no resolution needed - using configured model directly)
         let config = aiModelConfig
-        let resolvedConfig = config.resolveConfiguration(isFirstSong: isFirstSong)
 
         let recommendation = try await openAIClient.selectNextSong(
             persona: sessionService.currentPersonaStyleGuide,
             personaId: currentPersona.id,
             sessionHistory: sessionService.sessionHistory,
             directionChange: directionChange,
-            config: resolvedConfig
+            config: config
         )
 
         // Check if song has already been played
@@ -295,7 +332,7 @@ final class AISongCoordinator {
                 personaId: currentPersona.id,
                 sessionHistory: sessionService.sessionHistory,
                 directionChange: directionChange,
-                config: resolvedConfig
+                config: config
             )
 
             // Record the retry recommendation in cache

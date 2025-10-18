@@ -41,6 +41,10 @@ final class ServiceContainer {
 
     let sessionService: SessionService
 
+    // MARK: - Cache Services (depends on multiple services)
+
+    let firstSongCacheService: FirstSongCacheService
+
     // MARK: - Coordinators (depends on multiple services)
 
     let playbackCoordinator: PlaybackCoordinator
@@ -95,6 +99,23 @@ final class ServiceContainer {
 
         B2BLog.general.debug("✅ Session service initialized")
 
+        // Step 5.5: Initialize first song cache service (depends on PersonaService, MusicService, OpenAIClient)
+        // Create music matcher for first song cache (using default config)
+        let cacheServiceMusicMatcher = Self.createMusicMatcher(
+            musicService: musicService,
+            personaService: personaService,
+            songErrorLoggerService: songErrorLoggerService
+        )
+
+        firstSongCacheService = FirstSongCacheService(
+            personaService: personaService,
+            musicService: musicService,
+            openAIClient: openAIClient,
+            musicMatcher: cacheServiceMusicMatcher
+        )
+
+        B2BLog.general.debug("✅ First song cache service initialized")
+
         // Step 6: Initialize coordinators (depend on multiple services)
         playbackCoordinator = PlaybackCoordinator(
             musicService: musicService,
@@ -115,7 +136,8 @@ final class ServiceContainer {
             toastService: toastService,
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
-            songErrorLoggerService: songErrorLoggerService
+            songErrorLoggerService: songErrorLoggerService,
+            firstSongCacheService: firstSongCacheService
         )
 
         B2BLog.general.debug("✅ Coordinators initialized")
@@ -157,6 +179,39 @@ final class ServiceContainer {
         )
 
         B2BLog.general.info("✅ ServiceContainer fully initialized - All dependencies injected")
+    }
+
+    // MARK: - Helper Methods
+
+    /// Create appropriate music matcher based on configuration
+    private static func createMusicMatcher(
+        musicService: MusicService,
+        personaService: PersonaService,
+        songErrorLoggerService: SongErrorLoggerService
+    ) -> MusicMatchingProtocol {
+        // Read configuration to determine which matcher to use
+        let config: AIModelConfig
+        if let data = UserDefaults.standard.data(forKey: "aiModelConfig"),
+           let decoded = try? JSONDecoder().decode(AIModelConfig.self, from: data) {
+            config = decoded
+        } else {
+            config = .default
+        }
+
+        switch config.musicMatcher {
+        case .stringBased:
+            return StringBasedMusicMatcher(
+                musicService: musicService,
+                personaService: personaService,
+                songErrorLoggerService: songErrorLoggerService
+            )
+        case .llmBased:
+            return LLMBasedMusicMatcher(
+                musicService: musicService,
+                personaService: personaService,
+                songErrorLoggerService: songErrorLoggerService
+            )
+        }
     }
 
     // MARK: - Configuration Helper

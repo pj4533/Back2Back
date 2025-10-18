@@ -33,6 +33,18 @@ struct Back2BackApp: App {
         WindowGroup {
             ContentView()
                 .withServices(services)
+                .task {
+                    // Refresh missing first selections on app launch
+                    B2BLog.general.info("App launched - refreshing missing first selections")
+                    await services.firstSongCacheService.refreshMissingSelections()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                    // Refresh missing first selections when app becomes active
+                    Task {
+                        B2BLog.general.info("App became active - refreshing missing first selections")
+                        await services.firstSongCacheService.refreshMissingSelections()
+                    }
+                }
                 .onAppear {
                     B2BLog.ui.debug("Main ContentView appeared")
                 }

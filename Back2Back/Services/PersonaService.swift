@@ -140,4 +140,28 @@ final class PersonaService {
             B2BLog.general.error("❌ Failed to find persona for selection: \(persona.id)")
         }
     }
+
+    func updateFirstSelection(for personaId: UUID, selection: CachedFirstSelection) {
+        B2BLog.general.info("Updating first selection for persona: \(personaId)")
+
+        if let index = personas.firstIndex(where: { $0.id == personaId }) {
+            personas[index].firstSelection = selection
+            savePersonas()
+            B2BLog.general.info("✅ First selection updated for persona")
+        } else {
+            B2BLog.general.error("❌ Failed to find persona for first selection update: \(personaId)")
+        }
+    }
+
+    func clearFirstSelection(for personaId: UUID) {
+        B2BLog.general.info("Clearing first selection for persona: \(personaId)")
+
+        if let index = personas.firstIndex(where: { $0.id == personaId }) {
+            personas[index].firstSelection = nil
+            savePersonas()
+            B2BLog.general.info("✅ First selection cleared for persona")
+        } else {
+            B2BLog.general.error("❌ Failed to find persona for first selection clear: \(personaId)")
+        }
+    }
 }

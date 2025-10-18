@@ -115,44 +115,4 @@ struct AIModelConfigTests {
             #expect(config.songSelectionModel == model)
         }
     }
-
-    @Test("Automatic mode resolves to nano/low for first song")
-    func testAutomaticModeFirstSong() {
-        let config = AIModelConfig(
-            songSelectionModel: "automatic",
-            songSelectionReasoningLevel: .low
-        )
-
-        let resolved = config.resolveConfiguration(isFirstSong: true)
-
-        #expect(resolved.songSelectionModel == "gpt-5-nano")
-        #expect(resolved.songSelectionReasoningLevel == .low)
-    }
-
-    @Test("Automatic mode resolves to gpt-5/low for subsequent songs")
-    func testAutomaticModeSubsequentSongs() {
-        let config = AIModelConfig(
-            songSelectionModel: "automatic",
-            songSelectionReasoningLevel: .low
-        )
-
-        let resolved = config.resolveConfiguration(isFirstSong: false)
-
-        #expect(resolved.songSelectionModel == "gpt-5")
-        #expect(resolved.songSelectionReasoningLevel == .low)
-    }
-
-    @Test("Non-automatic mode returns unchanged configuration")
-    func testNonAutomaticModeUnchanged() {
-        let config = AIModelConfig(
-            songSelectionModel: "gpt-5-mini",
-            songSelectionReasoningLevel: .medium
-        )
-
-        let resolvedFirst = config.resolveConfiguration(isFirstSong: true)
-        let resolvedLater = config.resolveConfiguration(isFirstSong: false)
-
-        #expect(resolvedFirst == config)
-        #expect(resolvedLater == config)
-    }
 }

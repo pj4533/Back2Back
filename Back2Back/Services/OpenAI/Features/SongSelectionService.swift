@@ -2,12 +2,6 @@ import Foundation
 import OSLog
 import MusicKit
 
-struct SongRecommendation: Codable {
-    let artist: String
-    let song: String
-    let rationale: String
-}
-
 @MainActor
 class SongSelectionService {
     private let personaSongCacheService: PersonaSongCacheService
@@ -22,7 +16,8 @@ class SongSelectionService {
         sessionHistory: [SessionSong],
         directionChange: DirectionChange? = nil,
         config: AIModelConfig = .default,
-        client: OpenAIClient
+        client: OpenAIClient,
+        firstSelection: CachedFirstSelection? = nil
     ) async throws -> SongRecommendation {
         B2BLog.ai.info("Requesting AI song selection with persona using model: \(config.songSelectionModel), reasoning: \(config.songSelectionReasoningLevel.rawValue)")
 
@@ -30,7 +25,7 @@ class SongSelectionService {
             B2BLog.ai.info("Applying direction change: \(firstOption.directionPrompt)")
         }
 
-        let prompt = buildDJPrompt(persona: persona, personaId: personaId, history: sessionHistory, directionChange: directionChange)
+        let prompt = buildDJPrompt(persona: persona, personaId: personaId, history: sessionHistory, directionChange: directionChange, firstSelection: firstSelection)
 
         let request = ResponsesRequest(
             model: config.songSelectionModel,
@@ -127,7 +122,7 @@ class SongSelectionService {
 
     // MARK: - Private Helpers
 
-    private func buildDJPrompt(persona: String, personaId: UUID, history: [SessionSong], directionChange: DirectionChange? = nil) -> String {
+    private func buildDJPrompt(persona: String, personaId: UUID, history: [SessionSong], directionChange: DirectionChange? = nil, firstSelection: CachedFirstSelection? = nil) -> String {
         var historyText = ""
         if !history.isEmpty {
             historyText = """
@@ -152,6 +147,17 @@ class SongSelectionService {
             B2BLog.ai.info("Added \(recentSongs.count) recent songs to exclusion list for persona")
         }
 
+        // Add first selection exclusion if provided
+        var firstSelectionText = ""
+        if let cached = firstSelection {
+            firstSelectionText = """
+
+            IMPORTANT: Do NOT select this song (it's reserved as your opening track):
+            '\(cached.recommendation.song)' by \(cached.recommendation.artist)
+
+            """
+        }
+
         // Add direction change section if provided
         var directionText = ""
         if let direction = directionChange, let firstOption = direction.options.first {
@@ -166,7 +172,7 @@ class SongSelectionService {
 
         return """
         \(persona)
-        \(historyText)\(recentSongsText)\(directionText)
+        \(historyText)\(recentSongsText)\(firstSelectionText)\(directionText)
         Select the next song that:
         1. Complements the musical journey so far
         2. Reflects your DJ persona's taste
