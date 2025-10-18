@@ -4,40 +4,36 @@
 //
 //  Created on 2025-09-30.
 //  Extracted from SessionView as part of Phase 1 refactoring (#20)
+//  Refactored to use ViewModel only (Issue #56, 2025-10-18)
 //
 
 import SwiftUI
 
 struct SessionHistoryListView: View {
-    @Environment(\.services) private var services
+    let viewModel: SessionHistoryViewModel
+    let sessionViewModel: SessionViewModel
+    let favoritesService: FavoritesService
+    let personaService: PersonaService
 
     var body: some View {
-        guard let services = services else {
-            return AnyView(EmptyView())
-        }
-
-        let sessionService = services.sessionService
-
-        if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty && !sessionService.isAIThinking {
-            return AnyView(
+        if viewModel.isEmpty {
             ContentUnavailableView(
                 "No Songs Yet",
                 systemImage: "music.note.list",
                 description: Text("Start your DJ session by selecting the first track")
             )
-            .frame(maxHeight: .infinity))
+            .frame(maxHeight: .infinity)
         } else {
-            return AnyView(
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         // Show history (played songs)
-                        ForEach(sessionService.sessionHistory) { sessionSong in
+                        ForEach(viewModel.sessionHistory) { sessionSong in
                             SessionSongRow(
                                 sessionSong: sessionSong,
-                                sessionViewModel: services.sessionViewModel,
-                                favoritesService: services.favoritesService,
-                                personaService: services.personaService
+                                sessionViewModel: sessionViewModel,
+                                favoritesService: favoritesService,
+                                personaService: personaService
                             )
                                 // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
                                 // SwiftUI needs to know when status changes on same song
@@ -49,7 +45,7 @@ struct SessionHistoryListView: View {
                         }
 
                         // Show AI loading cell if AI is thinking
-                        if sessionService.isAIThinking {
+                        if viewModel.isAIThinking {
                             AILoadingCell()
                                 .id("ai-loading")
                                 .transition(.asymmetric(
@@ -59,12 +55,12 @@ struct SessionHistoryListView: View {
                         }
 
                         // Show queue (upcoming songs)
-                        ForEach(sessionService.songQueue) { sessionSong in
+                        ForEach(viewModel.songQueue) { sessionSong in
                             SessionSongRow(
                                 sessionSong: sessionSong,
-                                sessionViewModel: services.sessionViewModel,
-                                favoritesService: services.favoritesService,
-                                personaService: services.personaService
+                                sessionViewModel: sessionViewModel,
+                                favoritesService: favoritesService,
+                                personaService: personaService
                             )
                                 // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
                                 // SwiftUI needs to know when status changes on same song
@@ -76,21 +72,21 @@ struct SessionHistoryListView: View {
                         }
                     }
                     .padding()
-                    .animation(.spring(response: 0.3), value: sessionService.sessionHistory.count + sessionService.songQueue.count + (sessionService.isAIThinking ? 1 : 0))
+                    .animation(.spring(response: 0.3), value: viewModel.totalCount)
                 }
-                .onChange(of: sessionService.sessionHistory.count + sessionService.songQueue.count + (sessionService.isAIThinking ? 1 : 0)) { _, _ in
+                .onChange(of: viewModel.totalCount) { _, _ in
                     withAnimation {
                         // Scroll to last item (whether AI loading, queue, or history)
-                        if sessionService.isAIThinking {
+                        if viewModel.isAIThinking {
                             proxy.scrollTo("ai-loading", anchor: .bottom)
-                        } else if let lastQueued = sessionService.songQueue.last {
+                        } else if let lastQueued = viewModel.songQueue.last {
                             proxy.scrollTo(lastQueued.id, anchor: .bottom)
-                        } else if let lastHistory = sessionService.sessionHistory.last {
+                        } else if let lastHistory = viewModel.sessionHistory.last {
                             proxy.scrollTo(lastHistory.id, anchor: .bottom)
                         }
                     }
                 }
-            })
+            }
         }
     }
 }

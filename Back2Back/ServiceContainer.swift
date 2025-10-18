@@ -51,6 +51,11 @@ final class ServiceContainer {
 
     let sessionViewModel: SessionViewModel
     let personasViewModel: PersonasViewModel
+    let contentViewModel: ContentViewModel
+    let sessionHeaderViewModel: SessionHeaderViewModel
+    let sessionHistoryViewModel: SessionHistoryViewModel
+    let sessionActionButtonsViewModel: SessionActionButtonsViewModel
+    let favoritesViewModel: FavoritesViewModel
 
     // MARK: - Initialization
 
@@ -128,6 +133,27 @@ final class ServiceContainer {
         personasViewModel = PersonasViewModel(
             personaService: personaService,
             aiService: openAIClient
+        )
+
+        contentViewModel = ContentViewModel(
+            musicService: musicService
+        )
+
+        sessionHeaderViewModel = SessionHeaderViewModel(
+            sessionService: sessionService,
+            musicService: musicService
+        )
+
+        sessionHistoryViewModel = SessionHistoryViewModel(
+            sessionService: sessionService
+        )
+
+        sessionActionButtonsViewModel = SessionActionButtonsViewModel(
+            sessionService: sessionService
+        )
+
+        favoritesViewModel = FavoritesViewModel(
+            favoritesService: favoritesService
         )
 
         B2BLog.general.info("✅ ServiceContainer fully initialized - All dependencies injected")

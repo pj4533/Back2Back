@@ -4,33 +4,29 @@
 //
 //  Created on 2025-09-30.
 //  Extracted from SessionView as part of Phase 1 refactoring (#20)
+//  Refactored to use ViewModel only (Issue #56, 2025-10-18)
 //
 
 import SwiftUI
 
 struct SessionHeaderView: View {
-    @Environment(\.services) private var services
-
+    let viewModel: SessionHeaderViewModel
     let onNowPlayingTapped: () -> Void
 
     var body: some View {
-        guard let services = services else {
-            return AnyView(EmptyView())
-        }
-
-        return AnyView(VStack(spacing: 8) {
+        VStack(spacing: 8) {
             Text("Back2Back DJ Session")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
             Label(
-                "Turn: \(services.sessionService.currentTurn.rawValue)",
-                systemImage: services.sessionService.currentTurn == .user ? "person.fill" : "cpu"
+                "Turn: \(viewModel.currentTurn)",
+                systemImage: viewModel.turnIcon
             )
             .font(.headline)
-            .foregroundStyle(services.sessionService.currentTurn == .user ? .blue : .purple)
+            .foregroundStyle(viewModel.turnColor == .user ? .blue : .purple)
 
-            Text("AI Persona: \(services.sessionService.currentPersonaName)")
+            Text("AI Persona: \(viewModel.personaName)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             .padding(.horizontal)
@@ -39,7 +35,7 @@ struct SessionHeaderView: View {
         .background(Color(UIColor.systemGroupedBackground))
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                if services.musicService.currentlyPlaying != nil {
+                if viewModel.hasNowPlaying {
                     Button(action: onNowPlayingTapped) {
                         Image(systemName: "music.note")
                             .font(.title3)
@@ -47,6 +43,6 @@ struct SessionHeaderView: View {
                     }
                 }
             }
-        })
+        }
     }
 }

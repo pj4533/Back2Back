@@ -256,7 +256,7 @@ final class SessionViewModel {
 
     private func handleSongEnded() async {
         // Use turn manager to advance to next song
-        guard let (song, selectedBy) = await turnManager.advanceToNextSong() else {
+        guard let (song, _) = await turnManager.advanceToNextSong() else {
             return
         }
 

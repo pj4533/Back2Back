@@ -4,32 +4,23 @@
 //
 //  Created on 2025-09-30.
 //  Extracted from SessionView as part of Phase 1 refactoring (#20)
+//  Refactored to use ViewModel only (Issue #56, 2025-10-18)
 //
 
 import SwiftUI
 import OSLog
 
 struct SessionActionButtons: View {
-    @Environment(\.services) private var services
-
+    let viewModel: SessionActionButtonsViewModel
+    let sessionViewModel: SessionViewModel
     let onUserSelectTapped: () -> Void
     let onAIStartTapped: () -> Void
     let onDirectionOptionSelected: (DirectionOption) -> Void
 
     var body: some View {
-        guard let services = services else {
-            return AnyView(EmptyView())
-        }
-
-        let sessionService = services.sessionService
-        let sessionViewModel = services.sessionViewModel
-
-        // Check if user has already selected a song in the queue
-        let hasUserSelectedSong = sessionService.songQueue.contains { $0.selectedBy == .user }
-
-        return AnyView(VStack(spacing: 12) {
+        VStack(spacing: 12) {
             // Show both buttons only at the very start (no history and no queue)
-            if sessionService.sessionHistory.isEmpty && sessionService.songQueue.isEmpty {
+            if viewModel.shouldShowStartButtons {
                 HStack(spacing: 12) {
                     // User goes first button
                     Button(action: {
@@ -63,7 +54,7 @@ struct SessionActionButtons: View {
                         .cornerRadius(12)
                     }
                 }
-            } else if sessionService.currentTurn == .user && !hasUserSelectedSong {
+            } else if viewModel.shouldShowUserTurnButtons {
                 // After session has started, show user selection button and direction change button on their turn
                 HStack(spacing: 12) {
                     // User selection button
@@ -114,6 +105,6 @@ struct SessionActionButtons: View {
             }
         }
         .padding()
-        .background(Color(UIColor.systemBackground)))
+        .background(Color(UIColor.systemBackground))
     }
 }

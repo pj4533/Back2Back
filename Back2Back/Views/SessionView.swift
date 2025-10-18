@@ -4,6 +4,7 @@
 //
 //  Created on 2025-09-27.
 //  Refactored as part of Phase 1 architecture improvements (#20)
+//  Refactored to use ViewModel only (Issue #56, 2025-10-18)
 //
 
 import SwiftUI
@@ -24,11 +25,21 @@ struct SessionView: View {
         let sessionViewModel = services.sessionViewModel
 
         return AnyView(VStack(spacing: 0) {
-            SessionHeaderView(onNowPlayingTapped: { showNowPlaying = true })
+            SessionHeaderView(
+                viewModel: services.sessionHeaderViewModel,
+                onNowPlayingTapped: { showNowPlaying = true }
+            )
 
-            SessionHistoryListView()
+            SessionHistoryListView(
+                viewModel: services.sessionHistoryViewModel,
+                sessionViewModel: sessionViewModel,
+                favoritesService: services.favoritesService,
+                personaService: services.personaService
+            )
 
             SessionActionButtons(
+                viewModel: services.sessionActionButtonsViewModel,
+                sessionViewModel: sessionViewModel,
                 onUserSelectTapped: { showSongPicker = true },
                 onAIStartTapped: {
                     Task {
@@ -73,5 +84,7 @@ struct SessionView: View {
 }
 
 #Preview {
+    let services = ServiceContainer()
     SessionView()
+        .withServices(services)
 }
