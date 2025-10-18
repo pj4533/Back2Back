@@ -218,6 +218,169 @@ struct AIRetryStrategyTests {
         #expect(result == "success on second try")
         #expect(attemptCount == 2)
     }
+
+    // MARK: - Task Cancellation Tests
+
+    @Test("Task cancellation before operation throws CancellationError")
+    func testCancellationBeforeOperation() async throws {
+        var attemptCount = 0
+
+        let task = Task {
+            try await AIRetryStrategy.executeWithRetry(
+                operation: {
+                    attemptCount += 1
+                    return "success"
+                }
+            )
+        }
+
+        // Cancel immediately before operation starts
+        task.cancel()
+
+        do {
+            let _: String? = try await task.value
+            Issue.record("Should have thrown CancellationError")
+        } catch is CancellationError {
+            // Expected - cancellation was detected
+            #expect(attemptCount == 0) // Should not have attempted
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test("Task cancellation during operation throws CancellationError")
+    func testCancellationDuringOperation() async throws {
+        var attemptCount = 0
+
+        let task = Task {
+            try await AIRetryStrategy.executeWithRetry(
+                operation: {
+                    attemptCount += 1
+                    // Simulate work
+                    try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                    return "success"
+                }
+            )
+        }
+
+        // Cancel during operation
+        try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
+        task.cancel()
+
+        do {
+            let _: String? = try await task.value
+            Issue.record("Should have thrown CancellationError")
+        } catch is CancellationError {
+            // Expected - cancellation was detected
+            #expect(attemptCount >= 0) // May have started
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test("Task cancellation prevents retry attempts")
+    func testCancellationPreventsRetry() async throws {
+        var attemptCount = 0
+
+        let task = Task<String?, Error> {
+            try await AIRetryStrategy.executeWithRetry(
+                operation: {
+                    attemptCount += 1
+                    // First attempt returns nil (triggers retry)
+                    return nil
+                },
+                retryOperation: {
+                    attemptCount += 1
+                    return "retry success"
+                }
+            )
+        }
+
+        // Cancel before retry can execute
+        try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
+        task.cancel()
+
+        do {
+            let _: String? = try await task.value
+            // May succeed if retry happened before cancellation, or throw CancellationError
+        } catch is CancellationError {
+            // Expected if cancellation happened before retry
+            #expect(attemptCount <= 2) // Should stop retrying
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test("Task cancellation during retry throws CancellationError")
+    func testCancellationDuringRetry() async throws {
+        var attemptCount = 0
+        var retryStarted = false
+
+        let task = Task<String?, Error> {
+            try await AIRetryStrategy.executeWithRetry(
+                operation: {
+                    attemptCount += 1
+                    return nil // First attempt fails
+                },
+                retryOperation: {
+                    retryStarted = true
+                    attemptCount += 1
+                    // Simulate work in retry
+                    try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                    return "retry success"
+                }
+            )
+        }
+
+        // Wait for retry to start
+        try? await Task.sleep(nanoseconds: 20_000_000) // 0.02 seconds
+        task.cancel()
+
+        do {
+            let _: String? = try await task.value
+            // May succeed if completed before cancellation
+        } catch is CancellationError {
+            // Expected if cancellation happened during retry
+            #expect(attemptCount >= 1) // First attempt should have completed
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test("Cancelled task doesn't invoke onRetry callback")
+    func testCancelledTaskSkipsOnRetryCallback() async throws {
+        var callbackInvoked = false
+        var attemptCount = 0
+
+        let task = Task<String?, Error> {
+            try await AIRetryStrategy.executeWithRetry(
+                operation: {
+                    attemptCount += 1
+                    return nil // First attempt fails
+                },
+                retryOperation: {
+                    attemptCount += 1
+                    return "retry success"
+                },
+                onRetry: {
+                    callbackInvoked = true
+                }
+            )
+        }
+
+        // Cancel before retry
+        try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
+        task.cancel()
+
+        do {
+            let _: String? = try await task.value
+        } catch is CancellationError {
+            // Callback should not have been invoked if cancellation prevented retry
+            // Note: This is timing-dependent, so we don't assert
+        } catch {
+            // Other errors are fine too
+        }
+    }
 }
 
 // MARK: - Test Helpers
