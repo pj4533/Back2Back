@@ -121,15 +121,17 @@ final class AISongCoordinator {
         }
 
         if let cached = currentPersona.firstSelection, let appleMusicSong = cached.appleMusicSong {
-            B2BLog.session.info("✨ Using cached first selection for instant playback")
+            B2BLog.firstSelectionCache.info("✨ Cache hit for persona '\(currentPersona.name)' - using cached first selection for instant playback")
+            B2BLog.firstSelectionCache.debug("Cached song: '\(cached.recommendation.song)' by \(cached.recommendation.artist)")
 
             // Convert SimplifiedSong back to MusicKit Song
             let songId = MusicItemID(appleMusicSong.id)
             guard let song = try? await MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: songId).response().items.first else {
-                B2BLog.session.warning("Failed to fetch cached song from MusicKit, falling back to AI selection")
+                B2BLog.firstSelectionCache.warning("⚠️ Failed to fetch cached song from MusicKit, falling back to AI selection")
 
                 // Clear invalid cache
                 personaService.clearFirstSelection(for: currentPersona.id)
+                B2BLog.firstSelectionCache.info("🗑️ Cleared invalid cache for persona '\(currentPersona.name)'")
 
                 // Fall through to normal AI selection
                 return try await performAISelection()
@@ -137,16 +139,17 @@ final class AISongCoordinator {
 
             // Clear the cache immediately
             personaService.clearFirstSelection(for: currentPersona.id)
+            B2BLog.firstSelectionCache.info("🗑️ Cache consumed for persona '\(currentPersona.name)' - cleared successfully")
 
             // Trigger immediate background regeneration (non-blocking)
             firstSongCacheService.regenerateAfterUse(for: currentPersona.id)
 
-            B2BLog.session.info("🎵 Instant playback with cached selection: \(song.title) by \(song.artistName)")
+            B2BLog.firstSelectionCache.info("🎵 Starting instant playback with cached selection: '\(song.title)' by \(song.artistName)")
             return song
         }
 
         // No cache available - fall back to normal AI selection
-        B2BLog.session.info("No cached first selection available, proceeding with AI selection")
+        B2BLog.firstSelectionCache.info("📦 Cache empty for persona '\(currentPersona.name)' - falling back to normal AI selection")
         return try await performAISelection()
     }
 
