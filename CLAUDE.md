@@ -90,12 +90,13 @@ Key MusicKit resources:
    - Configuration UI for model selection (GPT-5, GPT-5 Mini, GPT-5 Nano)
 
 ### Advanced Features Implemented
-7. **Time-based song repetition prevention** ✅
-   - PersonaSongCacheService with 24-hour cache
-   - Prevents personas from repeating songs across sessions
-   - Per-persona song tracking with automatic expiration
-   - UserDefaults persistence with cache cleanup
+7. **Count-based LRU song repetition prevention** ✅
+   - PersonaSongCacheService with configurable LRU cache (default: 50 songs)
+   - Prevents personas from repeating their most recent N songs
+   - Per-persona song tracking with automatic eviction
+   - UserDefaults persistence with cache size configuration
    - Debug UI to clear cache in ConfigurationView
+   - User-configurable cache size (10-500 songs)
 
 8. **Intelligent track matching** ✅
    - StringBasedMusicMatcher with fuzzy matching
@@ -146,7 +147,7 @@ Back2Back/
 │   ├── Models/
 │   │   ├── MusicModels.swift           # MusicSearchResult, NowPlayingItem, error types
 │   │   ├── PersonaModels.swift         # Persona and PersonaGenerationResult
-│   │   ├── PersonaSongCache.swift      # CachedSong, PersonaSongCache (24hr expiration)
+│   │   ├── PersonaSongCache.swift      # CachedSong, PersonaSongCache (LRU cache)
 │   │   ├── DirectionChange.swift       # Direction change prompt and button label
 │   │   ├── AIModelConfig.swift         # AI model configuration and persistence
 │   │   ├── OpenAIModels.swift          # Core OpenAI API types
@@ -183,7 +184,7 @@ Back2Back/
 │   │   ├── MusicService.swift            # Facade pattern MusicKit wrapper (@MainActor)
 │   │   ├── SessionService.swift          # Session state coordination
 │   │   ├── PersonaService.swift          # Persona CRUD operations
-│   │   ├── PersonaSongCacheService.swift # 24hr song repetition prevention
+│   │   ├── PersonaSongCacheService.swift # LRU song repetition prevention
 │   │   ├── EnvironmentService.swift      # Secure API key management
 │   │   ├── MusicKit/             # (NEW) MusicKit service layer
 │   │   │   ├── MusicAuthService.swift    # Authorization handling
@@ -231,7 +232,7 @@ Back2Back/
     ├── SessionServiceTests.swift
     ├── PersonaServiceTests.swift
     ├── PersonasViewModelTests.swift
-    ├── PersonaSongCacheServiceTests.swift  # 24hr cache tests
+    ├── PersonaSongCacheServiceTests.swift  # LRU cache tests
     ├── OpenAIClientTests.swift
     ├── OpenAIModelsTests.swift
     ├── OpenAISongSelectionTests.swift
@@ -367,12 +368,17 @@ Enhanced user experience for AI-powered persona creation:
 - **Streaming Updates**: Real-time progress from OpenAI API
 - **Better Expectations**: Users understand the advanced AI processing time
 
-### Time-Based Song Repetition Prevention (PR #19, September 2025)
-Implemented a 24-hour cache system to prevent personas from selecting the same songs across different sessions:
-- **PersonaSongCache models**: CachedSong and PersonaSongCache with automatic expiration
-- **PersonaSongCacheService**: Singleton with UserDefaults persistence
-- **Integration**: AI prompts now include exclusion list of recent songs
+### Count-Based LRU Song Repetition Prevention (PR #72, October 2025)
+Replaced time-based cache with count-based LRU (Least Recently Used) cache:
+- **PersonaSongCache models**: CachedSong and PersonaSongCache with LRU eviction
+- **PersonaSongCacheService**: Singleton with configurable cache size (default: 50 songs)
+- **Configuration UI**: User can adjust cache size (10-500 songs) in ConfigurationView
+- **Integration**: AI prompts now include exclusion list of most recent N songs
+- **Benefits**: Predictable behavior independent of session frequency, bounded memory usage
 - **Debug tools**: Clear cache button in ConfigurationView
+
+### Time-Based Song Repetition Prevention (PR #19, September 2025) [Replaced by #72]
+Original implementation with 24-hour time-based expiration (replaced by count-based LRU in PR #72)
 
 ### Improved Track Matching (PR #17, September 2025)
 Enhanced verification between AI recommendations and Apple Music search:
@@ -503,9 +509,11 @@ The app provides intelligent musical direction steering during user turns:
   - Featuring artist variations
 - Persona management (PersonasViewModelTests)
 - Song cache system (PersonaSongCacheServiceTests)
-  - 24-hour expiration logic
+  - LRU eviction logic
+  - Cache size configuration
   - Multi-persona isolation
   - Cache persistence and cleanup
+  - Backwards compatibility
 - Environment configuration (EnvironmentServiceTests)
 - AI model configuration (AIModelConfigTests)
 

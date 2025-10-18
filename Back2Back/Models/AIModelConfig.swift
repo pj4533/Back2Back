@@ -43,17 +43,22 @@ struct AIModelConfig: Codable, Equatable {
     /// Music matching strategy (default: string-based)
     var musicMatcher: MusicMatcherType
 
+    /// Number of songs to cache per persona (default: 50)
+    var songCacheSize: Int
+
     /// Default configuration now uses automatic mode
     static let `default` = AIModelConfig(
         songSelectionModel: "automatic",
         songSelectionReasoningLevel: .low,
-        musicMatcher: .stringBased
+        musicMatcher: .stringBased,
+        songCacheSize: 50
     )
 
-    init(songSelectionModel: String = "automatic", songSelectionReasoningLevel: ReasoningEffort = .low, musicMatcher: MusicMatcherType = .stringBased) {
+    init(songSelectionModel: String = "automatic", songSelectionReasoningLevel: ReasoningEffort = .low, musicMatcher: MusicMatcherType = .stringBased, songCacheSize: Int = 50) {
         self.songSelectionModel = songSelectionModel
         self.songSelectionReasoningLevel = songSelectionReasoningLevel
         self.musicMatcher = musicMatcher
+        self.songCacheSize = songCacheSize
     }
 
     /// Determines the actual configuration to use when "automatic" is selected
@@ -67,10 +72,10 @@ struct AIModelConfig: Codable, Equatable {
         // Automatic logic: fast for first song, thoughtful for subsequent songs
         if isFirstSong {
             B2BLog.ai.info("🚀 Automatic mode: Using gpt-5-nano with low reasoning for first song (fast start)")
-            return AIModelConfig(songSelectionModel: "gpt-5-nano", songSelectionReasoningLevel: .low)
+            return AIModelConfig(songSelectionModel: "gpt-5-nano", songSelectionReasoningLevel: .low, musicMatcher: musicMatcher, songCacheSize: songCacheSize)
         } else {
             B2BLog.ai.info("🎵 Automatic mode: Using gpt-5 with low reasoning for subsequent songs (thoughtful selection)")
-            return AIModelConfig(songSelectionModel: "gpt-5", songSelectionReasoningLevel: .low)
+            return AIModelConfig(songSelectionModel: "gpt-5", songSelectionReasoningLevel: .low, musicMatcher: musicMatcher, songCacheSize: songCacheSize)
         }
     }
 }
