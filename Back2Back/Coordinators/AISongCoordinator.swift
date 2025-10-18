@@ -15,7 +15,7 @@ import OSLog
 @MainActor
 @Observable
 final class AISongCoordinator {
-    private let openAIClient: OpenAIClient
+    private let openAIClient: any AIRecommendationServiceProtocol
     private let sessionService: SessionService
     private let environmentService: EnvironmentService
     private let musicMatcher: MusicMatchingProtocol
@@ -38,7 +38,7 @@ final class AISongCoordinator {
     }
 
     init(
-        openAIClient: OpenAIClient,
+        openAIClient: any AIRecommendationServiceProtocol,
         sessionService: SessionService,
         environmentService: EnvironmentService,
         musicService: MusicService,

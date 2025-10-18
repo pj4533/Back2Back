@@ -14,13 +14,13 @@ import MusicKit
 struct SessionViewModelTests {
     @MainActor
     func createTestViewModel() -> SessionViewModel {
-        // Create all dependencies with real instances for now
-        // These tests are mostly testing logic, not integration
+        // Create all dependencies with mocks for isolated testing
         let environmentService = EnvironmentService()
         let personaSongCacheService = PersonaSongCacheService()
         let musicService = MockMusicService()  // Use mock for music to avoid MusicKit
-        let openAIClient = OpenAIClient(environmentService: environmentService, personaSongCacheService: personaSongCacheService)
-        let statusMessageService = StatusMessageService(openAIClient: openAIClient)
+        let mockAIClient = MockAIRecommendationService()  // Use mock to prevent API calls
+        let realOpenAIClient = OpenAIClient(environmentService: environmentService, personaSongCacheService: personaSongCacheService)
+        let statusMessageService = StatusMessageService(openAIClient: realOpenAIClient)
         let personaService = PersonaService(statusMessageService: statusMessageService)
         let sessionService = SessionService(personaService: personaService)
 
@@ -31,7 +31,7 @@ struct SessionViewModelTests {
         let favoritesService = FavoritesService()
 
         let aiSongCoordinator = AISongCoordinator(
-            openAIClient: openAIClient,
+            openAIClient: mockAIClient,
             sessionService: sessionService,
             environmentService: environmentService,
             musicService: musicService,
@@ -48,7 +48,7 @@ struct SessionViewModelTests {
             playbackCoordinator: playbackCoordinator,
             aiSongCoordinator: aiSongCoordinator,
             turnManager: turnManager,
-            openAIClient: openAIClient
+            openAIClient: mockAIClient
         )
     }
 

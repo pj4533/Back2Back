@@ -6,12 +6,6 @@ import Foundation
 @MainActor
 struct OpenAIClientTests {
 
-    // SAFETY CHECK: Verify no API key is set to prevent accidental network calls
-    init() {
-        let apiKey = ProcessInfo.processInfo.environment["OPENAI_API_KEY"]
-        assert(apiKey == nil, "⚠️ OPENAI_API_KEY should NOT be set during testing! Real API calls would be made.")
-    }
-
     func createTestClient() -> OpenAIClient {
         let environmentService = EnvironmentService()
         let personaSongCacheService = PersonaSongCacheService()

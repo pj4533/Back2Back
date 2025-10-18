@@ -4,7 +4,7 @@ import OSLog
 
 @Observable
 @MainActor
-final class OpenAIClient: AIRecommendationServiceProtocol {
+class OpenAIClient: AIRecommendationServiceProtocol {
     private(set) var config: OpenAIConfig
     let session: URLSession
     private let environmentService: EnvironmentService

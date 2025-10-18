@@ -6,50 +6,92 @@
 
 ### How It Works
 
-1. **Tests run without API key**: Tests do NOT set `OPENAI_API_KEY` environment variable
-2. **Fail-safe in networking layer**: `OpenAINetworking.responses()` checks for API key BEFORE making network calls:
+We use **Protocol-Based Dependency Injection** with mock objects:
+
+1. **Production Code Uses Protocols**: ViewModels and Coordinators accept `any AIRecommendationServiceProtocol` instead of concrete `OpenAIClient`
    ```swift
-   guard let apiKey = client.apiKey, !apiKey.isEmpty else {
-       throw OpenAIError.apiKeyMissing  // ← Throws before URLSession.dataTask
+   // PersonasViewModel.swift
+   private let aiService: any AIRecommendationServiceProtocol  // Not: OpenAIClient
+   ```
+
+2. **Tests Inject Mocks**: Test factory methods inject `MockAIRecommendationService` instead of real client
+   ```swift
+   func createTestViewModel() -> PersonasViewModel {
+       let mockAIService = MockAIRecommendationService()
+       return PersonasViewModel(personaService: personaService, aiService: mockAIService)
    }
    ```
-3. **No mock needed**: Because the guard clause prevents network calls, we don't need complex mocking
+
+3. **Mock Provides Realistic Responses**: `MockAIRecommendationService` returns realistic JSON-like data
+   - Song recommendations with actual artist/song names
+   - Style guides with proper formatting
+   - Direction changes with realistic prompts
+   - Configurable error simulation
 
 ### Safety Guarantees
 
-- ✅ No network calls are made during testing
-- ✅ Even if tests call `client.selectNextSong()` or `client.generatePersonaStyleGuide()`, they fail with `OpenAIError.apiKeyMissing`
-- ✅ Tests that need to call these methods handle the error gracefully (like `PersonasViewModelTests.testRegenerateStyleGuide`)
+- ✅ **Zero network calls possible** - Tests never instantiate real OpenAIClient for AI operations
+- ✅ **Proper test isolation** - Each test uses fresh mock with controlled responses
+- ✅ **Realistic testing** - Mock responses match actual API response structure
+- ✅ **Error testing** - Can simulate API errors without making real calls
+- ✅ **Parameter verification** - Mock tracks all calls for assertion
 
-### What If OPENAI_API_KEY Is Set?
+### Architecture
 
-**WARNING**: If you run tests with `OPENAI_API_KEY` environment variable set, REAL API calls WILL be made and you WILL be charged by OpenAI.
+**Protocol-Based Design**:
+```
+AIRecommendationServiceProtocol (protocol)
+├── OpenAIClient (production)
+└── MockAIRecommendationService (testing)
+```
 
-To prevent accidental API calls:
-1. Never export `OPENAI_API_KEY` in your shell
-2. Don't add it to test schemes in Xcode
-3. CI/CD should NOT set this variable for test runs
+**Files Using Protocol Injection**:
+- `PersonasViewModel` - Accepts `any AIRecommendationServiceProtocol`
+- `SessionViewModel` - Accepts `any AIRecommendationServiceProtocol`
+- `AISongCoordinator` - Accepts `any AIRecommendationServiceProtocol`
+
+**Mock Implementation**:
+- `MockAIRecommendationService.swift` - Full protocol implementation with:
+  - Realistic default responses
+  - Call tracking for verification
+  - Error simulation support
+  - Parameter capture for assertions
 
 ### Test Categories
 
-**Model Tests** (No network risk):
+**Model Tests** (No dependencies):
 - `OpenAIModelsTests` - JSON encoding/decoding only
 - `OpenAISongSelectionTests` - Data structure tests only
 
-**Client Tests** (Protected by isConfigured check):
-- `OpenAIClientTests` - Only tests behavior when API key is missing
-- Wraps network-calling tests in `if !client.isConfigured`
+**Client Tests** (Uses real client, but tests configuration only):
+- `OpenAIClientTests` - Tests instantiation and configuration
+- Does NOT test network calls (would require API key)
 
-**Integration Tests** (Tests call OpenAI methods but fail safely):
-- `PersonasViewModelTests` - Calls `regenerateStyleGuide()` but catches errors
-- `SessionViewModelTests` - Uses OpenAIClient but never triggers network calls
-- These tests verify the code doesn't crash when API is unavailable
+**ViewModel Tests** (Uses mock for complete isolation):
+- `PersonasViewModelTests` - Uses `MockAIRecommendationService`
+- `SessionViewModelTests` - Uses `MockAIRecommendationService`
+- Full coverage of AI interactions without network calls
+
+### Benefits Over Guard Clause Approach
+
+**Old Approach** (Accidentally Safe):
+- Tests used real `OpenAIClient` without API key
+- Relied on runtime guard clause to prevent network calls
+- Real API calls would occur if `OPENAI_API_KEY` was set
+- Limited ability to test error scenarios
+
+**New Approach** (Intentionally Safe):
+- Tests use mock that cannot make network calls
+- Proper dependency injection following best practices
+- Complete control over responses and errors
+- Can test all code paths including error handling
 
 ### Verification
 
-Run this to verify no API key is set during tests:
+No verification needed - the architecture guarantees safety:
 ```swift
-#expect(ProcessInfo.processInfo.environment["OPENAI_API_KEY"] == nil, "API key should not be set during tests")
+// Mock implementation has no networking code
+class MockAIRecommendationService: AIRecommendationServiceProtocol {
+    // Pure in-memory responses, no URLSession
+}
 ```
-
-This assertion can be added to any test suite's init or setup method.

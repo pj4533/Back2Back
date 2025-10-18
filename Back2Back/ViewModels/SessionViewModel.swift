@@ -19,7 +19,7 @@ final class SessionViewModel {
     // Protocols break observation chain since they can't be @Observable
     private let musicService: MusicService
     private let sessionService: SessionService
-    private let openAIClient: OpenAIClient
+    private let openAIClient: any AIRecommendationServiceProtocol
 
     // Coordinators handle specific responsibilities
     private let playbackCoordinator: PlaybackCoordinator
@@ -37,7 +37,7 @@ final class SessionViewModel {
         playbackCoordinator: PlaybackCoordinator,
         aiSongCoordinator: AISongCoordinator,
         turnManager: TurnManager,
-        openAIClient: OpenAIClient
+        openAIClient: any AIRecommendationServiceProtocol
     ) {
         self.musicService = musicService
         self.sessionService = sessionService

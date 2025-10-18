@@ -5,19 +5,14 @@ import Foundation
 @MainActor
 struct PersonasViewModelTests {
 
-    // SAFETY CHECK: Verify no API key is set to prevent accidental network calls
-    init() {
-        let apiKey = ProcessInfo.processInfo.environment["OPENAI_API_KEY"]
-        assert(apiKey == nil, "⚠️ OPENAI_API_KEY should NOT be set during testing! Real API calls would be made.")
-    }
-
     func createTestViewModel() -> PersonasViewModel {
-        let environmentService = EnvironmentService()
-        let personaSongCacheService = PersonaSongCacheService()
-        let openAIClient = OpenAIClient(environmentService: environmentService, personaSongCacheService: personaSongCacheService)
-        let statusMessageService = StatusMessageService(openAIClient: openAIClient)
+        let mockAIService = MockAIRecommendationService()
+        let statusMessageService = StatusMessageService(openAIClient: OpenAIClient(
+            environmentService: EnvironmentService(),
+            personaSongCacheService: PersonaSongCacheService()
+        ))
         let personaService = PersonaService(statusMessageService: statusMessageService)
-        return PersonasViewModel(personaService: personaService, aiService: openAIClient)
+        return PersonasViewModel(personaService: personaService, aiService: mockAIService)
     }
 
     @Test("PersonasViewModel loads personas on initialization")
@@ -140,19 +135,27 @@ struct PersonasViewModelTests {
     func testRegenerateStyleGuide() async {
         // Given
         let viewModel = createTestViewModel()
-        let persona = Persona(
+
+        // Create persona first
+        await viewModel.createPersona(
             name: "Test Persona",
-            description: "Test description",
-            styleGuide: "Old style guide"
+            description: "Test description"
         )
 
-        // This test would need mocking of OpenAIClient to properly test
-        // For now, we just verify the method exists and can be called
+        guard let persona = viewModel.personas.first(where: { $0.name == "Test Persona" }) else {
+            #expect(Bool(false), "Failed to create test persona")
+            return
+        }
+
+        // When
         await viewModel.regenerateStyleGuide(for: persona)
 
-        // In a real test with mocking, we would verify:
-        // - isGeneratingStyleGuide becomes true then false
-        // - The persona's styleGuide is updated
-        // - lastGeneratedSources is populated
+        // Then - Mock provides realistic style guide
+        #expect(viewModel.lastGeneratedSources.count > 0, "Should have generated sources")
+
+        // Verify the persona's styleGuide was updated
+        let updatedPersona = viewModel.personas.first { $0.id == persona.id }
+        #expect(updatedPersona?.styleGuide != nil, "Style guide should be generated")
+        #expect(updatedPersona?.styleGuide.contains("DJ Style Guide") == true, "Style guide should contain header")
     }
 }

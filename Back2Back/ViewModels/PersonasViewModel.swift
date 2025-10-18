@@ -7,10 +7,10 @@ import OSLog
 @Observable
 final class PersonasViewModel {
     private let personaService: PersonaService
-    // Use concrete @Observable type for SwiftUI observation to work
-    private let aiService: OpenAIClient
+    // Use protocol type to enable dependency injection and proper testing
+    private let aiService: any AIRecommendationServiceProtocol
 
-    init(personaService: PersonaService, aiService: OpenAIClient) {
+    init(personaService: PersonaService, aiService: any AIRecommendationServiceProtocol) {
         self.personaService = personaService
         self.aiService = aiService
     }
