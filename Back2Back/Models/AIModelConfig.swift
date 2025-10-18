@@ -34,7 +34,7 @@ enum MusicMatcherType: String, Codable, CaseIterable {
 /// Configuration for AI model behavior in song selection
 /// Note: These settings only apply to song selection, not style guide generation
 struct AIModelConfig: Codable, Equatable {
-    /// Model to use for song selection: "gpt-5", "gpt-5-mini", "gpt-5-nano", or "automatic"
+    /// Model to use for song selection: "gpt-5", "gpt-5-mini", or "gpt-5-nano"
     var songSelectionModel: String
 
     /// Reasoning effort level for song selection
@@ -46,37 +46,19 @@ struct AIModelConfig: Codable, Equatable {
     /// Number of songs to cache per persona (default: 50)
     var songCacheSize: Int
 
-    /// Default configuration now uses automatic mode
+    /// Default configuration uses GPT-5 with low reasoning for all song selections
     static let `default` = AIModelConfig(
-        songSelectionModel: "automatic",
+        songSelectionModel: "gpt-5",
         songSelectionReasoningLevel: .low,
         musicMatcher: .stringBased,
         songCacheSize: 50
     )
 
-    init(songSelectionModel: String = "automatic", songSelectionReasoningLevel: ReasoningEffort = .low, musicMatcher: MusicMatcherType = .stringBased, songCacheSize: Int = 50) {
+    init(songSelectionModel: String = "gpt-5", songSelectionReasoningLevel: ReasoningEffort = .low, musicMatcher: MusicMatcherType = .stringBased, songCacheSize: Int = 50) {
         self.songSelectionModel = songSelectionModel
         self.songSelectionReasoningLevel = songSelectionReasoningLevel
         self.musicMatcher = musicMatcher
         self.songCacheSize = songCacheSize
-    }
-
-    /// Determines the actual configuration to use when "automatic" is selected
-    /// - Parameter isFirstSong: Whether this is the first song of the session
-    /// - Returns: The resolved AIModelConfig with concrete model and reasoning level
-    func resolveConfiguration(isFirstSong: Bool) -> AIModelConfig {
-        guard songSelectionModel == "automatic" else {
-            return self
-        }
-
-        // Automatic logic: fast for first song, thoughtful for subsequent songs
-        if isFirstSong {
-            B2BLog.ai.info("🚀 Automatic mode: Using gpt-5-nano with low reasoning for first song (fast start)")
-            return AIModelConfig(songSelectionModel: "gpt-5-nano", songSelectionReasoningLevel: .low, musicMatcher: musicMatcher, songCacheSize: songCacheSize)
-        } else {
-            B2BLog.ai.info("🎵 Automatic mode: Using gpt-5 with low reasoning for subsequent songs (thoughtful selection)")
-            return AIModelConfig(songSelectionModel: "gpt-5", songSelectionReasoningLevel: .low, musicMatcher: musicMatcher, songCacheSize: songCacheSize)
-        }
     }
 }
 
