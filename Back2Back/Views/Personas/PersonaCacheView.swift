@@ -66,7 +66,7 @@ struct PersonaCacheView: View {
     }
 
     private func loadCachedSongs() {
-        cachedSongs = cacheService.getRecentSongs(for: persona.id)
+        cachedSongs = cacheService.getRecentSongs(for: persona.id).reversed()
         B2BLog.ai.debug("Loaded \(cachedSongs.count) cached songs for persona \(persona.name)")
     }
 
