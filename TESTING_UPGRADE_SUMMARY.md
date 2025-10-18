@@ -12,7 +12,27 @@ This document summarizes the comprehensive testing upgrade effort for the Back2B
 
 ## Changes Made
 
-### 1. Mock Infrastructure Enhanced
+### 1. ✅ SongProtocol Abstraction Implemented (MAJOR MILESTONE)
+**Files Created:**
+- `Back2Back/Protocols/SongProtocol.swift` - NEW
+  - Protocol abstraction over MusicKit's Song type
+  - Enables unit testing without MusicKit catalog searches
+  - Real Song conforms via extension
+  - Comprehensive documentation of rationale
+
+- `Back2BackTests/Mocks/MockSong.swift` - NEW
+  - Comprehensive test implementation of SongProtocol
+  - Factory methods: `minimal()`, `full()`, `withId()`
+  - Test fixtures: `comeTogether`, `soWhat`, `oneMoreTime`, `unicodeTitle`, `featuringSong`, `remasteredSong`
+  - Edge cases: `veryShort`, `veryLong`
+  - Equatable and Hashable conformance
+  - Array extension: `mockQueue(count:)` for batch test data
+  - **270+ lines of well-documented test infrastructure**
+
+**Impact:**
+This unblocks ~50% of planned tests that were blocked by MusicKit Song instantiation limitation.
+
+### 2. Mock Infrastructure Enhanced
 **Files Created/Modified:**
 - `Back2BackTests/Mocks/TestFixtures.swift` - NEW
   - Test data structures for normalization test cases
@@ -78,18 +98,20 @@ MusicKit `Song` objects cannot be instantiated in unit tests. Test file includes
 - Tests requiring MusicKit Song objects
 - Documented for future implementation via protocol abstraction
 
-## Existing Tests Requiring Updates
+## Existing Tests - Status Update
 
-The following test files still use `.shared` and need to be updated to use dependency injection:
+### ✅ Fixed (6 files)
+1. **EnvironmentServiceTests.swift** - All 8 .shared instances removed
+2. **MusicAuthViewModelTests.swift** - Added dependency injection with MockMusicService
+3. **MusicServiceTests.swift** - Removed .shared usage
+4. **PersonaServiceTests.swift** - Removed .shared usage
+5. **PersonaSongCacheServiceTests.swift** - Removed .shared usage
+6. **StatusMessageServiceTests.swift** - Removed .shared usage
 
-1. **StatusMessageServiceTests.swift** - Uses StatusMessageService.shared
-2. **OpenAIClientTests.swift** - May use service singletons
-3. **PersonaServiceTests.swift** - Uses PersonaService.shared
-4. **PersonaSongCacheServiceTests.swift** - Uses PersonaSongCacheService.shared
-5. **SessionViewModelTests.swift** - Uses multiple .shared services
-6. **EnvironmentServiceTests.swift** - Uses EnvironmentService.shared (9 instances)
-7. **MusicServiceTests.swift** - Uses MusicService.shared
-8. **OpenAISongSelectionTests.swift** - May use service singletons
+### 🔨 Still Need Fixing (3 files)
+1. **SessionViewModelTests.swift** - Complex (needs MusicService, SessionService, OpenAIClient, coordinators)
+2. **OpenAIClientTests.swift** - Needs EnvironmentService dependency
+3. **OpenAISongSelectionTests.swift** - Needs OpenAIClient dependency
 
 ## MusicKit Testing Challenge
 
