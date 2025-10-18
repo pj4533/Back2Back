@@ -11,7 +11,7 @@ import Foundation
 
 @MainActor
 struct StatusMessageServiceTests {
-    let service = StatusMessageService.shared
+    let service = StatusMessageService()
 
     init() async {
         // Clear all caches before each test
