@@ -10,11 +10,11 @@ protocol SessionStateManagerProtocol {
     var currentPersonaStyleGuide: String { get }
     var currentPersonaName: String { get }
 
-    func addSongToHistory(_ song: Song, selectedBy: TurnType, rationale: String?, queueStatus: QueueStatus)
+    func addSongToHistory(_ song: Song, selectedBy: TurnType, rationale: String?, queueStatus: QueueStatus) -> SessionSong
     func queueSong(_ song: Song, selectedBy: TurnType, rationale: String?, queueStatus: QueueStatus) -> SessionSong
     func updateSongStatus(id: UUID, newStatus: QueueStatus)
     func moveQueuedSongToHistory(_ songId: UUID)
-    func updateCurrentlyPlayingSong(songId: String)
+    func updateCurrentlyPlayingSong(musicKitSongId: String)
     func getNextQueuedSong() -> SessionSong?
     func clearAIQueuedSongs()
     func markCurrentSongAsPlayed()

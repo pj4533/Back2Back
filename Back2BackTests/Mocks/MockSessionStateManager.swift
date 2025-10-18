@@ -17,7 +17,7 @@ class MockSessionStateManager: SessionStateManagerProtocol {
     var moveQueuedSongToHistoryCalled = false
     var clearAIQueuedSongsCalled = false
 
-    func addSongToHistory(_ song: Song, selectedBy: TurnType, rationale: String? = nil, queueStatus: QueueStatus = .played) {
+    func addSongToHistory(_ song: Song, selectedBy: TurnType, rationale: String? = nil, queueStatus: QueueStatus = .played) -> SessionSong {
         addSongToHistoryCalled = true
         let sessionSong = SessionSong(
             id: UUID(),
@@ -28,6 +28,7 @@ class MockSessionStateManager: SessionStateManagerProtocol {
             queueStatus: queueStatus
         )
         sessionHistory.append(sessionSong)
+        return sessionSong
     }
 
     func queueSong(_ song: Song, selectedBy: TurnType, rationale: String? = nil, queueStatus: QueueStatus) -> SessionSong {
@@ -60,7 +61,7 @@ class MockSessionStateManager: SessionStateManagerProtocol {
         }
     }
 
-    func updateCurrentlyPlayingSong(songId: String) {
+    func updateCurrentlyPlayingSong(musicKitSongId: String) {
         // Mock implementation
     }
 
