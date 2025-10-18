@@ -77,7 +77,7 @@ final class PlaybackCoordinator {
                 lastSongId = currentSongId
                 hasTriggeredEndOfSong = false
                 hasQueuedNextSongAt95 = false  // Reset for new song
-                sessionService.updateCurrentlyPlayingSong(songId: currentSongId)
+                sessionService.updateCurrentlyPlayingSong(musicKitSongId: currentSongId)
             }
         }
     }
@@ -113,7 +113,7 @@ final class PlaybackCoordinator {
                 lastPlaybackTime = currentPlaybackTime
 
                 // CRITICAL: Update the queue status to show this song is now playing
-                sessionService.updateCurrentlyPlayingSong(songId: currentSongId)
+                sessionService.updateCurrentlyPlayingSong(musicKitSongId: currentSongId)
 
                 return
             }

@@ -80,22 +80,10 @@ final class TurnManager {
     }
 
     /// Determine what queue status to use for next AI song based on current turn
-    /// NOTE: This now delegates to SessionService which uses SessionState's centralized logic
+    /// NOTE: This delegates to SessionService's centralized turn logic
     func determineNextQueueStatus() -> QueueStatus {
-        // REMOVED DUPLICATION: Turn logic is now in ONE place (SessionState.determineNextQueueStatus)
+        // REMOVED DUPLICATION: Turn logic is now in ONE place (SessionService.determineNextQueueStatus)
         // This method is kept for backward compatibility and delegates to SessionService
-        // which in turn delegates to SessionState
-
-        // Since SessionService doesn't expose determineNextQueueStatus, we implement it here
-        // but the actual turn state comes from the single source of truth (SessionState)
-        if sessionService.currentTurn == .user {
-            // User's turn → AI queues a backup song (only plays if user doesn't pick)
-            B2BLog.session.debug("Current turn is USER → AI queuing as .queuedIfUserSkips (backup)")
-            return .queuedIfUserSkips
-        } else {
-            // AI's turn → AI queues its active pick (will definitely play)
-            B2BLog.session.debug("Current turn is AI → AI queuing as .upNext (AI's pick)")
-            return .upNext
-        }
+        return sessionService.determineNextQueueStatus()
     }
 }
