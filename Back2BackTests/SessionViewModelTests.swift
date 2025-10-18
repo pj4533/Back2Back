@@ -30,6 +30,18 @@ struct SessionViewModelTests {
         let songErrorLoggerService = SongErrorLoggerService()
         let favoritesService = FavoritesService()
 
+        let musicMatcher = StringBasedMusicMatcher(
+            musicService: musicService,
+            personaService: personaService,
+            songErrorLoggerService: songErrorLoggerService
+        )
+        let firstSongCacheService = FirstSongCacheService(
+            personaService: personaService,
+            musicService: musicService,
+            openAIClient: realOpenAIClient,
+            musicMatcher: musicMatcher
+        )
+
         let aiSongCoordinator = AISongCoordinator(
             openAIClient: mockAIClient,
             sessionService: sessionService,
@@ -39,7 +51,8 @@ struct SessionViewModelTests {
             toastService: toastService,
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
-            songErrorLoggerService: songErrorLoggerService
+            songErrorLoggerService: songErrorLoggerService,
+            firstSongCacheService: firstSongCacheService
         )
 
         return SessionViewModel(

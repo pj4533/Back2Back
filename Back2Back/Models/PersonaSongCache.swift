@@ -12,6 +12,7 @@ struct CachedSong: Codable, Equatable {
     let artist: String
     let songTitle: String
     let selectedAt: Date  // Used for ordering in LRU cache
+    let artworkURL: URL?  // Optional for backward compatibility with existing caches
 }
 
 /// Stores the cache of recently selected songs for a specific persona using LRU (Least Recently Used) eviction

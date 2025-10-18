@@ -338,22 +338,8 @@ final class AISongCoordinator {
                 config: config
             )
 
-            // Record the retry recommendation in cache
-            personaSongCacheService.recordSong(
-                personaId: currentPersona.id,
-                artist: retryRecommendation.artist,
-                songTitle: retryRecommendation.song
-            )
-
             return retryRecommendation
         }
-
-        // Record the recommendation in cache
-        personaSongCacheService.recordSong(
-            personaId: currentPersona.id,
-            artist: recommendation.artist,
-            songTitle: recommendation.song
-        )
 
         return recommendation
     }
@@ -408,6 +394,16 @@ final class AISongCoordinator {
                         duration: 3.0
                     )
                     return nil  // Trigger retry with AIRetryStrategy
+                }
+
+                // Record the song in cache with artwork (after successful match and validation)
+                if let currentPersona = personaService.selectedPersona {
+                    personaSongCacheService.recordSong(
+                        personaId: currentPersona.id,
+                        artist: matchedSong.artistName,
+                        songTitle: matchedSong.title,
+                        artworkURL: matchedSong.artwork?.url(width: 300, height: 300)
+                    )
                 }
             }
 
