@@ -31,6 +31,12 @@ final class AIRetryStrategy {
     ) async throws -> T? {
         B2BLog.ai.debug("Starting retry strategy with max attempts: \(maxAttempts)")
 
+        // Check if task is cancelled before starting
+        guard !Task.isCancelled else {
+            B2BLog.ai.info("⏹️ Task cancelled before retry strategy started")
+            throw CancellationError()
+        }
+
         // First attempt
         do {
             let result = try await operation()
@@ -61,6 +67,10 @@ final class AIRetryStrategy {
 
             B2BLog.ai.debug("✅ First attempt succeeded")
             return result
+        } catch is CancellationError {
+            // Don't retry cancellations - propagate immediately
+            B2BLog.ai.info("⏹️ Task cancelled during first attempt")
+            throw CancellationError()
         } catch {
             // First attempt threw an error
             B2BLog.ai.warning("⚠️ First attempt failed with error: \(error)")
@@ -91,9 +101,9 @@ final class AIRetryStrategy {
         }
 
         // Check if task has been cancelled before retrying
-        if Task.isCancelled {
+        guard !Task.isCancelled else {
             B2BLog.ai.info("⏹️ Task cancelled - stopping retry attempts")
-            return nil
+            throw CancellationError()
         }
 
         // Call optional pre-retry callback
@@ -119,13 +129,11 @@ final class AIRetryStrategy {
                     onRetry: onRetry
                 )
             }
+        } catch is CancellationError {
+            // Don't retry cancellations - propagate immediately
+            B2BLog.ai.info("⏹️ Task cancelled during retry - stopping")
+            throw CancellationError()
         } catch {
-            // Check if this is a cancellation error
-            if Task.isCancelled {
-                B2BLog.ai.info("⏹️ Task cancelled during retry - stopping")
-                return nil
-            }
-
             B2BLog.ai.warning("⚠️ Retry attempt \(attemptNumber) failed with error: \(error)")
 
             if remainingAttempts > 1 {

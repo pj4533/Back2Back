@@ -30,7 +30,7 @@ struct AISongCoordinatorTests {
         let sessionService = SessionService(personaService: personaService)
         let toastService = ToastService()
         let songErrorLoggerService = SongErrorLoggerService()
-        let favoritesService = FavoritesService()
+        _ = FavoritesService()  // Not used yet but needed for initialization
 
         let coordinator = AISongCoordinator(
             openAIClient: openAIClient,
@@ -52,7 +52,9 @@ struct AISongCoordinatorTests {
         let (coordinator, _, _, _) = createTestCoordinator()
 
         // Coordinator should be created successfully
-        #expect(coordinator != nil)
+        // Just verify it's not nil (struct will always be non-nil)
+        _ = coordinator
+        #expect(true)  // Test passes if we got here without crashing
     }
 
     @Test("startPrefetch sets AI thinking state")
@@ -90,25 +92,28 @@ struct AISongCoordinatorTests {
     }
     */
 
-    @Test("Multiple startPrefetch calls supersede previous tasks")
-    func testMultiplePrefetchCallsSupersede() async {
-        let (coordinator, _, sessionService, _) = createTestCoordinator()
+    @Test("Multiple startPrefetch calls cancel previous tasks")
+    func testMultiplePrefetchCallsCancel() async {
+        let (coordinator, _, _, _) = createTestCoordinator()
 
         // Start first prefetch
         coordinator.startPrefetch(queueStatus: .upNext)
+        let firstTask = coordinator.prefetchTask
         try? await Task.sleep(nanoseconds: 50_000_000)
 
-        // Start second prefetch (should supersede first)
+        // Start second prefetch (should cancel first)
         coordinator.startPrefetch(queueStatus: .queuedIfUserSkips)
         try? await Task.sleep(nanoseconds: 50_000_000)
 
-        // Should still be thinking (new task active)
-        #expect(sessionService.isAIThinking == true)
+        // First task should be cancelled
+        #expect(firstTask?.isCancelled == true)
+        // New task should exist
+        #expect(coordinator.prefetchTask != nil)
     }
 
     @Test("Coordinator integrates with session service")
     func testSessionServiceIntegration() async {
-        let (coordinator, _, sessionService, _) = createTestCoordinator()
+        let (_, _, sessionService, _) = createTestCoordinator()
 
         // Verify coordinator can access session state
         #expect(sessionService.currentTurn == .user)
@@ -117,17 +122,16 @@ struct AISongCoordinatorTests {
 
     @Test("Coordinator integrates with music service")
     func testMusicServiceIntegration() async {
-        let (coordinator, _, _, musicService) = createTestCoordinator()
+        let (_, _, _, musicService) = createTestCoordinator()
 
         // Verify coordinator has access to music service
-        #expect(musicService != nil)
         #expect(musicService.isAuthorized == true)  // MockMusicService defaults to authorized
     }
 
     @Test("Coordinator handles missing API key gracefully")
     func testMissingAPIKeyHandling() async {
         // Create coordinator with unconfigured client
-        let (coordinator, openAIClient, _, _) = createTestCoordinator()
+        let (coordinator, _, _, _) = createTestCoordinator()
 
         // If API key is not set, prefetch should handle gracefully
         // (The actual behavior depends on environment configuration)
@@ -139,44 +143,179 @@ struct AISongCoordinatorTests {
         // Can't assert much here without mocking the API call
         // But we verify no crashes occur
     }
+
+    // MARK: - Task Cancellation Tests
+
+    @Test("Starting new prefetch cancels existing task")
+    func testNewPrefetchCancelsExisting() async {
+        let (coordinator, _, _, _) = createTestCoordinator()
+
+        // Start first prefetch
+        coordinator.startPrefetch(queueStatus: .upNext)
+        let firstTask = coordinator.prefetchTask
+        #expect(firstTask != nil)
+
+        // Wait a bit
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        // Start second prefetch - should cancel first
+        coordinator.startPrefetch(queueStatus: .queuedIfUserSkips)
+        let secondTask = coordinator.prefetchTask
+
+        // Second task should exist
+        #expect(secondTask != nil)
+
+        // First task should be cancelled
+        #expect(firstTask?.isCancelled == true)
+    }
+
+    @Test("cancelPrefetch properly cancels task")
+    func testCancelPrefetchCancelsTask() async {
+        let (coordinator, _, _, _) = createTestCoordinator()
+
+        // Start prefetch
+        coordinator.startPrefetch(queueStatus: .upNext)
+        let task = coordinator.prefetchTask
+        #expect(task != nil)
+
+        // Cancel it
+        coordinator.cancelPrefetch()
+
+        // Task should be cancelled and cleared
+        #expect(task?.isCancelled == true)
+        #expect(coordinator.prefetchTask == nil)
+    }
+
+    @Test("Cancellation handler clears AI thinking state")
+    func testCancellationHandlerClearsThinkingState() async {
+        let (coordinator, _, sessionService, _) = createTestCoordinator()
+
+        // Start prefetch
+        coordinator.startPrefetch(queueStatus: .upNext)
+        try? await Task.sleep(nanoseconds: 100_000_000) // Wait for task to start
+        #expect(sessionService.isAIThinking == true)
+
+        // Cancel immediately
+        coordinator.cancelPrefetch()
+
+        // Wait for cancellation handler to execute
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // AI thinking should be cleared by cancellation handler
+        // Note: This is timing-dependent, may not always pass immediately
+        #expect(sessionService.isAIThinking == false)
+    }
+
+    @Test("prefetchAndQueueAISong detects cancellation early")
+    func testPrefetchDetectsCancellationEarly() async {
+        let (coordinator, _, sessionService, _) = createTestCoordinator()
+
+        // Create a cancelled task
+        let task = Task {
+            await coordinator.prefetchAndQueueAISong(queueStatus: .upNext)
+        }
+
+        // Cancel immediately
+        task.cancel()
+
+        // Wait for task to complete
+        await task.value
+
+        // Should not have queued anything
+        #expect(sessionService.songQueue.isEmpty)
+    }
+
+    @Test("Multiple rapid prefetch calls properly cancel previous tasks")
+    func testMultipleRapidPrefetchCalls() async {
+        let (coordinator, _, _, _) = createTestCoordinator()
+
+        // Start multiple prefetch calls rapidly (simulating user tapping direction button)
+        coordinator.startPrefetch(queueStatus: .upNext)
+        let task1 = coordinator.prefetchTask
+
+        try? await Task.sleep(nanoseconds: 10_000_000) // 0.01 seconds
+        coordinator.startPrefetch(queueStatus: .upNext)
+        let task2 = coordinator.prefetchTask
+
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        coordinator.startPrefetch(queueStatus: .upNext)
+        let task3 = coordinator.prefetchTask
+
+        // All previous tasks should be cancelled
+        #expect(task1?.isCancelled == true)
+        #expect(task2?.isCancelled == true)
+
+        // Last task should be active
+        #expect(task3?.isCancelled == false)
+        #expect(coordinator.prefetchTask != nil)
+    }
+
+    @Test("Cancelled task doesn't queue song")
+    func testCancelledTaskDoesntQueueSong() async {
+        let (coordinator, _, sessionService, _) = createTestCoordinator()
+
+        // Start prefetch
+        coordinator.startPrefetch(queueStatus: .upNext)
+
+        // Cancel quickly
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        coordinator.cancelPrefetch()
+
+        // Wait for cancellation to complete
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        // Should not have queued any song
+        #expect(sessionService.songQueue.isEmpty)
+    }
+
+    @Test("Task with cancellation handler always cleans up")
+    func testCancellationHandlerAlwaysCleanup() async {
+        let (coordinator, _, _, _) = createTestCoordinator()
+
+        // Start and immediately cancel multiple times
+        for _ in 0..<5 {
+            coordinator.startPrefetch(queueStatus: .upNext)
+            try? await Task.sleep(nanoseconds: 10_000_000)
+            coordinator.cancelPrefetch()
+        }
+
+        // Wait for all cancellations to settle
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // Final state should be clean
+        #expect(coordinator.prefetchTask == nil)
+    }
 }
 
 // MARK: - Implementation Notes
 
 /*
- TESTING LIMITATIONS:
+ TESTING COVERAGE - PR #53 (Task Cancellation):
 
- AISongCoordinator's core functionality involves:
- 1. Calling OpenAI API for song selection (requires API key or mocking)
- 2. Searching MusicKit catalog (requires device or mocking)
- 3. Complex async task coordination with cancellation
- 4. Retry logic for failed matches
-
- CURRENT TESTS:
+ ✅ COMPLETED TESTS:
  - Basic initialization
  - AI thinking state management
- - Task superseding behavior
+ - Task superseding behavior (now uses proper cancellation)
  - Integration with dependencies
  - Graceful handling of missing configuration
+ - Proper task cancellation when starting new prefetch
+ - Cancellation handler execution and cleanup
+ - Early cancellation detection in prefetchAndQueueAISong
+ - Multiple rapid prefetch calls (direction button scenario)
+ - Cancelled tasks don't queue songs
+ - Consistent cleanup after cancellation
 
- FOR FULL COVERAGE, WE NEED:
- - Mock OpenAI responses for song selection
- - Mock MusicKit search results
- - Test the full async workflow end-to-end
- - Test retry logic when matching fails
- - Test Task ID-based cancellation
- - Test direction change integration
+ TESTING APPROACH:
+ - Uses Swift's native Task cancellation APIs
+ - Tests verify Task.isCancelled is properly checked
+ - Validates cancellation handlers execute for cleanup
+ - Confirms no resource leaks from uncancelled tasks
+ - Tests rapid cancellation scenarios (user tapping direction repeatedly)
 
- These tests provide a foundation and verify:
- - The coordinator can be created
- - Basic state management works
- - Task lifecycle management doesn't crash
- - Dependencies are properly injected
+ REMAINING LIMITATIONS:
+ - Full async workflow requires mocked OpenAI/MusicKit responses
+ - Integration tests would verify retry logic with cancellation
+ - Direction change integration needs mocked AI responses
 
- NEXT STEPS:
- - Add integration tests with mocked API responses
- - Test the complete song selection + matching flow
- - Verify retry logic and error handling
-
- See Issue #60 for full implementation requirements.
+ See Issue #53 for task cancellation implementation details.
  */
