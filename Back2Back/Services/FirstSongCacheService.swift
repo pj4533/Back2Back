@@ -31,18 +31,18 @@ class FirstSongCacheService {
         self.openAIClient = openAIClient
         self.musicMatcher = musicMatcher
 
-        B2BLog.general.info("FirstSongCacheService initialized")
+        B2BLog.firstSelectionCache.info("FirstSongCacheService initialized")
     }
 
     /// Refreshes missing first selections for all personas
     /// Called on app launch and when app becomes active
     func refreshMissingSelections() async {
-        B2BLog.general.info("Refreshing missing first selections for all personas")
+        B2BLog.firstSelectionCache.info("🔄 Refreshing missing first selections for all personas")
 
         for persona in personaService.personas {
             // Only generate if firstSelection is nil
             if persona.firstSelection == nil {
-                B2BLog.general.info("Generating missing first selection for persona: \(persona.name)")
+                B2BLog.firstSelectionCache.info("📦 Cache empty for persona '\(persona.name)' - generating first selection")
 
                 // Spawn background task (don't block)
                 Task.detached(priority: .low) { [weak self] in
@@ -56,14 +56,14 @@ class FirstSongCacheService {
     func refreshFirstSelectionIfNeeded(for personaId: UUID) async {
         // Prevent duplicate refresh tasks
         if activeRefreshTasks[personaId] != nil {
-            B2BLog.general.debug("Refresh task already in progress for persona \(personaId)")
+            B2BLog.firstSelectionCache.debug("⚠️ Refresh task already in progress for persona \(personaId)")
             return
         }
 
         // Check if persona still needs a first selection
         guard let persona = personaService.personas.first(where: { $0.id == personaId }),
               persona.firstSelection == nil else {
-            B2BLog.general.debug("Persona \(personaId) already has first selection or doesn't exist")
+            B2BLog.firstSelectionCache.debug("✅ Persona \(personaId) already has first selection or doesn't exist")
             return
         }
 
@@ -74,10 +74,10 @@ class FirstSongCacheService {
                 // Update persona with cached selection
                 await MainActor.run {
                     personaService.updateFirstSelection(for: personaId, selection: cached)
-                    B2BLog.general.info("✅ First selection cached for persona: \(persona.name)")
+                    B2BLog.firstSelectionCache.info("✅ First selection cached for persona '\(persona.name)': '\(cached.recommendation.song)' by \(cached.recommendation.artist)")
                 }
             } catch {
-                B2BLog.general.error("Failed to generate first selection for persona \(persona.name): \(error)")
+                B2BLog.firstSelectionCache.error("❌ Failed to generate first selection for persona '\(persona.name)': \(error)")
             }
 
             // Remove from active tasks
@@ -93,7 +93,7 @@ class FirstSongCacheService {
     /// Generates a first selection for the given persona
     /// Always uses GPT-5 with low reasoning for consistent quality
     func generateFirstSelection(for persona: Persona) async throws -> CachedFirstSelection {
-        B2BLog.ai.info("Generating first selection for persona: \(persona.name)")
+        B2BLog.firstSelectionCache.info("🤖 Starting generation of first selection for persona '\(persona.name)'")
 
         // Always use GPT-5 with low reasoning (no automatic mode)
         let config = AIModelConfig(
@@ -110,7 +110,7 @@ class FirstSongCacheService {
             config: config
         )
 
-        B2BLog.ai.info("AI recommended: '\(recommendation.song)' by \(recommendation.artist)")
+        B2BLog.firstSelectionCache.info("🎯 AI recommended: '\(recommendation.song)' by \(recommendation.artist)")
 
         // Search and match song in Apple Music
         let appleMusicSong = try await searchAndMatchSong(recommendation: recommendation, persona: persona)
@@ -122,7 +122,7 @@ class FirstSongCacheService {
             appleMusicSong: appleMusicSong
         )
 
-        B2BLog.ai.info("✅ First selection generated and matched successfully")
+        B2BLog.firstSelectionCache.info("✅ First selection generated and matched successfully for persona '\(persona.name)'")
 
         return cached
     }
@@ -130,7 +130,7 @@ class FirstSongCacheService {
     /// Regenerates first selection after it's been consumed
     /// Spawns low-priority background task immediately (non-blocking)
     func regenerateAfterUse(for personaId: UUID) {
-        B2BLog.general.info("🔄 Triggering immediate regeneration for persona \(personaId)")
+        B2BLog.firstSelectionCache.info("🔄 Triggering immediate regeneration after cache consumption for persona \(personaId)")
 
         Task.detached(priority: .low) { [weak self] in
             guard let self = self else { return }
@@ -141,7 +141,9 @@ class FirstSongCacheService {
             }
 
             if hasDuplicateTask {
-                B2BLog.general.debug("Regeneration task already in progress for persona \(personaId)")
+                await MainActor.run {
+                    B2BLog.firstSelectionCache.debug("⚠️ Regeneration task already in progress for persona \(personaId)")
+                }
                 return
             }
 
@@ -150,7 +152,9 @@ class FirstSongCacheService {
                 guard let persona = await MainActor.run(body: {
                     self.personaService.personas.first(where: { $0.id == personaId })
                 }) else {
-                    B2BLog.general.error("Persona \(personaId) not found for regeneration")
+                    await MainActor.run {
+                        B2BLog.firstSelectionCache.error("❌ Persona \(personaId) not found for regeneration")
+                    }
                     return
                 }
 
@@ -160,10 +164,12 @@ class FirstSongCacheService {
                     // Update persona with new cached selection
                     await MainActor.run {
                         self.personaService.updateFirstSelection(for: personaId, selection: cached)
-                        B2BLog.general.info("✅ First selection regenerated for persona: \(persona.name)")
+                        B2BLog.firstSelectionCache.info("✅ First selection regenerated for persona '\(persona.name)': '\(cached.recommendation.song)' by \(cached.recommendation.artist)")
                     }
                 } catch {
-                    B2BLog.general.error("Failed to regenerate first selection for persona \(persona.name): \(error)")
+                    await MainActor.run {
+                        B2BLog.firstSelectionCache.error("❌ Failed to regenerate first selection for persona '\(persona.name)': \(error)")
+                    }
                 }
 
                 // Remove from active tasks
@@ -193,7 +199,7 @@ class FirstSongCacheService {
         let matchesTitle = song.song.title.lowercased() == cached.recommendation.song.lowercased()
 
         if matchesArtist && matchesTitle {
-            B2BLog.general.info("🗑️ Played song matches cached first selection, invalidating cache")
+            B2BLog.firstSelectionCache.info("🗑️ Played song matches cached first selection - invalidating cache and triggering regeneration")
 
             // Clear the cached selection
             personaService.clearFirstSelection(for: personaId)
@@ -207,15 +213,15 @@ class FirstSongCacheService {
 
     /// Searches Apple Music and matches the AI recommendation
     private func searchAndMatchSong(recommendation: SongRecommendation, persona: Persona) async throws -> SimplifiedSong? {
-        B2BLog.ai.info("Searching Apple Music for: '\(recommendation.song)' by \(recommendation.artist)")
+        B2BLog.firstSelectionCache.info("🔍 Searching Apple Music for: '\(recommendation.song)' by \(recommendation.artist)")
 
         // Use the music matcher to find and match the song
         guard let song = try await musicMatcher.searchAndMatch(recommendation: recommendation) else {
-            B2BLog.ai.warning("No match found in Apple Music for first selection")
+            B2BLog.firstSelectionCache.warning("⚠️ No match found in Apple Music for first selection")
             return nil
         }
 
-        B2BLog.ai.info("✅ Matched: '\(song.title)' by \(song.artistName)")
+        B2BLog.firstSelectionCache.info("✅ Matched in Apple Music: '\(song.title)' by \(song.artistName)")
 
         // Create SimplifiedSong
         let artworkURL = song.artwork?.url(width: 300, height: 300)?.absoluteString

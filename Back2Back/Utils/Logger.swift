@@ -25,6 +25,7 @@ public struct B2BLog {
     public static let network = Logger(subsystem: subsystem, category: "Network")
     public static let ai = Logger(subsystem: subsystem, category: "AI")
     public static let session = Logger(subsystem: subsystem, category: "Session")
+    public static let firstSelectionCache = Logger(subsystem: subsystem, category: "FirstSelectionCache")
 }
 
 // MARK: - Usage Examples
@@ -38,10 +39,12 @@ public struct B2BLog {
  B2BLog.playback.error("❌ Failed to play song")
  B2BLog.auth.warning("⚠️ Authorization not determined")
  B2BLog.musicKit.info("✅ Song added to queue")
+ B2BLog.firstSelectionCache.info("🎯 Cache hit for persona: \(personaName)")
 
  // With string interpolation
  B2BLog.search.debug("⏱️ searchDuration: \(duration)")
  B2BLog.ui.info("👤 User opened settings")
  B2BLog.playback.info("🔄 State: idle → playing")
  B2BLog.network.debug("🌐 API: MusicCatalogSearchRequest")
+ B2BLog.firstSelectionCache.debug("Cache status: \(cacheEmpty ? "empty" : "has song")")
  */
