@@ -95,40 +95,80 @@ Key MusicKit resources:
    - Prevents personas from repeating their most recent N songs
    - Per-persona song tracking with automatic eviction
    - UserDefaults persistence with cache size configuration
-   - Debug UI to clear cache in ConfigurationView
+   - Debug UI to view and manage cache in ConfigurationView
    - User-configurable cache size (10-500 songs)
+   - Persona Song Cache UI viewer and editor (PR #83)
 
-8. **Intelligent track matching** ✅
+8. **First song selection pre-caching** ✅
+   - "AI Starts" feature for instant playback when user taps button (PR #82)
+   - Pre-caches first AI song selection in background
+   - Dedicated FirstSelectionCache logging category for debugging
+   - Eliminates wait time when starting sessions with AI
+
+9. **Favorites system** ✅
+   - FavoritesService with UserDefaults persistence
+   - FavoritesListView with swipe-to-delete
+   - Heart icon in session history to favorite songs
+   - Tracks song metadata with persona association
+   - Favorites tab in main navigation
+   - Observable service pattern for reactive UI
+
+10. **Intelligent track matching** ✅
    - StringBasedMusicMatcher with fuzzy matching
+   - LLMBasedMusicMatcher using Apple FoundationModels (PR #42, #47)
    - Unicode normalization (handles curly quotes, diacritics)
    - Artist/title normalization (featuring artists, "The" prefix, ampersands)
    - Parenthetical stripping (Remastered, Live, Part numbers)
    - Confidence scoring requiring BOTH artist and title matches
    - AI retry logic when no good match found
-   - MusicMatchingProtocol for future LLM-based matching
+   - MusicMatchingProtocol for swappable matching strategies
+   - Foundation Model validation to verify song matches persona (PR #48, #49)
 
-9. **AI Model Configuration** ✅
+11. **AI Model Configuration** ✅
    - ConfigurationView for model and reasoning level settings
    - AIModelConfig with UserDefaults persistence
    - Separate configs for song selection vs style guide generation
    - Model options: GPT-5, GPT-5 Mini, GPT-5 Nano
    - Reasoning levels: low, medium, high
 
-10. **Playback Controls & Progress** ✅
+12. **Playback Controls & Progress** ✅
    - Interactive progress bar with tap-to-seek and drag support
    - Live playback time tracking (500ms polling)
    - Skip forward/backward buttons (±15s jumps)
    - Visual feedback during scrubbing
    - Increased hit areas for better touch targets
 
-11. **Dynamic Direction Change Button** ✅
+13. **Dynamic Direction Change Button** ✅
    - AI-generated contextual direction suggestions during user's turn
    - Analyzes session history to suggest contrasting musical directions
    - Smart button label generation (e.g., "West Coast vibes", "60s garage rock")
    - Automatically regenerates when new songs play
-   - Task ID-based cancellation prevents race conditions
+   - Task ID-based cancellation prevents race conditions (PR #78)
    - GPT-5-mini powered for fast, cost-effective suggestions
    - Turn remains on user after direction change (AI provides backup)
+
+14. **Dynamic Status Messages** ✅
+   - StatusMessageService using Apple FoundationModels framework
+   - Persona-specific AI-generated status messages during AI thinking
+   - Fire-and-forget generation pattern for non-blocking UI
+   - Usage-based regeneration (refreshes every 3 uses)
+   - Cached messages with automatic fallback
+   - Genre-specific messages (e.g., "Digging through crates..." for hip-hop)
+
+15. **Song Error Debugging** ✅
+   - Song Errors view for debugging failed AI selections (PR #51)
+   - Detailed error view with validation reasons
+   - Short and long validation explanations
+   - Helps understand why certain songs were rejected
+   - Foundation Model-based validation explanations
+
+16. **Comprehensive Testing Architecture** ✅
+   - 258 passing tests (100% success rate)
+   - Protocol-based dependency injection for all services (PR #77)
+   - OpenAI API safety checks to prevent accidental network calls
+   - Mock implementations for all major services
+   - TestFixtures for consistent test data
+   - Testing safety documentation
 
 ### Not Yet Implemented
 - Playlist export to Apple Music
@@ -144,12 +184,14 @@ Back2Back/
 │   ├── Back2BackApp.swift       # App entry point with B2BLog initialization
 │   ├── ContentView.swift        # Main tab navigation (Session, Personas, Config)
 │   ├── SecretsTemplate.swift    # Template for API keys configuration
+│   ├── ServiceContainer.swift   # Dependency injection container for all services
 │   ├── Models/
 │   │   ├── MusicModels.swift           # MusicSearchResult, NowPlayingItem, error types
 │   │   ├── PersonaModels.swift         # Persona and PersonaGenerationResult
 │   │   ├── PersonaSongCache.swift      # CachedSong, PersonaSongCache (LRU cache)
 │   │   ├── DirectionChange.swift       # Direction change prompt and button label
 │   │   ├── AIModelConfig.swift         # AI model configuration and persistence
+│   │   ├── StatusMessageModels.swift   # StatusMessages, CachedStatusMessages
 │   │   ├── OpenAIModels.swift          # Core OpenAI API types
 │   │   ├── OpenAIModels+Core.swift     # Base request/response types
 │   │   ├── OpenAIModels+Components.swift  # Message, ToolCall, etc.
@@ -167,6 +209,8 @@ Back2Back/
 │   │   ├── MusicSearchView.swift         # Search UI with debounced input
 │   │   ├── NowPlayingView.swift          # Mini/expanded player with interactive controls
 │   │   ├── SessionView.swift             # DJ session UI with history/queue
+│   │   ├── FavoritesListView.swift       # Favorites list with swipe-to-delete
+│   │   ├── FavoriteSongRow.swift         # Favorite song row UI
 │   │   ├── PersonasListView.swift        # Persona management list
 │   │   ├── PersonaDetailView.swift       # Edit/create persona
 │   │   ├── ConfigurationView.swift       # AI model settings and debug tools
@@ -182,18 +226,20 @@ Back2Back/
 │   │       └── SourcesListView.swift
 │   ├── Services/
 │   │   ├── MusicService.swift            # Facade pattern MusicKit wrapper (@MainActor)
-│   │   ├── SessionService.swift          # Session state coordination
+│   │   ├── SessionService.swift          # Session state coordination (consolidated)
 │   │   ├── PersonaService.swift          # Persona CRUD operations
 │   │   ├── PersonaSongCacheService.swift # LRU song repetition prevention
+│   │   ├── FavoritesService.swift        # Favorites management (@Observable)
+│   │   ├── StatusMessageService.swift    # Dynamic AI status messages
 │   │   ├── EnvironmentService.swift      # Secure API key management
-│   │   ├── MusicKit/             # (NEW) MusicKit service layer
+│   │   ├── MusicKit/             # MusicKit service layer
 │   │   │   ├── MusicAuthService.swift    # Authorization handling
 │   │   │   ├── MusicSearchService.swift  # Catalog search with pagination
 │   │   │   └── MusicPlaybackService.swift # Playback, seek, skip controls
-│   │   ├── Session/              # (NEW) Session management services
+│   │   ├── Session/              # Session management services
 │   │   │   ├── QueueManager.swift        # Queue operations
 │   │   │   └── SessionHistoryService.swift # History tracking
-│   │   ├── OpenAI/               # (NEW) OpenAI service layer
+│   │   ├── OpenAI/               # OpenAI service layer
 │   │   │   ├── Core/
 │   │   │   │   ├── OpenAIClient.swift    # HTTP client
 │   │   │   │   └── OpenAIConfig.swift    # Configuration
@@ -206,15 +252,20 @@ Back2Back/
 │   │   └── MusicMatching/
 │   │       ├── MusicMatchingProtocol.swift      # Matcher interface
 │   │       ├── StringBasedMusicMatcher.swift    # Fuzzy string matching
-│   │       └── LLMBasedMusicMatcher.swift       # Future LLM matcher (stub)
+│   │       └── LLMBasedMusicMatcher.swift       # FoundationModels-based matcher
 │   ├── ViewModels/
+│   │   ├── ContentViewModel.swift        # Main content view coordination
 │   │   ├── MusicAuthViewModel.swift      # Auth state management
 │   │   ├── MusicSearchViewModel.swift    # Search with 0.75s debouncing
-│   │   ├── SessionViewModel.swift        # DJ session logic, AI coordination, direction changes
+│   │   ├── SessionViewModel.swift        # DJ session logic, AI coordination
+│   │   ├── SessionHeaderViewModel.swift  # Session header display logic
+│   │   ├── SessionHistoryViewModel.swift # Session history list logic
+│   │   ├── SessionActionButtonsViewModel.swift # Session action buttons (AI Starts, Direction Change)
 │   │   ├── NowPlayingViewModel.swift     # Playback state with live tracking
+│   │   ├── FavoritesViewModel.swift      # Favorites list management
 │   │   ├── PersonasViewModel.swift       # Persona list management
 │   │   ├── PersonaDetailViewModel.swift  # Persona editing/creation
-│   │   └── ViewModelError.swift          # (NEW) Unified error handling protocol
+│   │   └── ViewModelError.swift          # Unified error handling protocol
 │   ├── Utils/
 │   │   ├── Logger.swift          # B2BLog unified logging system
 │   │   └── AIRetryStrategy.swift # (NEW) Generic AI retry logic
@@ -305,18 +356,82 @@ This error occurs when automatic token generation fails. Common causes:
 - Handle user privacy appropriately (don't store unnecessary listening data)
 
 ## Build & Run Commands
+
+**IMPORTANT BUILD NOTE**: This is an iOS-only app. Building without specifying a destination will default to macOS and ALWAYS FAIL with provisioning profile errors. This is expected behavior - not a project configuration issue.
+
+### Correct Build Commands
 ```bash
-# Build the project
-xcodebuild -project Back2Back.xcodeproj -scheme Back2Back -configuration Debug build
+# DO NOT USE - Will fail with provisioning errors (defaults to macOS)
+# xcodebuild -project Back2Back.xcodeproj -scheme Back2Back -configuration Debug build
+
+# CORRECT: Build for iOS Simulator (requires valid simulator name)
+xcodebuild -project Back2Back.xcodeproj -scheme Back2Back -configuration Debug \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+
+# CORRECT: Build for physical device (requires provisioning profile)
+xcodebuild -project Back2Back.xcodeproj -scheme Back2Back -configuration Debug \
+  -destination 'platform=iOS,name=Your iPhone' build
 
 # Run unit tests (Swift Testing framework)
-xcodebuild test -project Back2Back.xcodeproj -scheme Back2Back -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+xcodebuild test -project Back2Back.xcodeproj -scheme Back2Back \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+
+# List available simulators to find valid device names
+xcrun simctl list devices available
 
 # Clean build folder
 xcodebuild clean -project Back2Back.xcodeproj -scheme Back2Back
 ```
 
+### Why the Build "Fails"
+- Back2Back is iOS-only (not a universal app)
+- Building without `-destination` defaults to macOS
+- The provisioning profile error **"doesn't include the currently selected device 'Peej MacBook Pro'"** is expected
+- **This is NOT a bug** - it's the correct behavior for an iOS-only app
+- Always specify `-destination 'platform=iOS Simulator,name=...'` when building
+
+### Best Practice for Verification
+Instead of building, prefer running tests which automatically use the correct destination:
+```bash
+# This is the preferred way to verify code changes
+xcodebuild test -project Back2Back.xcodeproj -scheme Back2Back \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+```
+
 ## Recent Improvements (September-October 2025)
+
+### MVVM Architecture Refactoring (PRs #56, #57, #66, #73, #75, #76, October 2025)
+Complete MVVM separation and architecture cleanup:
+- **Single Source of Truth**: Consolidated SessionState into SessionService (PR #73, #76)
+- **Eliminated Dual @Observable Pattern**: Merged SessionState into SessionService (PR #57)
+- **Complete MVVM Separation**: Views only observe ViewModels, never Services directly (PR #75)
+- **ServiceContainer**: Centralized dependency injection container for all services
+- **Environment-based DI**: Services accessible via `.environment(\.services)` modifier
+- **Granular ViewModels**: Split SessionViewModel into focused components:
+  - SessionHeaderViewModel - Session header display
+  - SessionHistoryViewModel - History list management
+  - SessionActionButtonsViewModel - Action buttons (AI Starts, Direction Change)
+- **Dead Code Removal**: Removed obsolete code replaced by SessionState (PR #74)
+- **Benefits**: Clearer data flow, easier testing, consistent architecture patterns
+
+### Comprehensive Testing Upgrade (PR #77, October 2025)
+Complete testing architecture overhaul:
+- **258 passing tests** (100% success rate)
+- **Protocol-based Dependency Injection**: All services now injectable via protocols
+- **Mock Infrastructure**: Complete mock implementations for all major services:
+  - MockMusicService, MockAIRecommendationService, MockSessionStateManager
+  - MockPlaybackCoordinator, MockTurnManager, MockAISongCoordinator
+  - MockOpenAIClient with configurable responses
+- **TestFixtures**: Consistent test data (MockSong, sample personas, test configurations)
+- **OpenAI API Safety**: Prevents accidental network calls during tests
+- **Testing Safety Documentation**: `Back2BackTests/TestingSafety.md`
+
+### Task Cancellation Improvements (PR #78, October 2025)
+Fixed task cancellation issues with proper Swift concurrency patterns:
+- **Replaced Task ID Superseding**: Proper Swift task cancellation instead of custom ID tracking
+- **Eliminated Cancellation Bleeding**: Task.isCancelled doesn't affect new tasks
+- **Cleaner Code**: Removed complex task ID validation logic
+- **Better Race Condition Handling**: Native Swift cancellation is more reliable
 
 ### Dynamic Direction Change Button (PR #38, October 2025)
 Intelligent AI-powered session steering feature:
@@ -400,7 +515,7 @@ Enhanced verification between AI recommendations and Apple Music search:
 
 ### Logging System (B2BLog)
 The app uses a comprehensive logging system with OSLog:
-- **Subsystems**: musicKit, auth, search, playback, ui, network, ai, session, general
+- **Subsystems**: musicKit, auth, search, playback, ui, network, ai, session, general, firstSelectionCache
 - **Log Levels**: trace, debug, info, notice, warning, error
 - **Special Methods**:
   - `performance(metric, value)` for performance metrics
@@ -408,6 +523,7 @@ The app uses a comprehensive logging system with OSLog:
   - `stateChange(from, to)` for state transitions
   - `apiCall(endpoint)` for network requests
   - `success(message)` for successful operations
+- **FirstSelectionCache**: Dedicated category for debugging "AI Starts" pre-caching
 
 ### Performance Optimizations
 - **Search Debouncing**: 0.75s delay using Combine's debounce operator

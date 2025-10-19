@@ -37,6 +37,21 @@ Back2Back transforms music listening into a collaborative DJ experience. Users p
   - Suggests dramatic contrasts (different eras, regions, tempos, moods)
   - Smart button labels like "West Coast vibes", "60s garage rock"
   - Automatically regenerates as session evolves
+  - Proper task cancellation prevents race conditions (PR #78)
+- **AI Starts Button**: Pre-caches first song for instant playback (PR #82)
+  - Background pre-fetching eliminates wait time
+  - Dedicated FirstSelectionCache logging for debugging
+  - Seamless session start experience
+- **Dynamic Status Messages**: Persona-specific AI thinking messages
+  - Generated using Apple FoundationModels framework
+  - Genre-specific messages (e.g., "Digging through crates..." for hip-hop)
+  - Cached with usage-based regeneration (every 3 uses)
+  - Non-blocking fire-and-forget generation pattern
+- **Favorites System**: Save and manage favorite songs
+  - Heart icon in session history to favorite songs
+  - Dedicated Favorites tab with swipe-to-delete
+  - Tracks persona association with each favorite
+  - UserDefaults persistence
 
 #### Advanced Song Matching
 - **StringBasedMusicMatcher**: Fuzzy matching with sophisticated normalization
@@ -44,8 +59,11 @@ Back2Back transforms music listening into a collaborative DJ experience. Users p
   - Artist variations (featuring artists, "The" prefix, ampersands, abbreviations)
   - Title cleaning (parentheticals, part numbers, remaster tags)
   - Confidence scoring requiring BOTH artist AND title matches
+- **LLMBasedMusicMatcher**: Apple FoundationModels-powered matching (PR #42, #47)
+  - AI-based track matching for difficult cases
+  - Foundation Model validation to verify persona alignment (PR #48, #49)
 - **AI Retry Logic**: Automatic retry when no good match is found
-- **Protocol-based Architecture**: Easy to swap for LLM-based matching in future
+- **Protocol-based Architecture**: MusicMatchingProtocol for swappable strategies
 
 #### Session Management
 - **Full Session History**: Track all played and queued songs
@@ -53,30 +71,36 @@ Back2Back transforms music listening into a collaborative DJ experience. Users p
 - **Turn Visualization**: Clear indication of whose turn (User/AI)
 - **Session Persistence**: Maintains state throughout app lifecycle
 
-#### Time-Based Repetition Prevention
-- **24-Hour Song Cache**: Prevents personas from repeating songs across sessions
+#### Count-Based LRU Song Repetition Prevention
+- **LRU Cache**: Prevents personas from repeating their most recent N songs (default: 50)
+- **Configurable Cache Size**: User can adjust from 10-500 songs in settings
 - **Per-Persona Tracking**: Each persona has independent cache
-- **Automatic Expiration**: Songs older than 24 hours are automatically excluded
-- **Debug Tools**: Clear cache button in configuration settings
+- **Automatic Eviction**: Oldest songs automatically removed when limit reached
+- **Persona Song Cache UI**: View and manage cached songs per persona (PR #83)
+- **Debug Tools**: Clear cache button and cache viewer in configuration
 
 #### Core Infrastructure
-- Comprehensive logging system using OSLog with 9 subsystem categories
+- Comprehensive logging system using OSLog with 10 subsystem categories (including FirstSelectionCache)
 - Swift 6+ concurrency with async/await patterns throughout
 - Non-blocking UI updates using Swift Concurrency
-- MVVM + Coordinators architecture with clear separation of concerns
+- Clean MVVM architecture with complete View/ViewModel separation (PR #75)
+- ServiceContainer with environment-based dependency injection
 - Protocol-oriented design for testability and flexibility
 - Facade pattern for service layer organization
 - Secure API key management via EnvironmentService
+- 258 passing unit tests (100% success rate) with comprehensive mocks (PR #77)
 
 #### User Interface
-- Tab-based navigation: Session, Personas, Configuration
+- Tab-based navigation: Session, Favorites, Personas, Configuration
 - Clean SwiftUI-based interface with smooth animations
 - Authorization view with Settings deep-linking
 - Real-time search with debounced results
 - Now Playing mini-player and expanded view
 - Session view with history and queue display
+- Favorites list with swipe-to-delete and heart icon
 - Persona management with create/edit/delete
-- Configuration UI for AI model settings
+- Configuration UI for AI model settings and cache management
+- Song Errors view for debugging failed AI selections (PR #51)
 
 ### Planned Future Features
 - **Playlist Export** - Save sessions as Apple Music playlists
@@ -411,14 +435,59 @@ Comprehensive test coverage includes:
 
 ## Recent Updates (September-October 2025)
 
+### MVVM Architecture Refactoring (PRs #56, #57, #66, #73, #75, #76, October 2025)
+Complete architecture cleanup and modernization:
+- **Single Source of Truth**: Consolidated SessionState into SessionService
+- **Eliminated Dual @Observable**: Merged duplicate observable patterns
+- **Complete MVVM Separation**: Views only observe ViewModels, never Services
+- **ServiceContainer**: Centralized dependency injection with environment-based access
+- **Granular ViewModels**: Split monolithic ViewModels into focused components
+- **Dead Code Removal**: Cleaned up obsolete patterns and files
+- **Benefits**: Clearer data flow, easier testing, consistent patterns
+
+### Comprehensive Testing Upgrade (PR #77, October 2025)
+Professional-grade testing infrastructure:
+- **258 passing tests** (100% success rate)
+- **Protocol-based DI**: All services injectable for testing
+- **Complete Mocks**: MockMusicService, MockAIRecommendationService, MockSessionStateManager, etc.
+- **TestFixtures**: Consistent test data across all tests
+- **OpenAI Safety**: Prevents accidental network calls during tests
+- **Testing Documentation**: Comprehensive safety guidelines
+
+### Task Cancellation Improvements (PR #78, October 2025)
+Proper Swift concurrency patterns:
+- **Native Cancellation**: Replaced custom task ID tracking with Swift task cancellation
+- **Eliminated Race Conditions**: Task.isCancelled properly isolates tasks
+- **Cleaner Code**: Removed complex validation logic
+- **More Reliable**: Native Swift cancellation is better tested
+
+### Persona Song Cache UI (PR #83, October 2025)
+Visual cache management:
+- **Cache Viewer**: See all cached songs per persona
+- **Editor Interface**: Remove individual songs from cache
+- **Visual Feedback**: Clear display of cache state
+- **Debug Tools**: Enhanced cache inspection capabilities
+
+### First Song Pre-caching (PR #82, October 2025)
+Instant "AI Starts" playback:
+- **Background Pre-fetching**: AI selects first song before user taps button
+- **Eliminates Wait Time**: Instant playback when starting with AI
+- **Dedicated Logging**: FirstSelectionCache category for debugging
+- **Seamless UX**: No more waiting for AI to think on first selection
+
+### Count-Based LRU Cache (PR #80, October 2025)
+Replaced time-based cache with count-based:
+- **LRU Eviction**: Keeps most recent N songs (default: 50)
+- **Configurable**: User adjustable from 10-500 songs
+- **Predictable**: Behavior independent of session frequency
+- **Memory Efficient**: Bounded cache size prevents unbounded growth
+
 ### Dynamic Direction Change Button (PR #38, October 2025)
 Intelligent session steering with AI-powered suggestions:
 - **Contextual Analysis**: GPT-5-mini examines session history to identify patterns
 - **Contrasting Suggestions**: Proposes dramatic direction changes (different eras, regions, styles)
 - **Smart Labels**: Context-aware button text like "West Coast vibes", "Downtempo shift"
 - **Automatic Updates**: Regenerates when songs play or button is tapped
-- **Race Condition Prevention**: Task ID-based coordination prevents cancellation issues
-- **Bug Fixes**: Addressed task cancellation bleeding, retry loops, state race conditions
 
 ### Simplified Queue Management (PR #36, October 2025)
 Complete overhaul for smoother playback experience:
