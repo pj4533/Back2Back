@@ -8,13 +8,17 @@
 
 import SwiftUI
 import MusicKit
+import OSLog
 
 struct SongSelectionDetailsView: View {
     let sessionSong: SessionSong
     let debugInfo: SongDebugInfo?
 
+    @State private var showingFormatSheet = false
     @State private var showingShareSheet = false
-    @State private var shareText = ""
+    @State private var exportFileURLs: [URL] = []
+
+    private let exportService = FileExportService()
 
     var body: some View {
         Group {
@@ -61,14 +65,19 @@ struct SongSelectionDetailsView: View {
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
-                            shareDebugInfo(debugInfo)
+                            showingFormatSheet = true
                         } label: {
-                            Label("Share", systemImage: "square.and.arrow.up")
+                            Label("Export", systemImage: "square.and.arrow.up")
                         }
                     }
                 }
-                .sheet(isPresented: $showingShareSheet) {
-                    ShareSheet(items: [shareText])
+                .sheet(isPresented: $showingFormatSheet) {
+                    ExportFormatSheet { format in
+                        exportDebugInfo(debugInfo, format: format)
+                    }
+                }
+                .sheet(isPresented: $showingShareSheet, onDismiss: cleanupExportFiles) {
+                    FileShareSheet(fileURLs: exportFileURLs, onComplete: cleanupExportFiles)
                 }
             } else {
                 ContentUnavailableView(
@@ -453,23 +462,58 @@ struct SongSelectionDetailsView: View {
         }
     }
 
-    // MARK: - Share Functionality
+    // MARK: - Export Functionality
 
-    private func shareDebugInfo(_ debugInfo: SongDebugInfo) {
-        let report = debugInfo.generateReport()
-        let json = debugInfo.generateJSON()
+    private func exportDebugInfo(_ debugInfo: SongDebugInfo, format: FileExportService.ExportFormat) {
+        // Generate filename from song info
+        let artist = sessionSong.song.artistName ?? "Unknown"
+        let title = sessionSong.song.title
+        let baseFilename = "Back2Back_Debug_\(artist)_\(title)"
 
-        shareText = """
-        === Text Report ===
+        do {
+            let content: String
 
-        \(report)
+            switch format {
+            case .text:
+                content = debugInfo.generateReport()
 
-        === JSON Export ===
+            case .json:
+                content = debugInfo.generateJSON()
 
-        \(json)
-        """
+            case .combined:
+                let report = debugInfo.generateReport()
+                let json = debugInfo.generateJSON()
+                content = """
+                === Text Report ===
 
-        showingShareSheet = true
+                \(report)
+
+                === JSON Export ===
+
+                \(json)
+                """
+            }
+
+            // Create temporary file
+            let fileURL = try exportService.createTemporaryFile(
+                content: content,
+                filename: baseFilename,
+                format: format
+            )
+
+            // Store URL and show share sheet
+            exportFileURLs = [fileURL]
+            showingShareSheet = true
+
+        } catch {
+            B2BLog.general.error("Failed to export debug info: \(error.localizedDescription)")
+            // TODO: Show error alert to user
+        }
+    }
+
+    private func cleanupExportFiles() {
+        exportService.cleanupFiles(exportFileURLs)
+        exportFileURLs.removeAll()
     }
 }
 
@@ -483,19 +527,6 @@ extension View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
-}
-
-// MARK: - Share Sheet
-
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Preview
