@@ -14,6 +14,7 @@ struct SessionHistoryListView: View {
     let sessionViewModel: SessionViewModel
     let favoritesService: FavoritesService
     let personaService: PersonaService
+    let songDebugService: SongDebugService
 
     var body: some View {
         if viewModel.isEmpty {
@@ -25,55 +26,65 @@ struct SessionHistoryListView: View {
             .frame(maxHeight: .infinity)
         } else {
             ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        // Show history (played songs)
-                        ForEach(viewModel.sessionHistory) { sessionSong in
-                            SessionSongRow(
-                                sessionSong: sessionSong,
-                                sessionViewModel: sessionViewModel,
-                                favoritesService: favoritesService,
-                                personaService: personaService
-                            )
-                                // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
-                                // SwiftUI needs to know when status changes on same song
-                                .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                                    removal: .opacity
-                                ))
-                        }
-
-                        // Show AI loading cell if AI is thinking
-                        if viewModel.isAIThinking {
-                            AILoadingCell()
-                                .id("ai-loading")
-                                .transition(.asymmetric(
-                                    insertion: .scale.combined(with: .opacity),
-                                    removal: .scale.combined(with: .opacity)
-                                ))
-                        }
-
-                        // Show queue (upcoming songs)
-                        ForEach(viewModel.songQueue) { sessionSong in
-                            SessionSongRow(
-                                sessionSong: sessionSong,
-                                sessionViewModel: sessionViewModel,
-                                favoritesService: favoritesService,
-                                personaService: personaService
-                            )
-                                // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
-                                // SwiftUI needs to know when status changes on same song
-                                .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                                    removal: .opacity
-                                ))
-                        }
+                List {
+                    // Show history (played songs)
+                    ForEach(viewModel.sessionHistory) { sessionSong in
+                        SessionSongRow(
+                            sessionSong: sessionSong,
+                            sessionViewModel: sessionViewModel,
+                            favoritesService: favoritesService,
+                            personaService: personaService,
+                            songDebugService: songDebugService
+                        )
+                        // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
+                        // SwiftUI needs to know when status changes on same song
+                        .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            removal: .opacity
+                        ))
                     }
-                    .padding()
-                    .animation(.spring(response: 0.3), value: viewModel.totalCount)
+
+                    // Show AI loading cell if AI is thinking
+                    if viewModel.isAIThinking {
+                        AILoadingCell()
+                            .id("ai-loading")
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .transition(.asymmetric(
+                                insertion: .scale.combined(with: .opacity),
+                                removal: .scale.combined(with: .opacity)
+                            ))
+                    }
+
+                    // Show queue (upcoming songs)
+                    ForEach(viewModel.songQueue) { sessionSong in
+                        SessionSongRow(
+                            sessionSong: sessionSong,
+                            sessionViewModel: sessionViewModel,
+                            favoritesService: favoritesService,
+                            personaService: personaService,
+                            songDebugService: songDebugService
+                        )
+                        // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
+                        // SwiftUI needs to know when status changes on same song
+                        .id("\(sessionSong.id)-\(sessionSong.queueStatus.description)")
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            removal: .opacity
+                        ))
+                    }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .animation(.spring(response: 0.3), value: viewModel.totalCount)
                 .onChange(of: viewModel.totalCount) { _, _ in
                     withAnimation {
                         // Scroll to last item (whether AI loading, queue, or history)

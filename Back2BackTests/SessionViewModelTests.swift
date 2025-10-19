@@ -41,6 +41,7 @@ struct SessionViewModelTests {
             openAIClient: realOpenAIClient,
             musicMatcher: musicMatcher
         )
+        let songDebugService = SongDebugService()
 
         let aiSongCoordinator = AISongCoordinator(
             openAIClient: mockAIClient,
@@ -52,7 +53,8 @@ struct SessionViewModelTests {
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
             songErrorLoggerService: songErrorLoggerService,
-            firstSongCacheService: firstSongCacheService
+            firstSongCacheService: firstSongCacheService,
+            songDebugService: songDebugService
         )
 
         let viewModel = SessionViewModel(

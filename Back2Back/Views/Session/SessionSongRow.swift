@@ -15,6 +15,10 @@ struct SessionSongRow: View {
     let sessionViewModel: SessionViewModel
     let favoritesService: FavoritesService
     let personaService: PersonaService
+    let songDebugService: SongDebugService
+
+    // State for navigation to details view
+    @State private var showingDetails = false
 
     // Add computed property to force view updates when queue status changes
     private var statusId: String {
@@ -41,6 +45,23 @@ struct SessionSongRow: View {
                         await sessionViewModel.skipToQueuedSong(sessionSong)
                     }
                 }
+            }
+            .swipeActions(edge: .leading) {
+                if sessionSong.selectedBy == .ai {
+                    Button {
+                        B2BLog.ui.info("User swiped to view details for: \(sessionSong.song.title)")
+                        showingDetails = true
+                    } label: {
+                        Label("Details", systemImage: "info.circle")
+                    }
+                    .tint(.purple)
+                }
+            }
+            .navigationDestination(isPresented: $showingDetails) {
+                SongSelectionDetailsView(
+                    sessionSong: sessionSong,
+                    debugInfo: songDebugService.getDebugInfo(for: sessionSong.id)
+                )
             }
     }
 

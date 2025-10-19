@@ -43,6 +43,7 @@ struct AISongCoordinatorTests {
             openAIClient: openAIClient,
             musicMatcher: musicMatcher
         )
+        let songDebugService = SongDebugService()
 
         let coordinator = AISongCoordinator(
             openAIClient: openAIClient,
@@ -54,7 +55,8 @@ struct AISongCoordinatorTests {
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
             songErrorLoggerService: songErrorLoggerService,
-            firstSongCacheService: firstSongCacheService
+            firstSongCacheService: firstSongCacheService,
+            songDebugService: songDebugService
         )
 
         return (coordinator, openAIClient, sessionService, musicService)

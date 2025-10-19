@@ -23,6 +23,7 @@ final class ServiceContainer {
     let toastService: ToastService
     let favoritesService: FavoritesService
     let songErrorLoggerService: SongErrorLoggerService
+    let songDebugService: SongDebugService
 
     // MARK: - OpenAI Services (depends on EnvironmentService)
 
@@ -72,6 +73,7 @@ final class ServiceContainer {
         toastService = ToastService()
         favoritesService = FavoritesService()
         songErrorLoggerService = SongErrorLoggerService()
+        songDebugService = SongDebugService()
 
         B2BLog.general.debug("✅ Core services initialized")
 
@@ -137,7 +139,8 @@ final class ServiceContainer {
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
             songErrorLoggerService: songErrorLoggerService,
-            firstSongCacheService: firstSongCacheService
+            firstSongCacheService: firstSongCacheService,
+            songDebugService: songDebugService
         )
 
         B2BLog.general.debug("✅ Coordinators initialized")
