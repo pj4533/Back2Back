@@ -19,6 +19,7 @@ protocol MusicServiceProtocol {
     func skipToNext() async throws
     func skipToPrevious() async throws
     func clearQueue()
+    func stop()
     func getCurrentPlaybackTime() -> TimeInterval
     func seek(to time: TimeInterval) async throws
     func skipForward(_ seconds: TimeInterval) async throws

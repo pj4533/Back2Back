@@ -234,6 +234,25 @@ final class SessionViewModel {
         lastDirectionGenerationSongId = nil
     }
 
+    /// Reset the entire DJ session
+    func resetSession() {
+        B2BLog.session.info("👤 User requested session reset")
+
+        // Cancel any AI operations
+        aiSongCoordinator.cancelPrefetch()
+
+        // Stop playback and clear music queue
+        musicService.stop()
+
+        // Reset session state
+        sessionService.resetSession()
+
+        // Clear direction change cache
+        clearDirectionCache()
+
+        B2BLog.session.info("✅ Session reset complete")
+    }
+
     // MARK: - Private Methods
 
     private func playCurrentSong(_ song: Song) async {

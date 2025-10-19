@@ -104,6 +104,10 @@ class MusicService: MusicServiceProtocol {
         playbackService.clearQueue()
     }
 
+    func stop() {
+        playbackService.stop()
+    }
+
     func getCurrentPlaybackTime() -> TimeInterval {
         playbackService.getCurrentPlaybackTime()
     }
