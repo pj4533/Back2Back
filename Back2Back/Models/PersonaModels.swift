@@ -41,11 +41,13 @@ struct CachedFirstSelection: Codable, Equatable {
     let recommendation: SongRecommendation
     let cachedAt: Date
     let appleMusicSong: SimplifiedSong?
+    let debugInfoId: UUID?  // Reference to debug info in SongDebugService
 
-    init(recommendation: SongRecommendation, cachedAt: Date = Date(), appleMusicSong: SimplifiedSong?) {
+    init(recommendation: SongRecommendation, cachedAt: Date = Date(), appleMusicSong: SimplifiedSong?, debugInfoId: UUID? = nil) {
         self.recommendation = recommendation
         self.cachedAt = cachedAt
         self.appleMusicSong = appleMusicSong
+        self.debugInfoId = debugInfoId
     }
 }
 

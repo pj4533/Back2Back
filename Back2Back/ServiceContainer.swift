@@ -42,15 +42,15 @@ final class ServiceContainer {
 
     let sessionService: SessionService
 
-    // MARK: - Cache Services (depends on multiple services)
-
-    let firstSongCacheService: FirstSongCacheService
-
     // MARK: - Coordinators (depends on multiple services)
 
     let playbackCoordinator: PlaybackCoordinator
     let turnManager: TurnManager
     let aiSongCoordinator: AISongCoordinator
+
+    // MARK: - Cache Services (depends on coordinators)
+
+    let firstSongCacheService: FirstSongCacheService
 
     // MARK: - ViewModels (depends on services and coordinators)
 
@@ -101,23 +101,6 @@ final class ServiceContainer {
 
         B2BLog.general.debug("✅ Session service initialized")
 
-        // Step 5.5: Initialize first song cache service (depends on PersonaService, MusicService, OpenAIClient)
-        // Create music matcher for first song cache (using default config)
-        let cacheServiceMusicMatcher = Self.createMusicMatcher(
-            musicService: musicService,
-            personaService: personaService,
-            songErrorLoggerService: songErrorLoggerService
-        )
-
-        firstSongCacheService = FirstSongCacheService(
-            personaService: personaService,
-            musicService: musicService,
-            openAIClient: openAIClient,
-            musicMatcher: cacheServiceMusicMatcher
-        )
-
-        B2BLog.general.debug("✅ First song cache service initialized")
-
         // Step 6: Initialize coordinators (depend on multiple services)
         playbackCoordinator = PlaybackCoordinator(
             musicService: musicService,
@@ -139,11 +122,20 @@ final class ServiceContainer {
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
             songErrorLoggerService: songErrorLoggerService,
-            firstSongCacheService: firstSongCacheService,
             songDebugService: songDebugService
         )
 
         B2BLog.general.debug("✅ Coordinators initialized")
+
+        // Step 6.5: Initialize first song cache service (depends on AISongCoordinator)
+        firstSongCacheService = FirstSongCacheService(
+            personaService: personaService,
+            musicService: musicService,
+            aiSongCoordinator: aiSongCoordinator,
+            songDebugService: songDebugService
+        )
+
+        B2BLog.general.debug("✅ First song cache service initialized")
 
         // Step 7: Initialize view models (depend on services and coordinators)
         sessionViewModel = SessionViewModel(
@@ -152,7 +144,8 @@ final class ServiceContainer {
             playbackCoordinator: playbackCoordinator,
             aiSongCoordinator: aiSongCoordinator,
             turnManager: turnManager,
-            openAIClient: openAIClient
+            openAIClient: openAIClient,
+            songDebugService: songDebugService
         )
 
         personasViewModel = PersonasViewModel(

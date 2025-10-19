@@ -32,17 +32,6 @@ struct AISongCoordinatorTests {
         let songErrorLoggerService = SongErrorLoggerService()
         _ = FavoritesService()  // Not used yet but needed for initialization
 
-        let musicMatcher = StringBasedMusicMatcher(
-            musicService: musicService,
-            personaService: personaService,
-            songErrorLoggerService: songErrorLoggerService
-        )
-        let firstSongCacheService = FirstSongCacheService(
-            personaService: personaService,
-            musicService: musicService,
-            openAIClient: openAIClient,
-            musicMatcher: musicMatcher
-        )
         let songDebugService = SongDebugService()
 
         let coordinator = AISongCoordinator(
@@ -55,9 +44,17 @@ struct AISongCoordinatorTests {
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
             songErrorLoggerService: songErrorLoggerService,
-            firstSongCacheService: firstSongCacheService,
             songDebugService: songDebugService
         )
+
+        // FirstSongCacheService now depends on coordinator, so create it after
+        let firstSongCacheService = FirstSongCacheService(
+            personaService: personaService,
+            musicService: musicService,
+            aiSongCoordinator: coordinator,
+            songDebugService: songDebugService
+        )
+        _ = firstSongCacheService  // Keep compiler happy (not used in tests yet)
 
         return (coordinator, openAIClient, sessionService, musicService)
     }

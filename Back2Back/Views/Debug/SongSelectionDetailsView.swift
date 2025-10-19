@@ -159,6 +159,9 @@ struct SongSelectionDetailsView: View {
 
     @ViewBuilder
     private func searchResultRow(_ result: SearchResultInfo, index: Int) -> some View {
+        // Compute wasSelected from matchingPhase.selectedResultId (single source of truth)
+        let wasSelected = debugInfo?.matchingPhase.selectedResultId == result.id
+
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("\(result.ranking + 1).")
@@ -170,9 +173,9 @@ struct SongSelectionDetailsView: View {
                     HStack {
                         Text(result.title)
                             .font(.body)
-                            .fontWeight(result.wasSelected ? .bold : .regular)
+                            .fontWeight(wasSelected ? .bold : .regular)
 
-                        if result.wasSelected {
+                        if wasSelected {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                                 .font(.caption)
@@ -200,7 +203,7 @@ struct SongSelectionDetailsView: View {
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
-            .background(result.wasSelected ? Color.green.opacity(0.1) : Color(.systemGray6))
+            .background(wasSelected ? Color.green.opacity(0.1) : Color(.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }

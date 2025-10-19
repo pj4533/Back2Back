@@ -30,17 +30,6 @@ struct SessionViewModelTests {
         let songErrorLoggerService = SongErrorLoggerService()
         let favoritesService = FavoritesService()
 
-        let musicMatcher = StringBasedMusicMatcher(
-            musicService: musicService,
-            personaService: personaService,
-            songErrorLoggerService: songErrorLoggerService
-        )
-        let firstSongCacheService = FirstSongCacheService(
-            personaService: personaService,
-            musicService: musicService,
-            openAIClient: realOpenAIClient,
-            musicMatcher: musicMatcher
-        )
         let songDebugService = SongDebugService()
 
         let aiSongCoordinator = AISongCoordinator(
@@ -53,9 +42,17 @@ struct SessionViewModelTests {
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
             songErrorLoggerService: songErrorLoggerService,
-            firstSongCacheService: firstSongCacheService,
             songDebugService: songDebugService
         )
+
+        // FirstSongCacheService now depends on coordinator, so create it after
+        let firstSongCacheService = FirstSongCacheService(
+            personaService: personaService,
+            musicService: musicService,
+            aiSongCoordinator: aiSongCoordinator,
+            songDebugService: songDebugService
+        )
+        _ = firstSongCacheService  // Keep compiler happy (not used in tests yet)
 
         let viewModel = SessionViewModel(
             musicService: musicService,
@@ -63,7 +60,8 @@ struct SessionViewModelTests {
             playbackCoordinator: playbackCoordinator,
             aiSongCoordinator: aiSongCoordinator,
             turnManager: turnManager,
-            openAIClient: mockAIClient
+            openAIClient: mockAIClient,
+            songDebugService: songDebugService
         )
 
         return (viewModel, musicService, sessionService)
