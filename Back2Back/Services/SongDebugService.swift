@@ -15,36 +15,19 @@ import Observation
 final class SongDebugService: SongDebugServiceProtocol {
     private let userDefaults = UserDefaults.standard
     private let debugInfoKey = "com.back2back.songDebugInfo"
-    private let enabledKey = "com.back2back.songDebugEnabled"
     private let maxEntries = 50
 
     private(set) var debugInfo: [UUID: SongDebugInfo] = [:]
 
-    /// Whether debug tracking is enabled (opt-in)
-    var isEnabled: Bool {
-        get {
-            userDefaults.bool(forKey: enabledKey)
-        }
-        set {
-            userDefaults.set(newValue, forKey: enabledKey)
-            B2BLog.session.info("Song debug tracking \(newValue ? "enabled" : "disabled")")
-        }
-    }
-
     init() {
         loadDebugInfo()
-        B2BLog.session.info("SongDebugService initialized (enabled: \(self.isEnabled), entries: \(self.debugInfo.count))")
+        B2BLog.session.info("SongDebugService initialized (entries: \(self.debugInfo.count))")
     }
 
     // MARK: - Public API
 
     /// Log comprehensive debug information for a song selection
     func logDebugInfo(_ info: SongDebugInfo) {
-        guard isEnabled else {
-            B2BLog.session.debug("Debug tracking disabled, skipping log for song \(info.id)")
-            return
-        }
-
         debugInfo[info.id] = info
 
         // FIFO eviction: Keep only the most recent maxEntries

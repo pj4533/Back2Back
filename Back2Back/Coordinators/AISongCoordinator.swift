@@ -204,50 +204,48 @@ final class AISongCoordinator {
             return
         }
 
-        // Create debug builder if debug tracking is enabled
+        // Create debug builder to track song selection process
         // We'll set the session song ID after the song is queued
-        var debugBuilder: SongDebugInfoBuilder? = songDebugService.isEnabled ? SongDebugInfoBuilder(sessionSongId: UUID()) : nil
+        var debugBuilder: SongDebugInfoBuilder? = SongDebugInfoBuilder(sessionSongId: UUID())
 
         // Capture session context
-        if let debugBuilder = debugBuilder {
-            let recentSongs = sessionService.sessionHistory.suffix(5).map { sessionSong in
-                RecentSongInfo(
-                    title: sessionSong.song.title,
-                    artist: sessionSong.song.artistName,
-                    selectedBy: sessionSong.selectedBy.rawValue
-                )
-            }
-
-            let sessionContext = SessionContext(
-                turnState: sessionService.currentTurn.rawValue.lowercased(),
-                historyCount: sessionService.sessionHistory.count,
-                queueCount: sessionService.songQueue.count,
-                recentSongs: Array(recentSongs)
+        let recentSongs = sessionService.sessionHistory.suffix(5).map { sessionSong in
+            RecentSongInfo(
+                title: sessionSong.song.title,
+                artist: sessionSong.song.artistName,
+                selectedBy: sessionSong.selectedBy.rawValue
             )
-            debugBuilder.setSessionContext(sessionContext)
-
-            // Capture persona snapshot
-            if let currentPersona = personaService.selectedPersona {
-                let personaSnapshot = PersonaSnapshot(
-                    name: currentPersona.name,
-                    styleGuide: currentPersona.styleGuide,
-                    createdAt: currentPersona.createdAt
-                )
-                debugBuilder.setPersonaSnapshot(personaSnapshot)
-            }
-
-            // Capture direction change if present
-            if let direction = directionChange, let firstOption = direction.options.first {
-                let directionInfo = DirectionChangeInfo(
-                    directionPrompt: firstOption.directionPrompt,
-                    buttonLabel: firstOption.buttonLabel,
-                    timestamp: Date()
-                )
-                debugBuilder.setDirectionChange(directionInfo)
-            }
-
-            B2BLog.session.debug("🐛 Debug tracking enabled - capturing session context")
         }
+
+        let sessionContext = SessionContext(
+            turnState: sessionService.currentTurn.rawValue.lowercased(),
+            historyCount: sessionService.sessionHistory.count,
+            queueCount: sessionService.songQueue.count,
+            recentSongs: Array(recentSongs)
+        )
+        debugBuilder?.setSessionContext(sessionContext)
+
+        // Capture persona snapshot
+        if let currentPersona = personaService.selectedPersona {
+            let personaSnapshot = PersonaSnapshot(
+                name: currentPersona.name,
+                styleGuide: currentPersona.styleGuide,
+                createdAt: currentPersona.createdAt
+            )
+            debugBuilder?.setPersonaSnapshot(personaSnapshot)
+        }
+
+        // Capture direction change if present
+        if let direction = directionChange, let firstOption = direction.options.first {
+            let directionInfo = DirectionChangeInfo(
+                directionPrompt: firstOption.directionPrompt,
+                buttonLabel: firstOption.buttonLabel,
+                timestamp: Date()
+            )
+            debugBuilder?.setDirectionChange(directionInfo)
+        }
+
+        B2BLog.session.debug("🐛 Capturing song selection details")
 
         sessionService.setAIThinking(true)
 

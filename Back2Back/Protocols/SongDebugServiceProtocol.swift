@@ -10,7 +10,6 @@ import Foundation
 
 @MainActor
 protocol SongDebugServiceProtocol {
-    var isEnabled: Bool { get set }
     var debugInfo: [UUID: SongDebugInfo] { get }
 
     func logDebugInfo(_ info: SongDebugInfo)
