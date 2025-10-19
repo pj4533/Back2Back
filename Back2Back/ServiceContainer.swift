@@ -131,7 +131,8 @@ final class ServiceContainer {
         firstSongCacheService = FirstSongCacheService(
             personaService: personaService,
             musicService: musicService,
-            aiSongCoordinator: aiSongCoordinator
+            aiSongCoordinator: aiSongCoordinator,
+            songDebugService: songDebugService
         )
 
         B2BLog.general.debug("✅ First song cache service initialized")
@@ -143,7 +144,8 @@ final class ServiceContainer {
             playbackCoordinator: playbackCoordinator,
             aiSongCoordinator: aiSongCoordinator,
             turnManager: turnManager,
-            openAIClient: openAIClient
+            openAIClient: openAIClient,
+            songDebugService: songDebugService
         )
 
         personasViewModel = PersonasViewModel(

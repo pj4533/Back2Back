@@ -20,6 +20,7 @@ class FirstSongCacheService {
     private let personaService: PersonaService
     private let musicService: MusicServiceProtocol
     private let aiSongCoordinator: AISongCoordinator
+    private let songDebugService: SongDebugService
 
     // Track in-progress operations to prevent duplicates
     private var activeRefreshTasks: [UUID: Task<Void, Never>] = [:]
@@ -27,11 +28,13 @@ class FirstSongCacheService {
     init(
         personaService: PersonaService,
         musicService: MusicServiceProtocol,
-        aiSongCoordinator: AISongCoordinator
+        aiSongCoordinator: AISongCoordinator,
+        songDebugService: SongDebugService
     ) {
         self.personaService = personaService
         self.musicService = musicService
         self.aiSongCoordinator = aiSongCoordinator
+        self.songDebugService = songDebugService
 
         // Observe notification for first selection consumption
         NotificationCenter.default.addObserver(
@@ -164,13 +167,21 @@ class FirstSongCacheService {
             shouldSaveDebugInfo: true   // Save to Song Errors debug view
         )
 
-        guard let (song, rationale, _) = result else {
+        guard let (song, rationale, debugInfo) = result else {
             B2BLog.firstSelectionCache.error("❌ Pipeline returned no result for first selection")
             throw FirstSongCacheError.generationFailed
         }
 
         B2BLog.firstSelectionCache.info("🎯 AI selected: '\(song.title)' by \(song.artistName)")
         B2BLog.firstSelectionCache.debug("   Rationale: \(rationale)")
+
+        // Save debug info and store its ID
+        var debugInfoId: UUID? = nil
+        if let debugInfo = debugInfo {
+            songDebugService.logDebugInfo(debugInfo)
+            debugInfoId = debugInfo.id
+            B2BLog.firstSelectionCache.info("💾 Saved debug info with ID: \(debugInfo.id)")
+        }
 
         // Convert MusicKit Song to SimplifiedSong for caching
         let artworkURL = song.artwork?.url(width: 300, height: 300)?.absoluteString
@@ -189,11 +200,12 @@ class FirstSongCacheService {
             rationale: rationale
         )
 
-        // Create CachedFirstSelection
+        // Create CachedFirstSelection with debug info ID
         let cached = CachedFirstSelection(
             recommendation: recommendation,
             cachedAt: Date(),
-            appleMusicSong: appleMusicSong
+            appleMusicSong: appleMusicSong,
+            debugInfoId: debugInfoId
         )
 
         B2BLog.firstSelectionCache.info("✅ First selection generated with full pipeline for persona '\(persona.name)'")

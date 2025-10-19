@@ -49,7 +49,8 @@ struct SessionViewModelTests {
         let firstSongCacheService = FirstSongCacheService(
             personaService: personaService,
             musicService: musicService,
-            aiSongCoordinator: aiSongCoordinator
+            aiSongCoordinator: aiSongCoordinator,
+            songDebugService: songDebugService
         )
         _ = firstSongCacheService  // Keep compiler happy (not used in tests yet)
 
@@ -59,7 +60,8 @@ struct SessionViewModelTests {
             playbackCoordinator: playbackCoordinator,
             aiSongCoordinator: aiSongCoordinator,
             turnManager: turnManager,
-            openAIClient: mockAIClient
+            openAIClient: mockAIClient,
+            songDebugService: songDebugService
         )
 
         return (viewModel, musicService, sessionService)

@@ -20,6 +20,7 @@ final class SessionViewModel {
     private let musicService: MusicService
     private let sessionService: SessionService
     private let openAIClient: any AIRecommendationServiceProtocol
+    private let songDebugService: SongDebugService
 
     // Coordinators handle specific responsibilities
     private let playbackCoordinator: PlaybackCoordinator
@@ -37,7 +38,8 @@ final class SessionViewModel {
         playbackCoordinator: PlaybackCoordinator,
         aiSongCoordinator: AISongCoordinator,
         turnManager: TurnManager,
-        openAIClient: any AIRecommendationServiceProtocol
+        openAIClient: any AIRecommendationServiceProtocol,
+        songDebugService: SongDebugService
     ) {
         self.musicService = musicService
         self.sessionService = sessionService
@@ -45,6 +47,7 @@ final class SessionViewModel {
         self.aiSongCoordinator = aiSongCoordinator
         self.turnManager = turnManager
         self.openAIClient = openAIClient
+        self.songDebugService = songDebugService
 
         B2BLog.session.info("SessionViewModel initialized")
 
@@ -101,9 +104,34 @@ final class SessionViewModel {
 
     func handleAIStartFirst() async {
         do {
-            if let song = try await aiSongCoordinator.handleAIStartFirst() {
+            if let (song, rationale, debugInfoId) = try await aiSongCoordinator.handleAIStartFirst() {
                 // Add to history with "playing" status since we'll play it immediately
-                sessionService.addSongToHistory(song, selectedBy: .ai, rationale: nil, queueStatus: .playing)
+                let sessionSong = sessionService.addSongToHistory(song, selectedBy: .ai, rationale: rationale, queueStatus: .playing)
+
+                // If debug info exists, correct it with actual SessionSong.id
+                if let debugInfoId = debugInfoId,
+                   let originalDebugInfo = songDebugService.getDebugInfo(for: debugInfoId) {
+                    B2BLog.firstSelectionCache.info("🔄 Correcting debug info ID from \(debugInfoId) to \(sessionSong.id)")
+
+                    // Create corrected version with actual SessionSong.id
+                    let correctedDebugInfo = SongDebugInfo(
+                        id: sessionSong.id,  // Use actual SessionSong ID
+                        timestamp: originalDebugInfo.timestamp,
+                        outcome: originalDebugInfo.outcome,
+                        retryCount: originalDebugInfo.retryCount,
+                        aiRecommendation: originalDebugInfo.aiRecommendation,
+                        searchPhase: originalDebugInfo.searchPhase,
+                        matchingPhase: originalDebugInfo.matchingPhase,
+                        validationPhase: originalDebugInfo.validationPhase,
+                        finalSong: originalDebugInfo.finalSong,
+                        sessionContext: originalDebugInfo.sessionContext,
+                        personaSnapshot: originalDebugInfo.personaSnapshot,
+                        directionChange: originalDebugInfo.directionChange
+                    )
+
+                    songDebugService.logDebugInfo(correctedDebugInfo)
+                    B2BLog.firstSelectionCache.info("✅ Debug info corrected and saved for session song \(sessionSong.id)")
+                }
 
                 // Play the song
                 await playCurrentSong(song)

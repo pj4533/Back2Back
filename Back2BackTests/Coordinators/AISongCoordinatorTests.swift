@@ -51,7 +51,8 @@ struct AISongCoordinatorTests {
         let firstSongCacheService = FirstSongCacheService(
             personaService: personaService,
             musicService: musicService,
-            aiSongCoordinator: coordinator
+            aiSongCoordinator: coordinator,
+            songDebugService: songDebugService
         )
         _ = firstSongCacheService  // Keep compiler happy (not used in tests yet)
 

@@ -122,7 +122,7 @@ final class AISongCoordinator {
 
     /// Start AI first - select and play initial song
     /// Checks for cached first selection for instant playback
-    func handleAIStartFirst() async throws -> Song? {
+    func handleAIStartFirst() async throws -> (song: Song, rationale: String, debugInfoId: UUID?)? {
         B2BLog.session.info("🤖 AI starting session first")
 
         // Check for cached first selection
@@ -138,6 +138,10 @@ final class AISongCoordinator {
 
             if let appleMusicSong = cached.appleMusicSong {
                 B2BLog.firstSelectionCache.info("   Song ID: \(appleMusicSong.id)")
+            }
+
+            if let debugInfoId = cached.debugInfoId {
+                B2BLog.firstSelectionCache.info("   Debug info ID: \(debugInfoId)")
             }
         } else {
             B2BLog.firstSelectionCache.info("🔍 First selection is NIL for '\(currentPersona.name)'")
@@ -173,7 +177,7 @@ final class AISongCoordinator {
             B2BLog.firstSelectionCache.info("📢 Posted firstSelectionConsumed notification for persona '\(currentPersona.name)'")
 
             B2BLog.firstSelectionCache.info("🎵 Starting instant playback with cached selection: '\(song.title)' by \(song.artistName)")
-            return song
+            return (song: song, rationale: cached.recommendation.rationale, debugInfoId: cached.debugInfoId)
         }
 
         // No cache available - fall back to normal AI selection
@@ -182,11 +186,12 @@ final class AISongCoordinator {
     }
 
     /// Performs standard AI selection with retry logic
-    private func performAISelection() async throws -> Song? {
+    /// Returns tuple with song but nil rationale and debugInfoId (old flow doesn't capture these)
+    private func performAISelection() async throws -> (song: Song, rationale: String, debugInfoId: UUID?)? {
         sessionService.setAIThinking(true)
         defer { sessionService.setAIThinking(false) }
 
-        return try await AIRetryStrategy.executeWithRetry(
+        let song = try await AIRetryStrategy.executeWithRetry(
             operation: { () -> Song? in
                 let recommendation = try await self.selectAISong()
                 B2BLog.ai.info("🎯 AI recommended: \(recommendation.song) by \(recommendation.artist)")
@@ -198,6 +203,12 @@ final class AISongCoordinator {
                 return await self.searchAndMatchSong(retryRecommendation)
             }
         )
+
+        // Old flow doesn't have rationale or debug info - return nil for those
+        if let song = song {
+            return (song: song, rationale: "", debugInfoId: nil)
+        }
+        return nil
     }
 
     /// Prefetch and queue AI song for specified queue position
