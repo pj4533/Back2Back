@@ -11,6 +11,14 @@ import MusicKit
 import Observation
 import OSLog
 
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// Posted when a first selection cache is consumed
+    /// UserInfo contains "personaId" key with UUID value
+    static let firstSelectionConsumed = Notification.Name("firstSelectionConsumed")
+}
+
 /// Coordinates AI song selection, matching, and queueing with retry logic
 @MainActor
 @Observable
@@ -25,7 +33,6 @@ final class AISongCoordinator {
     private let personaService: PersonaService
     private let personaSongCacheService: PersonaSongCacheService
     private let songErrorLoggerService: SongErrorLoggerService
-    private let firstSongCacheService: FirstSongCacheService
     private let songDebugService: SongDebugService
 
     private(set) var prefetchTask: Task<Void, Never>?
@@ -49,7 +56,6 @@ final class AISongCoordinator {
         personaService: PersonaService,
         personaSongCacheService: PersonaSongCacheService,
         songErrorLoggerService: SongErrorLoggerService,
-        firstSongCacheService: FirstSongCacheService,
         songDebugService: SongDebugService
     ) {
         self.openAIClient = openAIClient
@@ -60,7 +66,6 @@ final class AISongCoordinator {
         self.personaService = personaService
         self.personaSongCacheService = personaSongCacheService
         self.songErrorLoggerService = songErrorLoggerService
-        self.firstSongCacheService = firstSongCacheService
         self.songDebugService = songDebugService
 
         // Use provided matcher, or select based on configuration
@@ -159,8 +164,13 @@ final class AISongCoordinator {
             personaService.clearFirstSelection(for: currentPersona.id)
             B2BLog.firstSelectionCache.info("🗑️ Cache consumed for persona '\(currentPersona.name)' - cleared successfully")
 
-            // Trigger immediate background regeneration (non-blocking)
-            firstSongCacheService.regenerateAfterUse(for: currentPersona.id)
+            // Post notification to trigger background regeneration
+            NotificationCenter.default.post(
+                name: .firstSelectionConsumed,
+                object: nil,
+                userInfo: ["personaId": currentPersona.id]
+            )
+            B2BLog.firstSelectionCache.info("📢 Posted firstSelectionConsumed notification for persona '\(currentPersona.name)'")
 
             B2BLog.firstSelectionCache.info("🎵 Starting instant playback with cached selection: '\(song.title)' by \(song.artistName)")
             return song

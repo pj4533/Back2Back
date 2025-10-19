@@ -53,7 +53,6 @@ struct SessionViewModelTests {
             personaService: personaService,
             personaSongCacheService: personaSongCacheService,
             songErrorLoggerService: songErrorLoggerService,
-            firstSongCacheService: firstSongCacheService,
             songDebugService: songDebugService
         )
 

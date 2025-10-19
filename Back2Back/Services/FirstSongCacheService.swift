@@ -31,7 +31,30 @@ class FirstSongCacheService {
         self.openAIClient = openAIClient
         self.musicMatcher = musicMatcher
 
-        B2BLog.firstSelectionCache.info("FirstSongCacheService initialized")
+        // Observe notification for first selection consumption
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleFirstSelectionConsumed(_:)),
+            name: .firstSelectionConsumed,
+            object: nil
+        )
+
+        B2BLog.firstSelectionCache.info("FirstSongCacheService initialized with notification observer")
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    /// Handle notification when first selection is consumed
+    @objc private func handleFirstSelectionConsumed(_ notification: Notification) {
+        guard let personaId = notification.userInfo?["personaId"] as? UUID else {
+            B2BLog.firstSelectionCache.error("❌ firstSelectionConsumed notification missing personaId")
+            return
+        }
+
+        B2BLog.firstSelectionCache.info("📬 Received firstSelectionConsumed notification for persona \(personaId)")
+        regenerateAfterUse(for: personaId)
     }
 
     /// Refreshes missing first selections for all personas
