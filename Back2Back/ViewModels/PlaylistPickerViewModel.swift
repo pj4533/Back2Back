@@ -12,7 +12,8 @@ import OSLog
 
 @MainActor
 @Observable
-final class PlaylistPickerViewModel: ViewModelError {
+final class PlaylistPickerViewModel: ViewModelError, Identifiable {
+    let id = UUID()
     private let musicService: MusicServiceProtocol
     private let favoritedSong: FavoritedSong
 

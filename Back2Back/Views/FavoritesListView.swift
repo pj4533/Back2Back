@@ -15,8 +15,7 @@ struct FavoritesListView: View {
     let viewModel: FavoritesViewModel
     let musicService: MusicServiceProtocol
 
-    @State private var showPlaylistPicker = false
-    @State private var selectedSongForPlaylist: FavoritedSong?
+    @State private var playlistPickerViewModel: PlaylistPickerViewModel?
 
     var body: some View {
         Group {
@@ -28,15 +27,8 @@ struct FavoritesListView: View {
         }
         .navigationTitle("Favorites")
         .navigationBarTitleDisplayMode(.large)
-        .sheet(isPresented: $showPlaylistPicker) {
-            if let selectedSong = selectedSongForPlaylist {
-                PlaylistPickerView(
-                    viewModel: PlaylistPickerViewModel(
-                        musicService: musicService,
-                        favoritedSong: selectedSong
-                    )
-                )
-            }
+        .sheet(item: $playlistPickerViewModel) { viewModel in
+            PlaylistPickerView(viewModel: viewModel)
         }
     }
 
@@ -58,8 +50,11 @@ struct FavoritesListView: View {
                     .contextMenu {
                         Button {
                             B2BLog.ui.info("User selected 'Add to Playlist' for: \(favoritedSong.title)")
-                            selectedSongForPlaylist = favoritedSong
-                            showPlaylistPicker = true
+                            // Create ViewModel before presenting sheet to ensure proper observation
+                            playlistPickerViewModel = PlaylistPickerViewModel(
+                                musicService: musicService,
+                                favoritedSong: favoritedSong
+                            )
                         } label: {
                             Label("Add to Playlist", systemImage: "text.badge.plus")
                         }
