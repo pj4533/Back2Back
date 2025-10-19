@@ -120,6 +120,19 @@ final class AISongCoordinator {
             throw OpenAIError.decodingError(NSError(domain: "Back2Back", code: -1, userInfo: [NSLocalizedDescriptionKey: "No persona selected"]))
         }
 
+        // Debug: Log cache status
+        if let cached = currentPersona.firstSelection {
+            B2BLog.firstSelectionCache.info("🔍 First selection EXISTS for '\(currentPersona.name)'")
+            B2BLog.firstSelectionCache.info("   Recommendation: '\(cached.recommendation.song)' by \(cached.recommendation.artist)")
+            B2BLog.firstSelectionCache.info("   Apple Music song: \(cached.appleMusicSong != nil ? "EXISTS" : "MISSING (nil)")")
+
+            if let appleMusicSong = cached.appleMusicSong {
+                B2BLog.firstSelectionCache.info("   Song ID: \(appleMusicSong.id)")
+            }
+        } else {
+            B2BLog.firstSelectionCache.info("🔍 First selection is NIL for '\(currentPersona.name)'")
+        }
+
         if let cached = currentPersona.firstSelection, let appleMusicSong = cached.appleMusicSong {
             B2BLog.firstSelectionCache.info("✨ Cache hit for persona '\(currentPersona.name)' - using cached first selection for instant playback")
             B2BLog.firstSelectionCache.debug("Cached song: '\(cached.recommendation.song)' by \(cached.recommendation.artist)")

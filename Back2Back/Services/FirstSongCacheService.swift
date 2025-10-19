@@ -38,56 +38,83 @@ class FirstSongCacheService {
     /// Called on app launch and when app becomes active
     func refreshMissingSelections() async {
         B2BLog.firstSelectionCache.info("🔄 Refreshing missing first selections for all personas")
+        B2BLog.firstSelectionCache.info("   Total personas to check: \(self.personaService.personas.count)")
 
-        for persona in personaService.personas {
+        var personasWithCache = 0
+        var personasNeedingCache = 0
+
+        for persona in self.personaService.personas {
             // Only generate if firstSelection is nil
             if persona.firstSelection == nil {
-                B2BLog.firstSelectionCache.info("📦 Cache empty for persona '\(persona.name)' - generating first selection")
+                personasNeedingCache += 1
+                B2BLog.firstSelectionCache.info("📦 Cache MISSING for persona '\(persona.name)' (ID: \(persona.id)) - spawning background cache generation")
 
                 // Spawn background task (don't block)
                 Task.detached(priority: .low) { [weak self] in
                     await self?.refreshFirstSelectionIfNeeded(for: persona.id)
                 }
+            } else {
+                personasWithCache += 1
+                B2BLog.firstSelectionCache.info("✅ Cache EXISTS for persona '\(persona.name)' - skipping")
+                if let cachedSong = persona.firstSelection {
+                    B2BLog.firstSelectionCache.debug("   Cached: '\(cachedSong.recommendation.song)' by \(cachedSong.recommendation.artist)")
+                }
             }
         }
+
+        B2BLog.firstSelectionCache.info("📊 Cache status summary: \(personasWithCache) with cache, \(personasNeedingCache) need generation")
     }
 
     /// Generates a first selection for the given persona if one doesn't exist
     func refreshFirstSelectionIfNeeded(for personaId: UUID) async {
+        B2BLog.firstSelectionCache.info("🔍 refreshFirstSelectionIfNeeded called for persona \(personaId)")
+
         // Prevent duplicate refresh tasks
         if activeRefreshTasks[personaId] != nil {
-            B2BLog.firstSelectionCache.debug("⚠️ Refresh task already in progress for persona \(personaId)")
+            B2BLog.firstSelectionCache.warning("⚠️ Refresh task already in progress for persona \(personaId) - skipping duplicate")
             return
         }
 
         // Check if persona still needs a first selection
-        guard let persona = personaService.personas.first(where: { $0.id == personaId }),
-              persona.firstSelection == nil else {
-            B2BLog.firstSelectionCache.debug("✅ Persona \(personaId) already has first selection or doesn't exist")
+        guard let persona = personaService.personas.first(where: { $0.id == personaId }) else {
+            B2BLog.firstSelectionCache.error("❌ Persona \(personaId) not found in personas array")
             return
         }
 
+        if persona.firstSelection != nil {
+            B2BLog.firstSelectionCache.info("✅ Persona '\(persona.name)' already has first selection - skipping generation")
+            return
+        }
+
+        B2BLog.firstSelectionCache.info("🚀 Starting cache generation task for persona '\(persona.name)'")
+
         let refreshTask = Task {
             do {
+                B2BLog.firstSelectionCache.info("🎲 Calling generateFirstSelection for persona '\(persona.name)'")
                 let cached = try await generateFirstSelection(for: persona)
 
                 // Update persona with cached selection
                 await MainActor.run {
+                    B2BLog.firstSelectionCache.info("💾 Saving cached first selection to PersonaService for '\(persona.name)'")
                     personaService.updateFirstSelection(for: personaId, selection: cached)
                     B2BLog.firstSelectionCache.info("✅ First selection cached for persona '\(persona.name)': '\(cached.recommendation.song)' by \(cached.recommendation.artist)")
                 }
             } catch {
-                B2BLog.firstSelectionCache.error("❌ Failed to generate first selection for persona '\(persona.name)': \(error)")
+                B2BLog.firstSelectionCache.error("❌ Failed to generate first selection for persona '\(persona.name)': \(error.localizedDescription)")
+                B2BLog.firstSelectionCache.error("   Error details: \(String(describing: error))")
             }
 
             // Remove from active tasks
             await MainActor.run {
+                B2BLog.firstSelectionCache.debug("🧹 Removing persona '\(persona.name)' from active refresh tasks")
                 activeRefreshTasks[personaId] = nil
             }
         }
 
         activeRefreshTasks[personaId] = refreshTask
+        B2BLog.firstSelectionCache.info("⏳ Awaiting completion of cache generation for persona '\(persona.name)'")
         await refreshTask.value
+        B2BLog.firstSelectionCache.info("🏁 Cache generation task completed for persona '\(persona.name)'")
     }
 
     /// Generates a first selection for the given persona

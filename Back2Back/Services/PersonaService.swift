@@ -30,6 +30,22 @@ final class PersonaService {
            let decoded = try? JSONDecoder().decode([Persona].self, from: data) {
             personas = decoded
             B2BLog.general.info("Loaded \(decoded.count) personas")
+
+            // Migration: Clear first selection caches that don't have appleMusicSong
+            // (These are from before appleMusicSong was added to CachedFirstSelection)
+            var needsMigration = false
+            for (index, persona) in personas.enumerated() {
+                if let firstSelection = persona.firstSelection, firstSelection.appleMusicSong == nil {
+                    B2BLog.general.info("⚠️ Migrating persona '\(persona.name)' - clearing invalid first selection cache (missing appleMusicSong)")
+                    personas[index].firstSelection = nil
+                    needsMigration = true
+                }
+            }
+
+            if needsMigration {
+                B2BLog.general.info("💾 Saving personas after migration")
+                savePersonas()
+            }
         } else {
             B2BLog.general.info("No saved personas found")
         }

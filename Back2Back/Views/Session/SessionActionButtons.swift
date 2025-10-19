@@ -11,11 +11,25 @@ import SwiftUI
 import OSLog
 
 struct SessionActionButtons: View {
-    let viewModel: SessionActionButtonsViewModel
-    let sessionViewModel: SessionViewModel
+    @Bindable var viewModel: SessionActionButtonsViewModel
+    @Bindable var sessionViewModel: SessionViewModel
     let onUserSelectTapped: () -> Void
     let onAIStartTapped: () -> Void
     let onDirectionOptionSelected: (DirectionOption) -> Void
+
+    init(
+        viewModel: SessionActionButtonsViewModel,
+        sessionViewModel: SessionViewModel,
+        onUserSelectTapped: @escaping () -> Void,
+        onAIStartTapped: @escaping () -> Void,
+        onDirectionOptionSelected: @escaping (DirectionOption) -> Void
+    ) {
+        self.viewModel = viewModel
+        self.sessionViewModel = sessionViewModel
+        self.onUserSelectTapped = onUserSelectTapped
+        self.onAIStartTapped = onAIStartTapped
+        self.onDirectionOptionSelected = onDirectionOptionSelected
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -41,11 +55,12 @@ struct SessionActionButtons: View {
                     // AI goes first button
                     Button(action: {
                         B2BLog.ui.debug("User tapped AI start button")
+                        B2BLog.ui.debug("Cache status at tap: \(viewModel.hasFirstSelectionCached)")
                         onAIStartTapped()
                     }) {
                         Label(
                             "AI Starts",
-                            systemImage: "cpu"
+                            systemImage: viewModel.hasFirstSelectionCached ? "bolt.circle.fill" : "cpu"
                         )
                         .frame(maxWidth: .infinity)
                         .padding()

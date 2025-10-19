@@ -171,7 +171,8 @@ final class ServiceContainer {
         )
 
         sessionActionButtonsViewModel = SessionActionButtonsViewModel(
-            sessionService: sessionService
+            sessionService: sessionService,
+            personaService: personaService
         )
 
         favoritesViewModel = FavoritesViewModel(
