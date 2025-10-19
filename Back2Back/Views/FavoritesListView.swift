@@ -4,6 +4,7 @@
 //
 //  Created on 2025-10-12.
 //  Refactored to use ViewModel only (Issue #56, 2025-10-18)
+//  Updated with playlist export feature (Issue #85, 2025-10-19)
 //
 
 import SwiftUI
@@ -12,6 +13,10 @@ import OSLog
 
 struct FavoritesListView: View {
     let viewModel: FavoritesViewModel
+    let musicService: MusicServiceProtocol
+
+    @State private var showPlaylistPicker = false
+    @State private var selectedSongForPlaylist: FavoritedSong?
 
     var body: some View {
         Group {
@@ -23,6 +28,16 @@ struct FavoritesListView: View {
         }
         .navigationTitle("Favorites")
         .navigationBarTitleDisplayMode(.large)
+        .sheet(isPresented: $showPlaylistPicker) {
+            if let selectedSong = selectedSongForPlaylist {
+                PlaylistPickerView(
+                    viewModel: PlaylistPickerViewModel(
+                        musicService: musicService,
+                        favoritedSong: selectedSong
+                    )
+                )
+            }
+        }
     }
 
     private var emptyStateView: some View {
@@ -40,6 +55,15 @@ struct FavoritesListView: View {
                 FavoriteSongRow(favoritedSong: favoritedSong)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .listRowSeparator(.hidden)
+                    .contextMenu {
+                        Button {
+                            B2BLog.ui.info("User selected 'Add to Playlist' for: \(favoritedSong.title)")
+                            selectedSongForPlaylist = favoritedSong
+                            showPlaylistPicker = true
+                        } label: {
+                            Label("Add to Playlist", systemImage: "text.badge.plus")
+                        }
+                    }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             withAnimation {
@@ -59,7 +83,8 @@ struct FavoritesListView: View {
 #Preview {
     NavigationStack {
         FavoritesListView(
-            viewModel: FavoritesViewModel(favoritesService: FavoritesService())
+            viewModel: FavoritesViewModel(favoritesService: FavoritesService()),
+            musicService: MusicService()
         )
     }
 }

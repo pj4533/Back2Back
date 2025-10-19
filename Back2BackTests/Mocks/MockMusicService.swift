@@ -40,12 +40,23 @@ class MockMusicService: MusicService {
     var playSongCalled = false
     var addToQueueCalled = false
     var stopCalled = false
+    var fetchUserPlaylistsCalled = false
+    var convertToSongCalled = false
+    var addSongToPlaylistCalled = false
     var lastSearchTerm: String?
     var lastPlayedSong: Song?
     var lastQueuedSong: Song?
+    var lastConvertedSong: FavoritedSong?
+    var lastAddedSong: Song?
+    var lastTargetPlaylist: Playlist?
 
     // Test data
     private var _searchResults: [MusicSearchResult] = []
+    var mockPlaylists: [Playlist] = []
+    var mockSongForConversion: Song?
+    var shouldThrowOnFetchPlaylists = false
+    var shouldThrowOnConvertToSong = false
+    var shouldThrowOnAddToPlaylist = false
 
     override var searchResults: [MusicSearchResult] {
         get { _searchResults }
@@ -94,5 +105,36 @@ class MockMusicService: MusicService {
 
     override func getCurrentPlaybackTime() -> TimeInterval {
         return 0
+    }
+
+    // MARK: - Library Methods
+
+    override func fetchUserPlaylists() async throws -> [Playlist] {
+        fetchUserPlaylistsCalled = true
+        if shouldThrowOnFetchPlaylists {
+            throw MusicLibraryError.fetchFailed(underlying: NSError(domain: "test", code: -1))
+        }
+        return mockPlaylists
+    }
+
+    override func convertToSong(favoritedSong: FavoritedSong) async throws -> Song {
+        convertToSongCalled = true
+        lastConvertedSong = favoritedSong
+        if shouldThrowOnConvertToSong {
+            throw MusicLibraryError.songNotFound(songId: favoritedSong.songId)
+        }
+        guard let song = mockSongForConversion else {
+            throw MusicLibraryError.songNotFound(songId: favoritedSong.songId)
+        }
+        return song
+    }
+
+    override func addSongToPlaylist(song: Song, playlist: Playlist) async throws {
+        addSongToPlaylistCalled = true
+        lastAddedSong = song
+        lastTargetPlaylist = playlist
+        if shouldThrowOnAddToPlaylist {
+            throw MusicLibraryError.addToPlaylistFailed(underlying: NSError(domain: "test", code: -1))
+        }
     }
 }

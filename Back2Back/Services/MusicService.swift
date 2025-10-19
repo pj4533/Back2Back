@@ -19,6 +19,7 @@ class MusicService: MusicServiceProtocol {
     private let authService = MusicAuthService()
     private let searchService = MusicSearchService()
     private let playbackService = MusicPlaybackService()
+    private let libraryService = MusicLibraryService()
 
     // MARK: - Exposed Properties (delegated)
 
@@ -122,5 +123,19 @@ class MusicService: MusicServiceProtocol {
 
     func skipBackward(_ seconds: TimeInterval = 15) async throws {
         try await playbackService.skipBackward(seconds)
+    }
+
+    // MARK: - Library (delegated to MusicLibraryService)
+
+    func fetchUserPlaylists() async throws -> [Playlist] {
+        try await libraryService.fetchUserPlaylists()
+    }
+
+    func convertToSong(favoritedSong: FavoritedSong) async throws -> Song {
+        try await libraryService.convertToSong(favoritedSong: favoritedSong)
+    }
+
+    func addSongToPlaylist(song: Song, playlist: Playlist) async throws {
+        try await libraryService.addSongToPlaylist(song: song, playlist: playlist)
     }
 }
