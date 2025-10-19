@@ -12,6 +12,9 @@ import SwiftUI
 struct SessionHeaderView: View {
     let viewModel: SessionHeaderViewModel
     let onNowPlayingTapped: () -> Void
+    let onResetSession: () -> Void
+
+    @State private var showResetConfirmation = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -34,7 +37,14 @@ struct SessionHeaderView: View {
         .padding()
         .background(Color(UIColor.systemGroupedBackground))
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button(action: { showResetConfirmation = true }) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.title3)
+                        .foregroundColor(.red)
+                }
+                .accessibilityLabel("Reset Session")
+
                 if viewModel.hasNowPlaying {
                     Button(action: onNowPlayingTapped) {
                         Image(systemName: "music.note")
@@ -43,6 +53,18 @@ struct SessionHeaderView: View {
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            "Reset Session",
+            isPresented: $showResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Reset Session", role: .destructive) {
+                onResetSession()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear all session history and stop playback. This action cannot be undone.")
         }
     }
 }

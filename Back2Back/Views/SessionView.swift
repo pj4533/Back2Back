@@ -27,7 +27,11 @@ struct SessionView: View {
         return AnyView(VStack(spacing: 0) {
             SessionHeaderView(
                 viewModel: services.sessionHeaderViewModel,
-                onNowPlayingTapped: { showNowPlaying = true }
+                onNowPlayingTapped: { showNowPlaying = true },
+                onResetSession: {
+                    B2BLog.session.info("User confirmed session reset")
+                    sessionViewModel.resetSession()
+                }
             )
 
             SessionHistoryListView(

@@ -13,7 +13,7 @@ import MusicKit
 @Suite("SessionViewModel Tests")
 struct SessionViewModelTests {
     @MainActor
-    func createTestViewModel() -> SessionViewModel {
+    func createTestViewModel() -> (SessionViewModel, MockMusicService, SessionService) {
         // Create all dependencies with mocks for isolated testing
         let environmentService = EnvironmentService()
         let personaSongCacheService = PersonaSongCacheService()
@@ -55,7 +55,7 @@ struct SessionViewModelTests {
             firstSongCacheService: firstSongCacheService
         )
 
-        return SessionViewModel(
+        let viewModel = SessionViewModel(
             musicService: musicService,
             sessionService: sessionService,
             playbackCoordinator: playbackCoordinator,
@@ -63,12 +63,14 @@ struct SessionViewModelTests {
             turnManager: turnManager,
             openAIClient: mockAIClient
         )
+
+        return (viewModel, musicService, sessionService)
     }
 
     @MainActor
     @Test("ViewModel initialization")
     func testViewModelInitialization() {
-        let viewModel = createTestViewModel()
+        let (viewModel, _, _) = createTestViewModel()
 
         // Verify the view model is properly initialized
         #expect(viewModel != nil)
@@ -430,7 +432,7 @@ struct SessionViewModelTests {
     @MainActor
     @Test("Direction change initial state")
     func testDirectionChangeInitialState() {
-        let viewModel = createTestViewModel()
+        let (viewModel, _, _) = createTestViewModel()
 
         // Initial state should have no cached direction
         #expect(viewModel.cachedDirectionChange == nil)
@@ -473,7 +475,7 @@ struct SessionViewModelTests {
     @MainActor
     @Test("Direction change generation state management")
     func testDirectionChangeGenerationStateManagement() {
-        let viewModel = createTestViewModel()
+        let (viewModel, _, _) = createTestViewModel()
 
         // Initial state
         #expect(viewModel.isGeneratingDirection == false)
@@ -497,6 +499,67 @@ struct SessionViewModelTests {
 
         // ID should use buttonLabel
         #expect(option.id == "Test label")
+    }
+
+    // MARK: - Reset Session Tests
+
+    @MainActor
+    @Test("Reset session clears all state")
+    func testResetSessionClearsState() {
+        let (viewModel, mockMusicService, mockSessionService) = createTestViewModel()
+
+        // Add some test data to the session
+        // (we can't use real Song objects, but we can check the reset clears things)
+        mockSessionService.setAIThinking(true)
+
+        // Verify initial state
+        #expect(mockSessionService.isAIThinking == true)
+
+        // Reset the session
+        viewModel.resetSession()
+
+        // Verify stop was called on music service
+        #expect(mockMusicService.stopCalled == true)
+
+        // Verify session was reset
+        #expect(mockSessionService.sessionHistory.isEmpty)
+        #expect(mockSessionService.songQueue.isEmpty)
+        #expect(mockSessionService.currentTurn == .user)
+        #expect(mockSessionService.isAIThinking == false)
+        #expect(mockSessionService.nextAISong == nil)
+    }
+
+    @MainActor
+    @Test("Reset session stops music playback")
+    func testResetSessionStopsPlayback() {
+        let (viewModel, mockMusicService, _) = createTestViewModel()
+
+        // Simulate playing state
+        mockMusicService.playbackState = .playing
+
+        // Reset the session
+        viewModel.resetSession()
+
+        // Verify stop was called
+        #expect(mockMusicService.stopCalled == true)
+
+        // Verify playback state is stopped
+        #expect(mockMusicService.playbackState == .stopped)
+    }
+
+    @MainActor
+    @Test("Reset session resets turn to user")
+    func testResetSessionResetsToUserTurn() {
+        let (viewModel, _, mockSessionService) = createTestViewModel()
+
+        // Initial state should be user turn
+        #expect(mockSessionService.currentTurn == .user)
+
+        // Reset the session (should maintain user turn)
+        viewModel.resetSession()
+
+        // Verify turn is still user
+        #expect(mockSessionService.currentTurn == .user)
     }
 
 }

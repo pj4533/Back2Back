@@ -39,6 +39,7 @@ class MockMusicService: MusicService {
     var searchCatalogCalled = false
     var playSongCalled = false
     var addToQueueCalled = false
+    var stopCalled = false
     var lastSearchTerm: String?
     var lastPlayedSong: Song?
     var lastQueuedSong: Song?
@@ -83,6 +84,12 @@ class MockMusicService: MusicService {
 
     override func togglePlayPause() async throws {
         _playbackState = _playbackState == .playing ? .paused : .playing
+    }
+
+    override func stop() {
+        stopCalled = true
+        _playbackState = .stopped
+        _currentlyPlaying = nil
     }
 
     override func getCurrentPlaybackTime() -> TimeInterval {

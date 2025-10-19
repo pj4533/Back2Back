@@ -214,6 +214,16 @@ final class MusicPlaybackService {
         player.queue = ApplicationMusicPlayer.Queue()
     }
 
+    /// Stop playback and clear the queue
+    func stop() {
+        B2BLog.playback.info("⏹️ Stopping playback")
+        player.pause()
+        clearQueue()
+        currentlyPlaying = nil
+        currentSongId = nil
+        lastLoggedSongId = nil
+    }
+
     /// Get current playback time
     func getCurrentPlaybackTime() -> TimeInterval {
         // Return the current real-time playback position
