@@ -93,6 +93,26 @@ class FirstSongCacheService {
         B2BLog.firstSelectionCache.info("📊 Cache status summary: \(personasWithCache) with cache, \(personasNeedingCache) need generation")
     }
 
+    /// Clears all first selection caches and triggers immediate regeneration
+    /// Used by debug UI to force-refresh all cached "AI Starts" songs
+    func clearAndRegenerateAll() async {
+        B2BLog.firstSelectionCache.info("🔄 Clearing and regenerating all first selection caches")
+        B2BLog.firstSelectionCache.info("   Total personas to clear: \(self.personaService.personas.count)")
+
+        // Clear all first selections
+        for persona in self.personaService.personas {
+            await MainActor.run {
+                personaService.clearFirstSelection(for: persona.id)
+            }
+            B2BLog.firstSelectionCache.info("🗑️ Cleared cache for persona '\(persona.name)'")
+        }
+
+        B2BLog.firstSelectionCache.info("✅ All caches cleared - triggering regeneration")
+
+        // Trigger regeneration for all personas
+        await refreshMissingSelections()
+    }
+
     /// Generates a first selection for the given persona if one doesn't exist
     func refreshFirstSelectionIfNeeded(for personaId: UUID) async {
         B2BLog.firstSelectionCache.info("🔍 refreshFirstSelectionIfNeeded called for persona \(personaId)")

@@ -13,6 +13,7 @@ struct ConfigurationView: View {
     @Environment(\.services) private var services
     @AIModelConfigStorage private var config
     @State private var showingClearCacheAlert = false
+    @State private var showingClearFirstSelectionAlert = false
 
     // Check if Apple Intelligence LLM is available
     private var isLLMAvailable: Bool {
@@ -181,10 +182,19 @@ struct ConfigurationView: View {
                         Text("Clear Persona Song Cache")
                     }
                 }
+
+                Button(role: .destructive) {
+                    showingClearFirstSelectionAlert = true
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.clockwise.circle")
+                        Text("Regenerate First Selection Caches")
+                    }
+                }
             } header: {
                 Text("Debug")
             } footer: {
-                Text("View failed song selections and clear the song repetition cache. Song selection details are automatically tracked for all AI picks.")
+                Text("View failed song selections, clear the song repetition cache, or regenerate all \"AI Starts\" cached songs. Song selection details are automatically tracked for all AI picks.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -205,6 +215,17 @@ struct ConfigurationView: View {
             }
         } message: {
             Text("This will clear the song repetition prevention cache for all personas. AI will be able to select recently played songs immediately.")
+        }
+        .alert("Regenerate All First Selection Caches?", isPresented: $showingClearFirstSelectionAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Regenerate", role: .destructive) {
+                Task {
+                    await services.firstSongCacheService.clearAndRegenerateAll()
+                    B2BLog.firstSelectionCache.info("User triggered regeneration of all first selection caches from config view")
+                }
+            }
+        } message: {
+            Text("This will invalidate all cached \"AI Starts\" songs and immediately regenerate them in the background. Regeneration may take several minutes.")
         })
     }
 }
