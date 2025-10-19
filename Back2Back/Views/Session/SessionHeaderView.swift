@@ -37,16 +37,14 @@ struct SessionHeaderView: View {
         .padding()
         .background(Color(UIColor.systemGroupedBackground))
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Button(action: { showResetConfirmation = true }) {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.title3)
                         .foregroundColor(.red)
                 }
                 .accessibilityLabel("Reset Session")
-            }
 
-            ToolbarItem(placement: .navigationBarTrailing) {
                 if viewModel.hasNowPlaying {
                     Button(action: onNowPlayingTapped) {
                         Image(systemName: "music.note")
