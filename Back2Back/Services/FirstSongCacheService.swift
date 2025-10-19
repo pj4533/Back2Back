@@ -10,12 +10,16 @@ import Foundation
 import MusicKit
 import OSLog
 
+/// Errors that can occur during first song cache operations
+enum FirstSongCacheError: Error {
+    case generationFailed
+}
+
 @MainActor
 class FirstSongCacheService {
     private let personaService: PersonaService
     private let musicService: MusicServiceProtocol
-    private let openAIClient: OpenAIClient
-    private let musicMatcher: MusicMatchingProtocol
+    private let aiSongCoordinator: AISongCoordinator
 
     // Track in-progress operations to prevent duplicates
     private var activeRefreshTasks: [UUID: Task<Void, Never>] = [:]
@@ -23,13 +27,11 @@ class FirstSongCacheService {
     init(
         personaService: PersonaService,
         musicService: MusicServiceProtocol,
-        openAIClient: OpenAIClient,
-        musicMatcher: MusicMatchingProtocol
+        aiSongCoordinator: AISongCoordinator
     ) {
         self.personaService = personaService
         self.musicService = musicService
-        self.openAIClient = openAIClient
-        self.musicMatcher = musicMatcher
+        self.aiSongCoordinator = aiSongCoordinator
 
         // Observe notification for first selection consumption
         NotificationCenter.default.addObserver(
@@ -141,29 +143,51 @@ class FirstSongCacheService {
     }
 
     /// Generates a first selection for the given persona
-    /// Always uses GPT-5 with low reasoning for consistent quality
+    /// Uses the shared song selection pipeline with full quality gates
     func generateFirstSelection(for persona: Persona) async throws -> CachedFirstSelection {
         B2BLog.firstSelectionCache.info("🤖 Starting generation of first selection for persona '\(persona.name)'")
+        B2BLog.firstSelectionCache.info("   Using full song selection pipeline with validation and retry logic")
 
-        // Always use GPT-5 with low reasoning (no automatic mode)
-        let config = AIModelConfig(
-            songSelectionModel: "gpt-5",
-            songSelectionReasoningLevel: .low
-        )
-
-        // Generate recommendation using OpenAIClient
-        let recommendation = try await openAIClient.selectNextSong(
-            persona: persona.styleGuide,
+        // Use the shared pipeline with empty session history
+        // The pipeline will:
+        // - Use user's configured AI model (respects AIModelConfig)
+        // - Perform full validation via SongPersonaValidator
+        // - Retry on validation failure with AIRetryStrategy
+        // - Record in PersonaSongCacheService
+        // - Save complete debug info to SongDebugService
+        let result = try await aiSongCoordinator.executeSongSelectionPipeline(
             personaId: persona.id,
+            personaStyleGuide: persona.styleGuide,
             sessionHistory: [], // Empty for first selection
             directionChange: nil,
-            config: config
+            shouldRecordInCache: true,  // Record to prevent immediate repeats
+            shouldSaveDebugInfo: true   // Save to Song Errors debug view
         )
 
-        B2BLog.firstSelectionCache.info("🎯 AI recommended: '\(recommendation.song)' by \(recommendation.artist)")
+        guard let (song, rationale, _) = result else {
+            B2BLog.firstSelectionCache.error("❌ Pipeline returned no result for first selection")
+            throw FirstSongCacheError.generationFailed
+        }
 
-        // Search and match song in Apple Music
-        let appleMusicSong = try await searchAndMatchSong(recommendation: recommendation, persona: persona)
+        B2BLog.firstSelectionCache.info("🎯 AI selected: '\(song.title)' by \(song.artistName)")
+        B2BLog.firstSelectionCache.debug("   Rationale: \(rationale)")
+
+        // Convert MusicKit Song to SimplifiedSong for caching
+        let artworkURL = song.artwork?.url(width: 300, height: 300)?.absoluteString
+
+        let appleMusicSong = SimplifiedSong(
+            id: song.id.rawValue,
+            title: song.title,
+            artistName: song.artistName,
+            artworkURL: artworkURL
+        )
+
+        // Create SongRecommendation for the cache (this matches the OpenAI response format)
+        let recommendation = SongRecommendation(
+            artist: song.artistName,
+            song: song.title,
+            rationale: rationale
+        )
 
         // Create CachedFirstSelection
         let cached = CachedFirstSelection(
@@ -172,7 +196,10 @@ class FirstSongCacheService {
             appleMusicSong: appleMusicSong
         )
 
-        B2BLog.firstSelectionCache.info("✅ First selection generated and matched successfully for persona '\(persona.name)'")
+        B2BLog.firstSelectionCache.info("✅ First selection generated with full pipeline for persona '\(persona.name)'")
+        B2BLog.firstSelectionCache.info("   ✓ Validated against persona style")
+        B2BLog.firstSelectionCache.info("   ✓ Recorded in PersonaSongCache")
+        B2BLog.firstSelectionCache.info("   ✓ Debug info saved to Song Errors view")
 
         return cached
     }
@@ -259,28 +286,4 @@ class FirstSongCacheService {
         }
     }
 
-    // MARK: - Private Helpers
-
-    /// Searches Apple Music and matches the AI recommendation
-    private func searchAndMatchSong(recommendation: SongRecommendation, persona: Persona) async throws -> SimplifiedSong? {
-        B2BLog.firstSelectionCache.info("🔍 Searching Apple Music for: '\(recommendation.song)' by \(recommendation.artist)")
-
-        // Use the music matcher to find and match the song
-        guard let song = try await musicMatcher.searchAndMatch(recommendation: recommendation) else {
-            B2BLog.firstSelectionCache.warning("⚠️ No match found in Apple Music for first selection")
-            return nil
-        }
-
-        B2BLog.firstSelectionCache.info("✅ Matched in Apple Music: '\(song.title)' by \(song.artistName)")
-
-        // Create SimplifiedSong
-        let artworkURL = song.artwork?.url(width: 300, height: 300)?.absoluteString
-
-        return SimplifiedSong(
-            id: song.id.rawValue,
-            title: song.title,
-            artistName: song.artistName,
-            artworkURL: artworkURL
-        )
-    }
 }
