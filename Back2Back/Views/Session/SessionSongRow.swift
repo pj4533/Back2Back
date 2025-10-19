@@ -17,6 +17,9 @@ struct SessionSongRow: View {
     let personaService: PersonaService
     let songDebugService: SongDebugService
 
+    // State for navigation to details view
+    @State private var showingDetails = false
+
     // Add computed property to force view updates when queue status changes
     private var statusId: String {
         "\(sessionSong.id)-\(sessionSong.queueStatus.description)"
@@ -33,28 +36,8 @@ struct SessionSongRow: View {
     }
 
     var body: some View {
-        // Add navigation link for debug details if AI-selected
-        if sessionSong.selectedBy == .ai {
-            NavigationLink {
-                SongDebugDetailView(
-                    sessionSong: sessionSong,
-                    debugInfo: songDebugService.getDebugInfo(for: sessionSong.id)
-                )
-            } label: {
-                rowContent
-            }
-            .buttonStyle(.plain) // Prevent NavigationLink styling
-            .swipeActions(edge: .leading) {
-                NavigationLink {
-                    SongDebugDetailView(
-                        sessionSong: sessionSong,
-                        debugInfo: songDebugService.getDebugInfo(for: sessionSong.id)
-                    )
-                } label: {
-                    Label("Debug", systemImage: "ladybug")
-                }
-                .tint(.purple)
-            }
+        rowContent
+            .contentShape(Rectangle()) // Make entire cell tappable
             .onTapGesture {
                 if isTappable {
                     B2BLog.ui.info("User tapped queued song to skip ahead: \(sessionSong.song.title)")
@@ -63,18 +46,23 @@ struct SessionSongRow: View {
                     }
                 }
             }
-        } else {
-            rowContent
-                .contentShape(Rectangle()) // Make entire cell tappable
-                .onTapGesture {
-                    if isTappable {
-                        B2BLog.ui.info("User tapped queued song to skip ahead: \(sessionSong.song.title)")
-                        Task {
-                            await sessionViewModel.skipToQueuedSong(sessionSong)
-                        }
+            .swipeActions(edge: .leading) {
+                if sessionSong.selectedBy == .ai {
+                    Button {
+                        B2BLog.ui.info("User swiped to view details for: \(sessionSong.song.title)")
+                        showingDetails = true
+                    } label: {
+                        Label("Details", systemImage: "info.circle")
                     }
+                    .tint(.purple)
                 }
-        }
+            }
+            .navigationDestination(isPresented: $showingDetails) {
+                SongSelectionDetailsView(
+                    sessionSong: sessionSong,
+                    debugInfo: songDebugService.getDebugInfo(for: sessionSong.id)
+                )
+            }
     }
 
     private var rowContent: some View {

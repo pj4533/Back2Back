@@ -1,15 +1,15 @@
 //
-//  SongDebugDetailView.swift
+//  SongSelectionDetailsView.swift
 //  Back2Back
 //
 //  Created on 2025-10-19.
-//  Comprehensive debugging details view for AI song selection (Issue #87)
+//  Comprehensive details view for AI song selection process (Issue #87)
 //
 
 import SwiftUI
 import MusicKit
 
-struct SongDebugDetailView: View {
+struct SongSelectionDetailsView: View {
     let sessionSong: SessionSong
     let debugInfo: SongDebugInfo?
 
@@ -56,7 +56,7 @@ struct SongDebugDetailView: View {
                     }
                     .padding()
                 }
-                .navigationTitle("Song Debug Details")
+                .navigationTitle("Selection Details")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
@@ -72,9 +72,9 @@ struct SongDebugDetailView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "No Debug Info",
+                    "No Selection Details",
                     systemImage: "info.circle",
-                    description: Text("Debug tracking was not enabled when this song was selected.\n\nEnable it in Configuration → Debug → Song Debug Tracking")
+                    description: Text("Song selection tracking was not enabled when this song was selected.\n\nEnable it in Configuration → Song Selection Tracking")
                 )
             }
         }
@@ -503,7 +503,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 // Note: Preview disabled because Song requires actual MusicKit data
 // #Preview {
 //     NavigationStack {
-//         SongDebugDetailView(
+//         SongSelectionDetailsView(
 //             sessionSong: /* Requires actual MusicKit Song */,
 //             debugInfo: nil
 //         )
