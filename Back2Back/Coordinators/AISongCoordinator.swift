@@ -689,32 +689,6 @@ final class AISongCoordinator {
                 )
                 debugBuilder?.setMatchingPhase(matchingPhase)
 
-                // Update search results to mark selected one
-                if let selectedSong = matchResult.song,
-                   let selectedIndex = searchResults.firstIndex(where: { $0.song.id == selectedSong.id }) {
-                    var updatedSearchPhase = searchPhase
-                    var updatedResults = updatedSearchPhase.results
-                    updatedResults[selectedIndex] = SearchResultInfo(
-                        id: selectedSong.id.rawValue,
-                        title: selectedSong.title,
-                        artist: selectedSong.artistName,
-                        album: selectedSong.albumTitle,
-                        releaseDate: selectedSong.releaseDate,
-                        duration: selectedSong.duration,
-                        genreNames: selectedSong.genreNames,
-                        ranking: selectedIndex,
-                        wasSelected: true
-                    )
-                    updatedSearchPhase = SearchPhase(
-                        query: searchPhase.query,
-                        results: updatedResults,
-                        resultCount: searchPhase.resultCount,
-                        duration: searchPhase.duration,
-                        timestamp: searchPhase.timestamp
-                    )
-                    debugBuilder?.setSearchPhase(updatedSearchPhase)
-                }
-
                 // Use the match result
                 if matchResult.confidence >= 0.5, let song = matchResult.song {
                     // Proceed with validation
@@ -855,32 +829,6 @@ final class AISongCoordinator {
                     llmResponse: nil // Could be populated by LLM matcher in future
                 )
                 debugBuilder?.setMatchingPhase(matchingPhase)
-
-                // Update search results to mark selected one
-                if let selectedSong = matchResult.song,
-                   let selectedIndex = searchResults.firstIndex(where: { $0.song.id == selectedSong.id }) {
-                    var updatedSearchPhase = searchPhase
-                    var updatedResults = updatedSearchPhase.results
-                    updatedResults[selectedIndex] = SearchResultInfo(
-                        id: selectedSong.id.rawValue,
-                        title: selectedSong.title,
-                        artist: selectedSong.artistName,
-                        album: selectedSong.albumTitle,
-                        releaseDate: selectedSong.releaseDate,
-                        duration: selectedSong.duration,
-                        genreNames: selectedSong.genreNames,
-                        ranking: selectedIndex,
-                        wasSelected: true
-                    )
-                    updatedSearchPhase = SearchPhase(
-                        query: searchPhase.query,
-                        results: updatedResults,
-                        resultCount: searchPhase.resultCount,
-                        duration: searchPhase.duration,
-                        timestamp: searchPhase.timestamp
-                    )
-                    debugBuilder?.setSearchPhase(updatedSearchPhase)
-                }
 
                 // Use the match result
                 if matchResult.confidence >= 0.5, let song = matchResult.song {
