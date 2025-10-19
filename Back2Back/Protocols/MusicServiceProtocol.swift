@@ -24,4 +24,7 @@ protocol MusicServiceProtocol {
     func seek(to time: TimeInterval) async throws
     func skipForward(_ seconds: TimeInterval) async throws
     func skipBackward(_ seconds: TimeInterval) async throws
+    func fetchUserPlaylists() async throws -> [Playlist]
+    func convertToSong(favoritedSong: FavoritedSong) async throws -> Song
+    func addSongToPlaylist(song: Song, playlist: Playlist) async throws
 }

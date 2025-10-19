@@ -4,6 +4,7 @@
 //
 //  Created on 2025-10-12.
 //  Refactored to use ViewModel only (Issue #56, 2025-10-18)
+//  Updated with playlist export feature (Issue #85, 2025-10-19)
 //
 
 import SwiftUI
@@ -12,6 +13,9 @@ import OSLog
 
 struct FavoritesListView: View {
     let viewModel: FavoritesViewModel
+    let musicService: MusicServiceProtocol
+
+    @State private var playlistPickerViewModel: PlaylistPickerViewModel?
 
     var body: some View {
         Group {
@@ -23,6 +27,9 @@ struct FavoritesListView: View {
         }
         .navigationTitle("Favorites")
         .navigationBarTitleDisplayMode(.large)
+        .sheet(item: $playlistPickerViewModel) { viewModel in
+            PlaylistPickerView(viewModel: viewModel)
+        }
     }
 
     private var emptyStateView: some View {
@@ -40,7 +47,7 @@ struct FavoritesListView: View {
                 FavoriteSongRow(favoritedSong: favoritedSong)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .listRowSeparator(.hidden)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
                             withAnimation {
                                 B2BLog.ui.info("User swiped to remove favorite: \(favoritedSong.title)")
@@ -49,6 +56,18 @@ struct FavoritesListView: View {
                         } label: {
                             Label("Remove", systemImage: "heart.slash.fill")
                         }
+
+                        Button {
+                            B2BLog.ui.info("User selected 'Add to Playlist' for: \(favoritedSong.title)")
+                            // Create ViewModel before presenting sheet to ensure proper observation
+                            playlistPickerViewModel = PlaylistPickerViewModel(
+                                musicService: musicService,
+                                favoritedSong: favoritedSong
+                            )
+                        } label: {
+                            Label("Add to Playlist", systemImage: "text.badge.plus")
+                        }
+                        .tint(.blue)
                     }
             }
         }
@@ -59,7 +78,8 @@ struct FavoritesListView: View {
 #Preview {
     NavigationStack {
         FavoritesListView(
-            viewModel: FavoritesViewModel(favoritesService: FavoritesService())
+            viewModel: FavoritesViewModel(favoritesService: FavoritesService()),
+            musicService: MusicService()
         )
     }
 }

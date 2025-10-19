@@ -46,7 +46,10 @@ struct ContentView: View {
             .tag(0)
 
             NavigationStack {
-                FavoritesListView(viewModel: services.favoritesViewModel)
+                FavoritesListView(
+                    viewModel: services.favoritesViewModel,
+                    musicService: services.musicService
+                )
             }
             .tabItem {
                 Label("Favorites", systemImage: "heart.fill")
