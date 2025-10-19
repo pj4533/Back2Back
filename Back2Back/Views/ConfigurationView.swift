@@ -153,6 +153,16 @@ struct ConfigurationView: View {
             }
 
             Section {
+                Toggle(isOn: Binding(
+                    get: { services.songDebugService.isEnabled },
+                    set: { services.songDebugService.isEnabled = $0 }
+                )) {
+                    HStack {
+                        Image(systemName: "ladybug")
+                        Text("Song Debug Tracking")
+                    }
+                }
+
                 NavigationLink {
                     SongErrorsView()
                 } label: {
@@ -184,7 +194,7 @@ struct ConfigurationView: View {
             } header: {
                 Text("Debug")
             } footer: {
-                Text("View failed song selections and clear the song repetition cache.")
+                Text("Enable debug tracking to capture detailed information about AI song selections. View failed song selections and clear the song repetition cache.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

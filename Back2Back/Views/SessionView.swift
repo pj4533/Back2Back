@@ -38,7 +38,8 @@ struct SessionView: View {
                 viewModel: services.sessionHistoryViewModel,
                 sessionViewModel: sessionViewModel,
                 favoritesService: services.favoritesService,
-                personaService: services.personaService
+                personaService: services.personaService,
+                songDebugService: services.songDebugService
             )
 
             SessionActionButtons(

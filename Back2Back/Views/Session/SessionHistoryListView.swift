@@ -14,6 +14,7 @@ struct SessionHistoryListView: View {
     let sessionViewModel: SessionViewModel
     let favoritesService: FavoritesService
     let personaService: PersonaService
+    let songDebugService: SongDebugService
 
     var body: some View {
         if viewModel.isEmpty {
@@ -33,7 +34,8 @@ struct SessionHistoryListView: View {
                                 sessionSong: sessionSong,
                                 sessionViewModel: sessionViewModel,
                                 favoritesService: favoritesService,
-                                personaService: personaService
+                                personaService: personaService,
+                                songDebugService: songDebugService
                             )
                                 // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
                                 // SwiftUI needs to know when status changes on same song
@@ -60,7 +62,8 @@ struct SessionHistoryListView: View {
                                 sessionSong: sessionSong,
                                 sessionViewModel: sessionViewModel,
                                 favoritesService: favoritesService,
-                                personaService: personaService
+                                personaService: personaService,
+                                songDebugService: songDebugService
                             )
                                 // Composite ID needed: SessionSong has mutable queueStatus with immutable UUID
                                 // SwiftUI needs to know when status changes on same song

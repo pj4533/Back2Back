@@ -15,6 +15,7 @@ struct SessionSongRow: View {
     let sessionViewModel: SessionViewModel
     let favoritesService: FavoritesService
     let personaService: PersonaService
+    let songDebugService: SongDebugService
 
     // Add computed property to force view updates when queue status changes
     private var statusId: String {
@@ -32,8 +33,28 @@ struct SessionSongRow: View {
     }
 
     var body: some View {
-        rowContent
-            .contentShape(Rectangle()) // Make entire cell tappable
+        // Add navigation link for debug details if AI-selected
+        if sessionSong.selectedBy == .ai {
+            NavigationLink {
+                SongDebugDetailView(
+                    sessionSong: sessionSong,
+                    debugInfo: songDebugService.getDebugInfo(for: sessionSong.id)
+                )
+            } label: {
+                rowContent
+            }
+            .buttonStyle(.plain) // Prevent NavigationLink styling
+            .swipeActions(edge: .leading) {
+                NavigationLink {
+                    SongDebugDetailView(
+                        sessionSong: sessionSong,
+                        debugInfo: songDebugService.getDebugInfo(for: sessionSong.id)
+                    )
+                } label: {
+                    Label("Debug", systemImage: "ladybug")
+                }
+                .tint(.purple)
+            }
             .onTapGesture {
                 if isTappable {
                     B2BLog.ui.info("User tapped queued song to skip ahead: \(sessionSong.song.title)")
@@ -42,6 +63,18 @@ struct SessionSongRow: View {
                     }
                 }
             }
+        } else {
+            rowContent
+                .contentShape(Rectangle()) // Make entire cell tappable
+                .onTapGesture {
+                    if isTappable {
+                        B2BLog.ui.info("User tapped queued song to skip ahead: \(sessionSong.song.title)")
+                        Task {
+                            await sessionViewModel.skipToQueuedSong(sessionSong)
+                        }
+                    }
+                }
+        }
     }
 
     private var rowContent: some View {
