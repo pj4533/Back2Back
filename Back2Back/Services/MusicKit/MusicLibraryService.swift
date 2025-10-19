@@ -22,6 +22,13 @@ final class MusicLibraryService: MusicLibraryServiceProtocol {
     func fetchUserPlaylists() async throws -> [Playlist] {
         B2BLog.musicKit.info("Fetching user playlists from library")
 
+        // Ensure we have MusicKit authorization first
+        let authStatus = MusicAuthorization.currentStatus
+        guard authStatus == .authorized else {
+            B2BLog.musicKit.error("Cannot fetch playlists: authorization status is \(String(describing: authStatus))")
+            throw MusicLibraryError.permissionDenied
+        }
+
         do {
             var request = MusicLibraryRequest<Playlist>()
             request.limit = 100 // Fetch up to 100 playlists

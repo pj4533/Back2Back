@@ -11,12 +11,15 @@ import MusicKit
 import Observation
 import OSLog
 
-/// Handles Apple Music authorization
+/// Handles Apple Music authorization (both playback and library access)
 @MainActor
 @Observable
 final class MusicAuthService {
     var authorizationStatus: MusicAuthorization.Status = .notDetermined
     var isAuthorized: Bool = false
+
+    // Library access permission is separate from playback permission
+    var hasLibraryAccess: Bool = false
 
     private static var isInitialized = false
 
@@ -34,6 +37,18 @@ final class MusicAuthService {
         authorizationStatus = status
         isAuthorized = status == .authorized
         B2BLog.auth.info("Authorization status: \(String(describing: status))")
+
+        // Check library access separately
+        updateLibraryAccessStatus()
+    }
+
+    /// Check if library access is available
+    /// Note: Library access requires explicit permission beyond playback
+    private func updateLibraryAccessStatus() {
+        // Library access piggybacks on the main authorization
+        // But requires the user to have granted full access (not just playback)
+        hasLibraryAccess = authorizationStatus == .authorized
+        B2BLog.auth.info("Library access status: \(self.hasLibraryAccess)")
     }
 
     /// Request Apple Music authorization from the user

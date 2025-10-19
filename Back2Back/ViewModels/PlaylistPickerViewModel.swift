@@ -34,6 +34,7 @@ final class PlaylistPickerViewModel: ViewModelError {
     // MARK: - Public API
 
     /// Loads user's playlists from Apple Music library
+    /// Requests authorization first if not already granted
     func loadPlaylists() async {
         guard !isLoading else { return }
 
@@ -42,6 +43,10 @@ final class PlaylistPickerViewModel: ViewModelError {
         B2BLog.musicKit.info("Loading user playlists for playlist picker")
 
         do {
+            // Request authorization if needed (this will show permission prompt)
+            try await musicService.requestAuthorization()
+
+            // Now fetch playlists with proper authorization
             playlists = try await musicService.fetchUserPlaylists()
             B2BLog.musicKit.info("Loaded \(self.playlists.count) playlists")
         } catch {
