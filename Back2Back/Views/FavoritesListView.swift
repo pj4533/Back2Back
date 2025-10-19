@@ -47,7 +47,16 @@ struct FavoritesListView: View {
                 FavoriteSongRow(favoritedSong: favoritedSong)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .listRowSeparator(.hidden)
-                    .contextMenu {
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            withAnimation {
+                                B2BLog.ui.info("User swiped to remove favorite: \(favoritedSong.title)")
+                                viewModel.removeFavorite(songId: favoritedSong.songId)
+                            }
+                        } label: {
+                            Label("Remove", systemImage: "heart.slash.fill")
+                        }
+
                         Button {
                             B2BLog.ui.info("User selected 'Add to Playlist' for: \(favoritedSong.title)")
                             // Create ViewModel before presenting sheet to ensure proper observation
@@ -58,16 +67,7 @@ struct FavoritesListView: View {
                         } label: {
                             Label("Add to Playlist", systemImage: "text.badge.plus")
                         }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            withAnimation {
-                                B2BLog.ui.info("User swiped to remove favorite: \(favoritedSong.title)")
-                                viewModel.removeFavorite(songId: favoritedSong.songId)
-                            }
-                        } label: {
-                            Label("Remove", systemImage: "heart.slash.fill")
-                        }
+                        .tint(.blue)
                     }
             }
         }
