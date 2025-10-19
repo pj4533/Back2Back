@@ -58,10 +58,23 @@ struct SessionActionButtons: View {
                         B2BLog.ui.debug("Cache status at tap: \(viewModel.hasFirstSelectionCached)")
                         onAIStartTapped()
                     }) {
-                        Label(
-                            "AI Starts",
-                            systemImage: viewModel.hasFirstSelectionCached ? "bolt.circle.fill" : "cpu"
-                        )
+                        Label {
+                            Text("AI Starts")
+                        } icon: {
+                            ZStack(alignment: .bottomTrailing) {
+                                Image(systemName: "cpu")
+                                if viewModel.hasFirstSelectionCached {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 8))
+                                        .background(
+                                            Circle()
+                                                .fill(Color.orange)
+                                                .padding(-1)
+                                        )
+                                        .offset(x: 2, y: 2)
+                                }
+                            }
+                        }
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.orange)
