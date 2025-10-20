@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import OSLog
+import MusicKit
 
 @Observable
 @MainActor
@@ -66,6 +67,16 @@ class OpenAIClient: AIRecommendationServiceProtocol {
             persona: persona,
             sessionHistory: sessionHistory,
             previousDirection: previousDirection,
+            client: self
+        )
+    }
+
+    func generatePersonaCommentary(persona: String, userSelection: Song, sessionHistory: [SessionSong], config: AIModelConfig = .default) async throws -> String {
+        try await songSelectionService.generatePersonaCommentary(
+            persona: persona,
+            userSelection: userSelection,
+            sessionHistory: sessionHistory,
+            config: config,
             client: self
         )
     }

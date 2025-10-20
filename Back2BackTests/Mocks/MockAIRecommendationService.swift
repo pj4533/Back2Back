@@ -1,4 +1,5 @@
 import Foundation
+import MusicKit
 @testable import Back2Back
 
 /// Mock implementation of AIRecommendationServiceProtocol for testing
@@ -13,12 +14,14 @@ class MockAIRecommendationService: AIRecommendationServiceProtocol {
     var selectNextSongCalled = false
     var generatePersonaStyleGuideCalled = false
     var generateDirectionChangeCalled = false
+    var generatePersonaCommentaryCalled = false
     var simpleCompletionCalled = false
 
     // Configurable mock responses
     var mockRecommendation: SongRecommendation?
     var mockPersonaResult: PersonaGenerationResult?
     var mockDirectionChange: DirectionChange?
+    var mockCommentary: String?
     var mockCompletionResult: String = "Mock completion"
 
     // Error simulation
@@ -65,6 +68,18 @@ class MockAIRecommendationService: AIRecommendationServiceProtocol {
             DirectionOption(directionPrompt: "Shift to West Coast psychedelic rock with experimental production and atmospheric textures", buttonLabel: "West Coast vibes"),
             DirectionOption(directionPrompt: "Explore 60s garage rock with raw energy and lo-fi production aesthetic", buttonLabel: "60s garage rock")
         ])
+    }
+
+    func generatePersonaCommentary(persona: String, userSelection: Song, sessionHistory: [SessionSong], config: AIModelConfig = .default) async throws -> String {
+        generatePersonaCommentaryCalled = true
+        lastPersonaName = persona
+        lastSessionHistory = sessionHistory
+
+        if shouldThrowError {
+            throw errorToThrow
+        }
+
+        return mockCommentary ?? "Nice choice! This track really fits the vibe we've been building."
     }
 
     func generatePersonaStyleGuide(name: String, description: String, onStatusUpdate: ((String) async -> Void)? = nil) async throws -> PersonaGenerationResult {
