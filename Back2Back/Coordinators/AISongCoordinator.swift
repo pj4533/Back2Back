@@ -29,7 +29,7 @@ final class AISongCoordinator {
     private let musicService: MusicService
     private let musicMatcher: MusicMatchingProtocol
     private let toastService: ToastService
-    private let validator = SongPersonaValidator()
+    private let validator: SongValidatorProtocol
     private let personaService: PersonaService
     private let personaSongCacheService: PersonaSongCacheService
     private let songErrorLoggerService: SongErrorLoggerService
@@ -52,6 +52,7 @@ final class AISongCoordinator {
         environmentService: EnvironmentService,
         musicService: MusicService,
         musicMatcher: MusicMatchingProtocol? = nil,
+        validator: SongValidatorProtocol? = nil,
         toastService: ToastService,
         personaService: PersonaService,
         personaSongCacheService: PersonaSongCacheService,
@@ -68,12 +69,13 @@ final class AISongCoordinator {
         self.songErrorLoggerService = songErrorLoggerService
         self.songDebugService = songDebugService
 
+        // Read configuration once for both matcher and validator
+        let config = Self.loadAIModelConfig()
+
         // Use provided matcher, or select based on configuration
         if let matcher = musicMatcher {
             self.musicMatcher = matcher
         } else {
-            // Read configuration to determine which matcher to use
-            let config = Self.loadAIModelConfig()
             self.musicMatcher = Self.createMatcher(
                 for: config.musicMatcher,
                 musicService: musicService,
@@ -81,7 +83,19 @@ final class AISongCoordinator {
                 songErrorLoggerService: songErrorLoggerService
             )
         }
-        B2BLog.session.debug("AISongCoordinator initialized with \(type(of: self.musicMatcher)) matcher")
+
+        // Use provided validator, or select based on configuration
+        if let validator = validator {
+            self.validator = validator
+        } else {
+            self.validator = Self.createValidator(
+                for: config.validatorType,
+                openAIClient: openAIClient,
+                environmentService: environmentService
+            )
+        }
+
+        B2BLog.session.debug("AISongCoordinator initialized with \(type(of: self.musicMatcher)) matcher and \(type(of: self.validator)) validator")
     }
 
     /// Factory method to create appropriate music matcher based on configuration
@@ -105,6 +119,40 @@ final class AISongCoordinator {
                 musicService: musicService,
                 personaService: personaService,
                 songErrorLoggerService: songErrorLoggerService
+            )
+        }
+    }
+
+    /// Factory method to create appropriate validator based on configuration
+    private static func createValidator(
+        for type: ValidatorType,
+        openAIClient: any AIRecommendationServiceProtocol,
+        environmentService: EnvironmentService
+    ) -> SongValidatorProtocol {
+        switch type {
+        case .foundationModels:
+            B2BLog.ai.info("Using Foundation Models validator (on-device)")
+            return FoundationModelsValidator()
+        case .openAILow:
+            B2BLog.ai.info("Using OpenAI validator with low reasoning")
+            return OpenAIValidator(
+                openAIClient: openAIClient as! OpenAIClient,
+                environmentService: environmentService,
+                reasoningLevel: .low
+            )
+        case .openAIMedium:
+            B2BLog.ai.info("Using OpenAI validator with medium reasoning")
+            return OpenAIValidator(
+                openAIClient: openAIClient as! OpenAIClient,
+                environmentService: environmentService,
+                reasoningLevel: .medium
+            )
+        case .openAIHigh:
+            B2BLog.ai.info("Using OpenAI validator with high reasoning")
+            return OpenAIValidator(
+                openAIClient: openAIClient as! OpenAIClient,
+                environmentService: environmentService,
+                reasoningLevel: .high
             )
         }
     }
@@ -912,8 +960,11 @@ final class AISongCoordinator {
         shouldRecordInCache: Bool,
         debugBuilder: SongDebugInfoBuilder?
     ) async -> Song? {
-        let personaDesc = personaService.personas.first(where: { $0.id == personaId })?.description ?? ""
-        let validationResult = await validator.validate(song: song, personaDescription: personaDesc)
+        guard let persona = personaService.personas.first(where: { $0.id == personaId }) else {
+            B2BLog.ai.warning("Persona not found for validation - accepting song by default")
+            return song
+        }
+        let validationResult = await validator.validate(song: song, persona: persona)
 
         // Capture validation phase if debug tracking enabled
         if let validation = validationResult, let debugBuilder = debugBuilder {
@@ -980,8 +1031,11 @@ final class AISongCoordinator {
 
     /// Helper method to validate and record a song (extracted for reuse)
     private func validateAndRecordSong(_ song: Song, debugBuilder: SongDebugInfoBuilder?) async -> Song? {
-        let personaDesc = personaService.selectedPersona?.description ?? ""
-        let validationResult = await validator.validate(song: song, personaDescription: personaDesc)
+        guard let persona = personaService.selectedPersona else {
+            B2BLog.ai.warning("No persona selected for validation - accepting song by default")
+            return song
+        }
+        let validationResult = await validator.validate(song: song, persona: persona)
 
         // Capture validation phase if debug tracking enabled
         if let validation = validationResult, let debugBuilder = debugBuilder {
