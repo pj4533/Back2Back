@@ -142,18 +142,36 @@ final class SessionService: SessionStateManagerProtocol {
         sessionHistory.first { $0.id == songId }
     }
 
-    /// Update persona commentary for a song in history
+    /// Update persona commentary for a song in history or queue
     func updateSongCommentary(id: UUID, commentary: String?, isGenerating: Bool = false) {
+        // First check history
         if let index = sessionHistory.firstIndex(where: { $0.id == id }) {
             sessionHistory[index].personaCommentary = commentary
             sessionHistory[index].isGeneratingCommentary = isGenerating
 
             if let commentary = commentary {
-                B2BLog.ai.info("Updated persona commentary for song: \(self.sessionHistory[index].song.title)")
+                B2BLog.ai.info("Updated persona commentary for song in history: \(self.sessionHistory[index].song.title)")
             } else {
-                B2BLog.ai.debug("Cleared commentary generation state for song: \(self.sessionHistory[index].song.title)")
+                B2BLog.ai.debug("Updated commentary generation state for song in history: \(self.sessionHistory[index].song.title)")
             }
+            return
         }
+
+        // Then check queue (for songs added while music is playing)
+        if let index = songQueue.firstIndex(where: { $0.id == id }) {
+            songQueue[index].personaCommentary = commentary
+            songQueue[index].isGeneratingCommentary = isGenerating
+
+            if let commentary = commentary {
+                B2BLog.ai.info("Updated persona commentary for song in queue: \(self.songQueue[index].song.title)")
+            } else {
+                B2BLog.ai.debug("Updated commentary generation state for song in queue: \(self.songQueue[index].song.title)")
+            }
+            return
+        }
+
+        // If we reach here, song wasn't found
+        B2BLog.ai.warning("Could not update commentary for song ID \(id) - not found in history or queue")
     }
 
     /// Update song status in history

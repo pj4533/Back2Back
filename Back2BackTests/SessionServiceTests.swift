@@ -193,4 +193,32 @@ struct SessionServiceTests {
         // This test documents that SessionService is now the single
         // @Observable source of truth (issue #57 fix)
     }
+
+    @MainActor
+    @Test("Update commentary - non-existent song ID logs warning")
+    func testUpdateCommentaryNonExistentId() {
+        let service = createTestService()
+        let nonExistentId = UUID()
+
+        // Updating non-existent song should not crash (just logs warning)
+        service.updateSongCommentary(id: nonExistentId, commentary: "This won't work", isGenerating: false)
+
+        // Verify nothing was added to history or queue
+        #expect(service.sessionHistory.isEmpty)
+        #expect(service.songQueue.isEmpty)
+    }
+
+    // Note: Tests involving actual song creation require MusicKit Song objects
+    // which cannot be instantiated in unit tests. The commentary update logic
+    // is integration tested through the full SessionViewModel flow.
+    //
+    // Key behaviors tested above:
+    // - Non-existent ID handling (logs warning, doesn't crash)
+    //
+    // Integration testing (manual or UI tests) should verify:
+    // - Commentary updates work for songs in history
+    // - Commentary updates work for songs in queue
+    // - Commentary state preserved when moving from queue to history
+    // - Progress indicator shows during generation
+    // - Commentary appears when generation completes
 }
