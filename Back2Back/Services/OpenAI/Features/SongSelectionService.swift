@@ -65,6 +65,63 @@ class SongSelectionService {
         return response.outputText
     }
 
+    /// Generates persona commentary on a user's song selection
+    ///
+    /// This method uses the active DJ persona to provide a brief (1-2 sentence) comment
+    /// about the user's track choice. The commentary reflects the persona's style guide
+    /// and may be supportive, snarky, surprised, or critical depending on the persona's
+    /// personality and how the song fits with their taste and the session's direction.
+    ///
+    /// - Parameters:
+    ///   - persona: The current DJ persona's style guide
+    ///   - userSelection: The song the user selected
+    ///   - sessionHistory: The songs played so far in the session
+    ///   - config: AI model configuration (defaults to .default)
+    ///   - client: The OpenAI client to use for the request
+    /// - Returns: A brief commentary string (1-2 sentences)
+    /// - Throws: OpenAI API errors
+    func generatePersonaCommentary(
+        persona: String,
+        userSelection: Song,
+        sessionHistory: [SessionSong],
+        config: AIModelConfig = .default,
+        client: OpenAIClient
+    ) async throws -> String {
+        B2BLog.ai.info("Generating persona commentary for user selection: '\(userSelection.title)' by \(userSelection.artistName)")
+
+        let prompt = buildPersonaCommentaryPrompt(
+            persona: persona,
+            userSelection: userSelection,
+            history: sessionHistory
+        )
+
+        // Use configured model for song selection (commentary is part of the DJ interaction)
+        let request = ResponsesRequest(
+            model: config.songSelectionModel,
+            input: prompt,
+            verbosity: .medium,
+            reasoningEffort: config.songSelectionReasoningLevel
+        )
+
+        do {
+            let response = try await client.performNetworkRequest(request)
+
+            // Trim whitespace and ensure we got something back
+            let commentary = response.outputText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !commentary.isEmpty else {
+                B2BLog.ai.error("Received empty commentary from OpenAI")
+                throw OpenAIError.decodingError(NSError(domain: "OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Empty commentary response"]))
+            }
+
+            B2BLog.ai.info("Generated persona commentary: \(commentary)")
+            return commentary
+        } catch {
+            B2BLog.ai.error("Failed to generate persona commentary: \(error)")
+            throw error
+        }
+    }
+
     /// Generates contextual direction change suggestions based on the current persona and session history
     ///
     /// This method uses GPT-5-mini to analyze the current DJ session and suggest multiple musical direction
@@ -250,6 +307,35 @@ class SongSelectionService {
         }
 
         Keep the buttonLabels concise and user-friendly. Examples: "West Coast vibes", "60s garage rock", "Downtempo shift", "British invasion", "Modern production"
+        """
+    }
+
+    private func buildPersonaCommentaryPrompt(persona: String, userSelection: Song, history: [SessionSong]) -> String {
+        var historyText = ""
+        if !history.isEmpty {
+            historyText = """
+
+            Session history (in order played):
+            \(formatSessionHistory(history))
+
+            """
+        }
+
+        return """
+        You are a DJ persona with the following style guide:
+        \(persona)
+        \(historyText)
+        The user just selected: "\(userSelection.title)" by \(userSelection.artistName)
+
+        Provide a brief (1-2 sentence) comment about this selection from your persona's perspective. Consider:
+        1. Does this song align with your taste?
+        2. Is it a mainstream/underground choice (relative to your preferences)?
+        3. How does it fit with the session's direction so far?
+        4. What would your persona authentically think about this selection?
+
+        Your comment should be concise, in-character, and may be supportive, snarky, surprised, or critical depending on your persona.
+
+        Respond with ONLY the comment text (no JSON, no formatting, just 1-2 sentences).
         """
     }
 

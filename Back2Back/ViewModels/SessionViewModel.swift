@@ -78,10 +78,12 @@ final class SessionViewModel {
         // Check if something is currently playing
         let isMusicPlaying = musicService.playbackState == .playing || musicService.currentlyPlaying != nil
 
+        let sessionSongId: UUID
         if isMusicPlaying {
             // Music is playing - queue the song
             B2BLog.session.info("Music currently playing - queueing user song with 'upNext' status")
-            _ = sessionService.queueSong(song, selectedBy: .user, rationale: nil, queueStatus: .upNext)
+            let sessionSong = sessionService.queueSong(song, selectedBy: .user, rationale: nil, queueStatus: .upNext)
+            sessionSongId = sessionSong.id
 
             // Start pre-fetching AI's next song to play after the user's queued song
             B2BLog.session.info("Starting AI prefetch for next position after user's queued song")
@@ -89,7 +91,8 @@ final class SessionViewModel {
         } else {
             // Nothing playing - play immediately
             B2BLog.session.info("No music playing - starting playback immediately")
-            sessionService.addSongToHistory(song, selectedBy: .user, rationale: nil, queueStatus: .playing)
+            let sessionSong = sessionService.addSongToHistory(song, selectedBy: .user, rationale: nil, queueStatus: .playing)
+            sessionSongId = sessionSong.id
 
             // Play the song
             await playCurrentSong(song)
@@ -98,6 +101,9 @@ final class SessionViewModel {
             B2BLog.session.info("Starting AI prefetch for 'upNext' position")
             aiSongCoordinator.startPrefetch(queueStatus: .upNext)
         }
+
+        // Generate persona commentary asynchronously (fire-and-forget pattern)
+        generatePersonaCommentary(for: sessionSongId, song: song)
 
         B2BLog.session.debug("Queue after user selection - History: \(self.sessionService.sessionHistory.count), Queue: \(self.sessionService.songQueue.count)")
     }
@@ -298,6 +304,43 @@ final class SessionViewModel {
             }
         } catch {
             B2BLog.playback.error("Failed to play song: \(error)")
+        }
+    }
+
+    /// Generate persona commentary for a user's song selection asynchronously
+    ///
+    /// This method uses the fire-and-forget pattern to generate commentary without blocking
+    /// the UI or delaying playback. The commentary is generated in the background and
+    /// automatically updates the UI when complete via SwiftUI's @Observable pattern.
+    ///
+    /// - Parameters:
+    ///   - sessionSongId: The UUID of the session song to update
+    ///   - song: The song the user selected
+    private func generatePersonaCommentary(for sessionSongId: UUID, song: Song) {
+        // Fire-and-forget pattern to avoid blocking
+        Task.detached { @MainActor [weak self] in
+            guard let self else { return }
+
+            // Mark as generating
+            self.sessionService.updateSongCommentary(id: sessionSongId, commentary: nil, isGenerating: true)
+
+            do {
+                B2BLog.ai.info("Generating persona commentary for user selection: \(song.title)")
+
+                let commentary = try await self.openAIClient.generatePersonaCommentary(
+                    persona: self.sessionService.currentPersonaStyleGuide,
+                    userSelection: song,
+                    sessionHistory: self.sessionService.sessionHistory,
+                    config: .default
+                )
+
+                // Update with commentary
+                self.sessionService.updateSongCommentary(id: sessionSongId, commentary: commentary, isGenerating: false)
+            } catch {
+                B2BLog.ai.error("Failed to generate persona commentary: \(error)")
+                // Clear loading state on error
+                self.sessionService.updateSongCommentary(id: sessionSongId, commentary: nil, isGenerating: false)
+            }
         }
     }
 

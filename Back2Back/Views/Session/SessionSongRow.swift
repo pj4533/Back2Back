@@ -139,11 +139,32 @@ struct SessionSongRow: View {
                                 .foregroundStyle(.tertiary)
                         }
 
+                        // AI selections show rationale
                         if let rationale = sessionSong.rationale {
                             Text(rationale)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .padding(.top, 2)
+                        }
+
+                        // User selections show persona commentary
+                        if sessionSong.selectedBy == .user {
+                            if sessionSong.isGeneratingCommentary {
+                                HStack(spacing: 4) {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                    Text("AI is thinking...")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.top, 2)
+                            } else if let commentary = sessionSong.personaCommentary {
+                                Text(commentary)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .italic()  // Differentiate from rationale
+                                    .padding(.top, 2)
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
