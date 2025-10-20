@@ -46,19 +46,24 @@ struct AIModelConfig: Codable, Equatable {
     /// Number of songs to cache per persona (default: 50)
     var songCacheSize: Int
 
+    /// Song validator type (default: Foundation Models)
+    var validatorType: ValidatorType
+
     /// Default configuration uses GPT-5 with low reasoning for all song selections
     static let `default` = AIModelConfig(
         songSelectionModel: "gpt-5",
         songSelectionReasoningLevel: .low,
         musicMatcher: .stringBased,
-        songCacheSize: 50
+        songCacheSize: 50,
+        validatorType: .foundationModels
     )
 
-    init(songSelectionModel: String = "gpt-5", songSelectionReasoningLevel: ReasoningEffort = .low, musicMatcher: MusicMatcherType = .stringBased, songCacheSize: Int = 50) {
+    init(songSelectionModel: String = "gpt-5", songSelectionReasoningLevel: ReasoningEffort = .low, musicMatcher: MusicMatcherType = .stringBased, songCacheSize: Int = 50, validatorType: ValidatorType = .foundationModels) {
         self.songSelectionModel = songSelectionModel
         self.songSelectionReasoningLevel = songSelectionReasoningLevel
         self.musicMatcher = musicMatcher
         self.songCacheSize = songCacheSize
+        self.validatorType = validatorType
     }
 }
 

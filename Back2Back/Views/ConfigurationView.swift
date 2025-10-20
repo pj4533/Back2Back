@@ -20,6 +20,28 @@ struct ConfigurationView: View {
         SystemLanguageModel.default.availability == .available
     }
 
+    // Check if selected validator is available
+    private var validatorIsAvailable: Bool {
+        guard let services = services else { return false }
+
+        switch config.validatorType {
+        case .foundationModels:
+            return isLLMAvailable
+        case .openAILow, .openAIMedium, .openAIHigh:
+            return services.environmentService.getOpenAIKey() != nil
+        }
+    }
+
+    // Reason for validator unavailability
+    private var validatorUnavailableReason: String {
+        switch config.validatorType {
+        case .foundationModels:
+            return "Apple Intelligence not available (requires iOS 26+)"
+        case .openAILow, .openAIMedium, .openAIHigh:
+            return "OpenAI API key not configured"
+        }
+    }
+
     var body: some View {
         guard let services = services else {
             return AnyView(Text("Loading..."))
@@ -123,6 +145,61 @@ struct ConfigurationView: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 12) {
+                    Text("Song Validation Strategy")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Picker("Validator", selection: $config.validatorType) {
+                        ForEach(ValidatorType.allCases, id: \.self) { type in
+                            Text(type.displayName).tag(type)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    // Show description of selected validator
+                    Text(config.validatorType.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+
+                    // Show availability status
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: validatorIsAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundStyle(validatorIsAvailable ? .green : .red)
+                        Text(validatorIsAvailable ? "Available and ready to use" : validatorUnavailableReason)
+                            .font(.caption)
+                            .foregroundStyle(validatorIsAvailable ? .green : .red)
+                    }
+                    .padding(.top, 8)
+
+                    // Show network dependency warning for OpenAI validators
+                    if config.validatorType.requiresNetwork {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "network")
+                                .foregroundStyle(.orange)
+                            Text("Requires internet connection")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+                .padding(.vertical, 8)
+            } header: {
+                Text("Song Validation")
+            } footer: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Validates that matched songs actually fit the persona's style before playing.")
+
+                    Text("• Foundation Models: Fast, private, offline | Limited to persona description only")
+                    Text("• OpenAI (Low/Medium/High): Better accuracy with full style guides | Slower, costs money, requires network")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("Song Repetition Prevention")
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -202,7 +279,7 @@ struct ConfigurationView: View {
         .navigationTitle("Configuration")
         .navigationBarTitleDisplayMode(.large)
         .onChange(of: config) { oldValue, newValue in
-            B2BLog.general.info("AI config changed - Model: \(newValue.songSelectionModel), Reasoning: \(newValue.songSelectionReasoningLevel.rawValue), Matcher: \(newValue.musicMatcher.displayName), Cache Size: \(newValue.songCacheSize)")
+            B2BLog.general.info("AI config changed - Model: \(newValue.songSelectionModel), Reasoning: \(newValue.songSelectionReasoningLevel.rawValue), Matcher: \(newValue.musicMatcher.displayName), Validator: \(newValue.validatorType.displayName), Cache Size: \(newValue.songCacheSize)")
 
             // Sync cache size to UserDefaults for PersonaSongCacheService
             UserDefaults.standard.set(newValue.songCacheSize, forKey: "com.back2back.personaSongCacheSize")
