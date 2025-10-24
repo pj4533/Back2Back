@@ -15,12 +15,12 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
             color: #1a1a1a;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            padding: 40px 0;
         }
 
         .github-link {
@@ -138,10 +138,15 @@
         }
 
         @media (max-width: 968px) {
+            body {
+                padding: 60px 20px 40px;
+            }
+
             .container {
                 grid-template-columns: 1fr;
                 gap: 40px;
                 text-align: center;
+                width: 100%;
             }
 
             .content {
@@ -149,31 +154,66 @@
             }
 
             h1 {
-                font-size: 36px;
+                font-size: 32px;
+                margin-bottom: 16px;
             }
 
             .tagline {
                 font-size: 18px;
+                margin-bottom: 24px;
             }
 
             .description {
-                font-size: 16px;
+                font-size: 15px;
+                margin-bottom: 32px;
+            }
+
+            .description li {
+                margin-bottom: 16px;
+                text-align: left;
+                line-height: 1.5;
             }
 
             .screenshot {
-                max-height: 50vh;
+                max-height: 60vh;
             }
 
             .icon {
+                width: 100px;
+                height: 100px;
                 margin-left: auto;
                 margin-right: auto;
+                margin-bottom: 24px;
             }
 
             .github-link {
                 top: 20px;
                 right: 20px;
-                width: 50px;
-                height: 50px;
+                width: 44px;
+                height: 44px;
+            }
+
+            .cta-button {
+                padding: 16px 32px;
+                font-size: 17px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 28px;
+            }
+
+            .tagline {
+                font-size: 16px;
+            }
+
+            .description {
+                font-size: 14px;
+            }
+
+            .description li {
+                padding-left: 20px;
             }
         }
     </style>
@@ -188,12 +228,12 @@
         <div class="content">
             <img src="back2back_icon.png" alt="Back2Back DJ Icon" class="icon">
             <h1>Back2Back DJ</h1>
-            <p class="tagline">Your AI DJ partner for collaborative music sessions</p>
+            <p class="tagline">Deep Research for Music Discovery</p>
             <div class="description">
                 <ul>
-                    <li>Take turns with AI selecting tracks in a collaborative DJ session</li>
-                    <li>Use preset personas or create custom ones with deep AI research</li>
-                    <li>Discover music together with Apple Music</li>
+                    <li>AI pipeline researches, validates, and matches every song selection</li>
+                    <li>Personas use internet research to build deep style guides</li>
+                    <li>DJ with AI or let it play, discover music you'd never find</li>
                 </ul>
             </div>
             <a href="https://testflight.apple.com/join/Xx7T6m4V" class="cta-button">Join TestFlight Beta</a>
